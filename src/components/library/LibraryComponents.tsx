@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Animated, Image, PanResponder, Text, View } from 'react-native';
-import { GripVertical, Heart } from 'lucide-react-native';
+import { GripVertical, Heart, Music2 } from 'lucide-react-native';
 import { useDesignTokens } from '../../theme/DesignThemeContext';
 import { createStyles } from '../../theme/createStyles';
 
@@ -135,7 +135,7 @@ export function Artwork({
       {uri ? (
         <Image source={{ uri }} style={styles.artworkImage} />
       ) : (
-        <Text style={styles.artworkFallback}>♪</Text>
+        <Music2 color={tokens.colors.muted} size={size * 0.4} />
       )}
     </View>
   );

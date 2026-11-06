@@ -6,6 +6,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
 import kotlin.math.sin
+import kotlin.math.sqrt
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -38,27 +39,25 @@ class SoftwareEqualizerAudioProcessorTest {
     }
 
     @Test
-    fun enabledBandChangesMatchingPcmSignal() {
+    fun enabledBandBoostsMatchingSignalRelativeToOtherBands() {
         SoftwareEqualizer.update(true, listOf(12f, 0f, 0f, 0f, 0f))
         processor.configure(AudioProcessor.AudioFormat(48_000, 1, C.ENCODING_PCM_16BIT))
-        val input = ByteBuffer.allocateDirect(4_800 * Short.SIZE_BYTES)
-            .order(ByteOrder.LITTLE_ENDIAN)
-        repeat(4_800) { index ->
-            val sample = (sin(2.0 * Math.PI * 60.0 * index / 48_000) * 3_000).toInt()
-            input.putShort(sample.toShort())
-        }
-        input.flip()
 
-        processor.queueInput(input)
-        val output = processor.getOutput().order(ByteOrder.LITTLE_ENDIAN)
-        val outputSamples = IntArray(4_800) { output.short.toInt() }
-        val inputRms = 3_000 / kotlin.math.sqrt(2.0)
-        val outputRms = kotlin.math.sqrt(
-            outputSamples.drop(2_400).sumOf { sample -> sample.toDouble() * sample } /
-                2_400,
-        )
+        val boostedRms = rms(processTone(frequencyHz = 60.0, amplitude = 3_000))
+        processor.flush()
+        val otherRms = rms(processTone(frequencyHz = 4_000.0, amplitude = 3_000))
 
-        assertTrue(abs(outputRms - inputRms) > inputRms)
+        assertTrue(boostedRms / otherRms > 3.0)
+    }
+
+    @Test
+    fun highGainDoesNotClipLoudSignal() {
+        SoftwareEqualizer.update(true, listOf(12f, 0f, 0f, 0f, 0f))
+        processor.configure(AudioProcessor.AudioFormat(48_000, 1, C.ENCODING_PCM_16BIT))
+
+        val output = processTone(frequencyHz = 60.0, amplitude = 30_000)
+
+        assertTrue(output.maxOf { sample -> abs(sample) } < 32_000)
     }
 
     @Test
@@ -67,4 +66,23 @@ class SoftwareEqualizerAudioProcessorTest {
             SoftwareEqualizer.update(true, listOf(13f, 0f, 0f, 0f, 0f))
         }
     }
+
+    /** Returns the second half of the output, once the filters have settled. */
+    private fun processTone(frequencyHz: Double, amplitude: Int): List<Int> {
+        val sampleCount = 9_600
+        val input = ByteBuffer.allocateDirect(sampleCount * Short.SIZE_BYTES)
+            .order(ByteOrder.LITTLE_ENDIAN)
+        repeat(sampleCount) { index ->
+            val sample = sin(2.0 * Math.PI * frequencyHz * index / 48_000) * amplitude
+            input.putShort(sample.toInt().toShort())
+        }
+        input.flip()
+
+        processor.queueInput(input)
+        val output = processor.getOutput().order(ByteOrder.LITTLE_ENDIAN)
+        return List(sampleCount) { output.short.toInt() }.drop(sampleCount / 2)
+    }
+
+    private fun rms(samples: List<Int>): Double =
+        sqrt(samples.sumOf { sample -> sample.toDouble() * sample } / samples.size)
 }

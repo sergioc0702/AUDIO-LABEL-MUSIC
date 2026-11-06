@@ -72,6 +72,7 @@ internal class SoftwareEqualizerAudioProcessor : AudioProcessor {
     private var inputEnded = false
     private var cachedGainsDb: List<Float> = emptyList()
     private var coefficients: Array<Coefficients> = emptyArray()
+    private var preampGain = 1f
     private var filterStates: Array<Array<FilterState>> = emptyArray()
 
     override fun configure(inputAudioFormat: AudioFormat): AudioFormat {
@@ -135,7 +136,7 @@ internal class SoftwareEqualizerAudioProcessor : AudioProcessor {
                 } else {
                     input.float
                 }
-            var sample = inputSample.takeIf(Float::isFinite) ?: 0f
+            var sample = (inputSample.takeIf(Float::isFinite) ?: 0f) * preampGain
             for (bandIndex in coefficients.indices) {
                 sample = filterStates[channelIndex][bandIndex]
                     .process(coefficients[bandIndex], sample)
@@ -178,20 +179,26 @@ internal class SoftwareEqualizerAudioProcessor : AudioProcessor {
         encoding = C.ENCODING_INVALID
         cachedGainsDb = emptyList()
         coefficients = emptyArray()
+        preampGain = 1f
         filterStates = emptyArray()
     }
 
     private fun prepareFilters(gainsDb: List<Float>) {
-        if (cachedGainsDb == gainsDb && filterStates.size == channelCount) {
+        if (filterStates.size != channelCount) {
+            filterStates = Array(channelCount) {
+                Array(EQUALIZER_BAND_COUNT) { FilterState() }
+            }
+        }
+        if (cachedGainsDb == gainsDb) {
             return
         }
+        // Filter state is kept so that moving a slider does not produce a click.
         cachedGainsDb = gainsDb.toList()
         coefficients = Array(EQUALIZER_BAND_COUNT) { bandIndex ->
             createCoefficients(frequenciesHz[bandIndex], gainsDb[bandIndex], sampleRateHz)
         }
-        filterStates = Array(channelCount) {
-            Array(EQUALIZER_BAND_COUNT) { FilterState() }
-        }
+        // Lowers the input by the largest boost so that boosted bands keep headroom.
+        preampGain = 10.0.pow(-maxOf(0f, gainsDb.max()) / 20.0).toFloat()
     }
 
     private fun createCoefficients(

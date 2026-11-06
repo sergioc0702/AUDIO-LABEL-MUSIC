@@ -2,17 +2,17 @@ import type { ReactNode, Ref } from 'react';
 import {
   Animated,
   FlatList,
-  Pressable,
   RefreshControl,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Search } from 'lucide-react-native';
+import { Music2, Search, X } from 'lucide-react-native';
 import type { Track } from '../types/Track';
 import type { createStyles } from '../theme/createStyles';
 import type { AppDesignTokens } from '../theme/tokens';
 import { LibrarySkeleton } from '../components/library/LibraryComponents';
+import { PressableScale } from '../components/motion/PressableScale';
 
 type ScreenStyles = ReturnType<typeof createStyles>;
 
@@ -98,15 +98,30 @@ export function SearchScreen({
           style={styles.searchInput}
           value={query}
         />
+        {query ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Borrar búsqueda"
+            hitSlop={6}
+            onPress={() => onQueryChange('')}
+            pressedScale={0.85}
+            style={styles.searchClear}
+          >
+            <X color={colors.muted} size={20} />
+          </PressableScale>
+        ) : null}
       </View>
 
       {errorMessage ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{errorMessage}</Text>
           {errorRetryAction ? (
-            <Pressable accessibilityRole="button" onPress={errorRetryAction}>
+            <PressableScale
+              accessibilityRole="button"
+              onPress={errorRetryAction}
+            >
               <Text style={styles.retryText}>Reintentar</Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
         </View>
       ) : null}
@@ -120,7 +135,7 @@ export function SearchScreen({
         <LibrarySkeleton />
       ) : tracks.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyNote}>♪</Text>
+          <Music2 color={colors.muted} size={40} />
           <Text style={styles.emptyTitle}>
             {query ? 'No encontramos resultados' : 'Tu biblioteca está vacía'}
           </Text>
@@ -140,6 +155,8 @@ export function SearchScreen({
             index,
           })}
           initialNumToRender={12}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           keyExtractor={track => track.id}
           maxToRenderPerBatch={8}
           onScroll={Animated.event(

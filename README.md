@@ -2,7 +2,9 @@
 
 Reproductor local creado con React Native y TypeScript. La biblioteca se obtiene
 de `MediaStore` y completa título, artista, álbum y carátula con
-`MediaMetadataRetriever` cuando faltan datos en el índice de Android.
+`MediaMetadataRetriever` cuando faltan datos en el índice de Android. Las
+etiquetas leídas se guardan en Room y cada archivo solo se vuelve a abrir si
+cambia; las carátulas incrustadas se guardan como archivos de la app.
 
 ## Pasos para ejecutar
 
@@ -125,7 +127,9 @@ keystore release y la contraseña cifrada guardados en
   PCM en el audio sink de ExoPlayer, sin efectos globales ni ID de sesión de
   audio. La cadena PCM se mantiene para aplicar cambios en tiempo real, por lo
   que no hay passthrough/offload de audio comprimido; al desactivar el
-  ecualizador, los samples pasan sin cambios.
+  ecualizador, los samples pasan sin cambios. La señal se atenúa según la mayor
+  ganancia positiva para evitar el recorte, por lo que subir una banda baja el
+  volumen de las demás en lugar de subir el volumen total.
 - Permisos de audio adaptados a Android 13 y versiones anteriores.
 - La interfaz adopta el diseño oscuro con acento lima del prototipo
   `brutal-player-rn`; los colores, tipografía, espaciado, radios y movimiento
@@ -141,6 +145,12 @@ El módulo local de KotlinAudio conserva su licencia Apache 2.0 en
 
 - `App.tsx` compone la interfaz, administra el estado de navegación y conecta
   las acciones de pantalla con los servicios de la aplicación.
+- `src/theme/playerThemes.ts` define los temas del reproductor: cada uno declara
+  su paleta y su escena animada. Para añadir uno basta una entrada en esa lista
+  (y una escena nueva en `src/components/player/scenes/` si la necesita); el test
+  `__tests__/playerThemes.test.ts` comprueba que sus textos sigan siendo legibles.
+- `src/components/motion/` agrupa las piezas de movimiento reutilizables. Las
+  animaciones respetan el ajuste de Android para quitar animaciones.
 - `src/services/player.ts` concentra las operaciones de `react-native-track-player`,
   como preparar el reproductor, gestionar la cola y ejecutar controles de
   reproducción.

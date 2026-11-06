@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, Text, View } from 'react-native';
-import { GripVertical } from 'lucide-react-native';
+import { GripVertical, Minus, Music2 } from 'lucide-react-native';
 import { Artwork } from '../library/LibraryComponents';
 import { useDesignTokens } from '../../theme/DesignThemeContext';
 import { createStyles } from '../../theme/createStyles';
@@ -25,6 +25,7 @@ export function ProgressSlider({
   const [width, setWidth] = useState(0);
   const [previewPosition, setPreviewPosition] = useState<number | null>(null);
   const dragStartX = useRef(0);
+  const thumbScale = useRef(new Animated.Value(1)).current;
   const propsRef = useRef({ disabled, duration, onSeek, width });
   propsRef.current = { disabled, duration, onSeek, width };
 
@@ -39,36 +40,45 @@ export function ProgressSlider({
     );
   };
 
-  const seekResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () =>
-          !propsRef.current.disabled &&
-          propsRef.current.duration > 0 &&
-          propsRef.current.width > 0,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: event => {
-          dragStartX.current = event.nativeEvent.locationX;
-          setPreviewPosition(positionForX(dragStartX.current));
-        },
-        onPanResponderMove: (_, gesture) => {
-          setPreviewPosition(positionForX(dragStartX.current + gesture.dx));
-        },
-        onPanResponderRelease: async (_, gesture) => {
-          const targetPosition = positionForX(dragStartX.current + gesture.dx);
-          try {
-            await propsRef.current.onSeek(targetPosition);
-          } finally {
-            setPreviewPosition(null);
-          }
-        },
-        onPanResponderTerminate: () => {
+  const seekResponder = useMemo(() => {
+    const animateThumb = (toValue: number) =>
+      Animated.spring(thumbScale, {
+        toValue,
+        speed: 30,
+        bounciness: 6,
+        useNativeDriver: true,
+      }).start();
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () =>
+        !propsRef.current.disabled &&
+        propsRef.current.duration > 0 &&
+        propsRef.current.width > 0,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: event => {
+        dragStartX.current = event.nativeEvent.locationX;
+        animateThumb(1.6);
+        setPreviewPosition(positionForX(dragStartX.current));
+      },
+      onPanResponderMove: (_, gesture) => {
+        setPreviewPosition(positionForX(dragStartX.current + gesture.dx));
+      },
+      onPanResponderRelease: async (_, gesture) => {
+        const targetPosition = positionForX(dragStartX.current + gesture.dx);
+        animateThumb(1);
+        try {
+          await propsRef.current.onSeek(targetPosition);
+        } finally {
           setPreviewPosition(null);
-        },
-        onShouldBlockNativeResponder: () => true,
-      }),
-    [],
-  );
+        }
+      },
+      onPanResponderTerminate: () => {
+        animateThumb(1);
+        setPreviewPosition(null);
+      },
+      onShouldBlockNativeResponder: () => true,
+    });
+  }, [thumbScale]);
   const displayedPosition = Math.max(
     0,
     Math.min(duration, previewPosition ?? position),
@@ -120,9 +130,27 @@ export function ProgressSlider({
           <View
             style={[styles.progressFill, { width: `${progressRatio * 100}%` }]}
           />
-          <View
-            style={[styles.progressThumb, { left: `${progressRatio * 100}%` }]}
+          <Animated.View
+            style={[
+              styles.progressThumb,
+              {
+                left: `${progressRatio * 100}%`,
+                transform: [{ scale: thumbScale }],
+              },
+            ]}
           />
+          {previewPosition !== null ? (
+            <View
+              style={[
+                styles.progressBubble,
+                { left: `${progressRatio * 100}%` },
+              ]}
+            >
+              <Text style={styles.progressBubbleText}>
+                {formatTime(displayedPosition)}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
       <View style={styles.expandedTimes}>
@@ -513,7 +541,7 @@ export function QueueTrackRow({
               {track.artist}
             </Text>
           </View>
-          {isCurrent ? <Text style={styles.queueCurrentIcon}>♫</Text> : null}
+          {isCurrent ? <Music2 color={tokens.colors.accent} size={20} /> : null}
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -529,7 +557,7 @@ export function QueueTrackRow({
             disabled && styles.queueActionDisabled,
           ]}
         >
-          <Text style={styles.queueRemoveIcon}>−</Text>
+          <Minus color={tokens.colors.danger} size={20} />
         </Pressable>
       </Animated.View>
     </View>

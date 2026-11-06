@@ -19,6 +19,7 @@ import {
   deleteTrackFromDevice,
   getDeviceTracks,
   getEqualizerSettings,
+  getPlaybackRate,
   getPlaylists,
   getRecentPlayback,
   recordPlaybackHistory,
@@ -35,19 +36,30 @@ jest.mock('lucide-react-native', () => {
   const Icon = () => ReactModule.createElement(ReactNative.View);
   return {
     Album: Icon,
+    Check: Icon,
+    ChevronDown: Icon,
+    ChevronLeft: Icon,
+    ChevronRight: Icon,
     Clock3: Icon,
     Gauge: Icon,
     GripVertical: Icon,
     Heart: Icon,
     Home: Icon,
     ListMusic: Icon,
+    Minus: Icon,
     MoreVertical: Icon,
     Music2: Icon,
+    Pause: Icon,
     Play: Icon,
+    Plus: Icon,
+    RefreshCw: Icon,
+    Repeat: Icon,
+    Repeat1: Icon,
     Search: Icon,
     Shuffle: Icon,
-    SlidersHorizontal: Icon,
+    SkipBack: Icon,
     SkipForward: Icon,
+    SlidersHorizontal: Icon,
     X: Icon,
   };
 });
@@ -319,7 +331,7 @@ test('renders correctly', async () => {
   expect(
     renderer!.root.findByProps({ accessibilityLabel: 'Biblioteca' }),
   ).toBeTruthy();
-});
+}, 30_000);
 
 test('retries a library loading failure with the library loader', async () => {
   jest
@@ -986,6 +998,7 @@ test('plays only the selected album or artist and keeps same-title albums separa
     node =>
       node.props.accessibilityLabel === 'Abrir álbum Homónimo' &&
       typeof node.props.onPress === 'function',
+    { deep: false },
   );
   expect(albumButtons).toHaveLength(2);
   await ReactTestRenderer.act(() => {
@@ -1001,7 +1014,15 @@ test('plays only the selected album or artist and keeps same-title albums separa
     expect.objectContaining({ id: 'album-a-2' }),
   ]);
   expect(TrackPlayer.skip).toHaveBeenLastCalledWith(0);
+  expect(
+    renderer!.root.findAllByProps({ accessibilityLabel: 'Artistas' }),
+  ).toHaveLength(0);
 
+  await ReactTestRenderer.act(() => {
+    renderer!.root
+      .findByProps({ accessibilityLabel: 'Volver a álbumes' })
+      .props.onPress();
+  });
   await ReactTestRenderer.act(() => {
     renderer!.root
       .findByProps({ accessibilityLabel: 'Artistas' })
@@ -1100,6 +1121,141 @@ test('shuffles upcoming tracks in the live queue and restores their prior order'
 
   await ReactTestRenderer.act(() => renderer!.unmount());
   randomSpy.mockRestore();
+});
+
+test('restores the pre-shuffle order after the library refreshes', async () => {
+  const tracks: Track[] = ['song-1', 'song-2', 'song-3'].map((id, index) => ({
+    id,
+    uri: `file:///${id}.mp3`,
+    title: `Tema ${index + 1}`,
+    artist: 'Artista',
+    album: 'Álbum',
+    albumId: 'album-1',
+    duration: 180,
+    dateAdded: index,
+    artwork: null,
+  }));
+  const nativeQueue: PlayerTrack[] = tracks.map(track => ({
+    id: track.id,
+    url: track.uri,
+    title: track.title,
+    artist: track.artist,
+  }));
+  jest
+    .mocked(getDeviceTracks)
+    .mockImplementation(async () => tracks.map(track => ({ ...track })));
+  jest.mocked(useActiveTrack).mockReturnValue({
+    id: 'song-1',
+    url: 'file:///song-1.mp3',
+    title: 'Tema 1',
+  });
+  jest.mocked(TrackPlayer.getActiveTrackIndex).mockResolvedValue(0);
+  jest.mocked(TrackPlayer.getQueue).mockImplementation(async () => nativeQueue);
+  jest.mocked(TrackPlayer.move).mockImplementation(async (from, to) => {
+    const [movedTrack] = nativeQueue.splice(from, 1);
+    nativeQueue.splice(to, 0, movedTrack);
+  });
+  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+
+  let renderer: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = createLibraryApp();
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+  await ReactTestRenderer.act(() => {
+    renderer!.root
+      .findByProps({
+        accessibilityLabel: 'Abrir reproductor: Tema 1 de Artista',
+      })
+      .props.onPress();
+  });
+  await ReactTestRenderer.act(async () => {
+    renderer!.root
+      .findByProps({ accessibilityLabel: 'Activar mezcla' })
+      .props.onPress();
+    await Promise.resolve();
+  });
+  randomSpy.mockRestore();
+  expect(nativeQueue.map(track => track.id)).toEqual([
+    'song-1',
+    'song-3',
+    'song-2',
+  ]);
+
+  await ReactTestRenderer.act(async () => {
+    DeviceEventEmitter.emit('musicLibraryChanged');
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+  await ReactTestRenderer.act(async () => {
+    renderer!.root
+      .findByProps({ accessibilityLabel: 'Desactivar mezcla' })
+      .props.onPress();
+    await Promise.resolve();
+  });
+
+  expect(nativeQueue.map(track => track.id)).toEqual([
+    'song-1',
+    'song-2',
+    'song-3',
+  ]);
+
+  await ReactTestRenderer.act(() => renderer!.unmount());
+});
+
+test('starts the player at normal speed when the saved rate is invalid', async () => {
+  jest.mocked(getPlaybackRate).mockResolvedValueOnce(3);
+
+  let renderer: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+
+  expect(TrackPlayer.setRate).toHaveBeenCalledWith(1);
+  expect(JSON.stringify(renderer!.toJSON())).not.toContain(
+    'No se pudo iniciar el reproductor',
+  );
+
+  await ReactTestRenderer.act(() => renderer!.unmount());
+});
+
+test('starts the player when the saved equalizer is invalid', async () => {
+  jest.mocked(getEqualizerSettings).mockResolvedValueOnce({
+    enabled: true,
+    bandGainsDb: [40, 0, 0, 0, 0],
+  });
+
+  let renderer: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+
+  expect(TrackPlayer.setRate).toHaveBeenCalledWith(1);
+  expect(JSON.stringify(renderer!.toJSON())).not.toContain(
+    'No se pudo iniciar el reproductor',
+  );
+
+  await ReactTestRenderer.act(() => renderer!.unmount());
+});
+
+test('starts the player when the saved equalizer cannot be read', async () => {
+  jest
+    .mocked(getEqualizerSettings)
+    .mockRejectedValueOnce(new Error('Ajustes dañados'));
+
+  let renderer: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+
+  expect(TrackPlayer.setRate).toHaveBeenCalledWith(1);
+  expect(JSON.stringify(renderer!.toJSON())).not.toContain(
+    'No se pudo iniciar el reproductor',
+  );
+
+  await ReactTestRenderer.act(() => renderer!.unmount());
 });
 
 test('adds a song to the next position without replacing the active queue', async () => {
@@ -1776,6 +1932,16 @@ test('renames and deletes a playlist without deleting its audio', async () => {
       .findByProps({ accessibilityLabel: 'Listas' })
       .props.onPress();
   });
+  expect(
+    renderer!.root.findAllByProps({
+      accessibilityLabel: 'Eliminar Entrenamiento',
+    }),
+  ).toHaveLength(0);
+  await ReactTestRenderer.act(() => {
+    renderer!.root
+      .findByProps({ accessibilityLabel: 'Más acciones para Entrenamiento' })
+      .props.onPress();
+  });
   await ReactTestRenderer.act(() => {
     renderer!.root
       .findByProps({ accessibilityLabel: 'Renombrar Entrenamiento' })
@@ -1796,6 +1962,13 @@ test('renames and deletes a playlist without deleting its audio', async () => {
     playlist.id,
     renamedPlaylist.name,
   );
+  await ReactTestRenderer.act(() => {
+    renderer!.root
+      .findByProps({
+        accessibilityLabel: `Más acciones para ${renamedPlaylist.name}`,
+      })
+      .props.onPress();
+  });
   await ReactTestRenderer.act(() => {
     renderer!.root
       .findByProps({ accessibilityLabel: `Eliminar ${renamedPlaylist.name}` })

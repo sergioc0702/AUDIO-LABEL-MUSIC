@@ -1,7 +1,22 @@
 import { StyleSheet } from 'react-native';
 import { defaultDesignTokens, type AppDesignTokens } from './tokens';
 
+const stylesByTokens = new WeakMap<
+  AppDesignTokens,
+  ReturnType<typeof buildStyles>
+>();
+
+/** Returns the same styles for the same tokens, so list rows do not rebuild them. */
 export function createStyles(tokens: AppDesignTokens) {
+  let styles = stylesByTokens.get(tokens);
+  if (!styles) {
+    styles = buildStyles(tokens);
+    stylesByTokens.set(tokens, styles);
+  }
+  return styles;
+}
+
+function buildStyles(tokens: AppDesignTokens) {
   const { colors, typography } = tokens;
   return StyleSheet.create({
     safeArea: {
@@ -260,6 +275,34 @@ export function createStyles(tokens: AppDesignTokens) {
       fontWeight: '700',
       letterSpacing: -0.5,
       marginTop: 2,
+      transformOrigin: 'left center',
+    },
+    libraryContent: {
+      flex: 1,
+    },
+    headerBackButton: {
+      marginRight: 12,
+    },
+    groupDetailHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 16,
+      paddingBottom: 16,
+      paddingHorizontal: 20,
+      paddingTop: 4,
+    },
+    groupDetailCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    groupDetailActions: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 12,
+    },
+    dangerActionText: {
+      color: colors.danger,
     },
     refreshButton: {
       alignItems: 'center',
@@ -270,10 +313,6 @@ export function createStyles(tokens: AppDesignTokens) {
       height: 48,
       justifyContent: 'center',
       width: 48,
-    },
-    refreshIcon: {
-      color: colors.accent,
-      fontSize: 23,
     },
     libraryPrimaryActions: {
       alignItems: 'center',
@@ -541,6 +580,8 @@ export function createStyles(tokens: AppDesignTokens) {
       backgroundColor: colors.accent,
       borderRadius: defaultDesignTokens.radius.md,
       flex: 1,
+      flexDirection: 'row',
+      gap: 8,
       justifyContent: 'center',
       minHeight: 48,
       paddingHorizontal: 12,
@@ -575,11 +616,6 @@ export function createStyles(tokens: AppDesignTokens) {
       justifyContent: 'center',
       marginLeft: 0,
       width: 36,
-    },
-    playlistRemoveIcon: {
-      color: colors.danger,
-      fontSize: 26,
-      fontWeight: '500',
     },
     playlistReorderControls: {
       alignItems: 'center',
@@ -737,9 +773,6 @@ export function createStyles(tokens: AppDesignTokens) {
       color: colors.muted,
       fontSize: 22,
     },
-    favoriteIconActive: {
-      color: colors.accent,
-    },
     trackMoreButton: {
       alignItems: 'center',
       height: 48,
@@ -775,11 +808,6 @@ export function createStyles(tokens: AppDesignTokens) {
     artworkImage: {
       height: '100%',
       width: '100%',
-    },
-    artworkFallback: {
-      color: colors.accent,
-      fontSize: 25,
-      fontWeight: '700',
     },
     trackDetails: {
       flex: 1,
@@ -818,29 +846,12 @@ export function createStyles(tokens: AppDesignTokens) {
       paddingHorizontal: defaultDesignTokens.spacing.sm,
       paddingVertical: defaultDesignTokens.spacing.sm,
     },
-    groupPlay: {
-      color: colors.accent,
-      fontSize: 17,
-      paddingHorizontal: 10,
-    },
     emptyState: {
       alignItems: 'center',
       flex: 1,
       justifyContent: 'center',
       paddingHorizontal: 36,
       paddingBottom: 50,
-    },
-    emptyNote: {
-      alignItems: 'center',
-      backgroundColor: colors.accentSoft,
-      borderRadius: defaultDesignTokens.radius.pill,
-      color: colors.accent,
-      fontSize: 36,
-      height: 76,
-      lineHeight: 76,
-      overflow: 'hidden',
-      textAlign: 'center',
-      width: 76,
     },
     emptyTitle: {
       color: colors.text,
@@ -1118,7 +1129,7 @@ export function createStyles(tokens: AppDesignTokens) {
       borderRadius: defaultDesignTokens.radius.lg,
       borderWidth: StyleSheet.hairlineWidth,
       marginHorizontal: 16,
-      marginTop: 8,
+      marginTop: 6,
       marginBottom: defaultDesignTokens.spacing.xs,
       overflow: 'hidden',
     },
@@ -1130,7 +1141,7 @@ export function createStyles(tokens: AppDesignTokens) {
     miniPlayerRow: {
       alignItems: 'center',
       flexDirection: 'row',
-      minHeight: 68,
+      minHeight: 60,
       paddingHorizontal: 10,
     },
     miniTrackInfo: {
@@ -1178,16 +1189,6 @@ export function createStyles(tokens: AppDesignTokens) {
       fontSize: 15,
       fontWeight: '900',
     },
-    pauseIcon: {
-      flexDirection: 'row',
-      gap: 4,
-    },
-    pauseBar: {
-      backgroundColor: colors.onAccent,
-      borderRadius: 1,
-      height: 18,
-      width: 4,
-    },
     bottomNavigation: {
       alignItems: 'center',
       backgroundColor: colors.surface,
@@ -1196,10 +1197,10 @@ export function createStyles(tokens: AppDesignTokens) {
       borderWidth: StyleSheet.hairlineWidth,
       flexDirection: 'row',
       justifyContent: 'space-around',
-      height: 68,
+      height: 60,
       marginHorizontal: 20,
-      marginTop: 6,
-      marginBottom: 10,
+      marginTop: 4,
+      marginBottom: 8,
       paddingHorizontal: 7,
     },
     navigationItem: {
@@ -1208,25 +1209,57 @@ export function createStyles(tokens: AppDesignTokens) {
       flexDirection: 'row',
       gap: 8,
       justifyContent: 'center',
-      minHeight: 50,
+      minHeight: 48,
       borderRadius: defaultDesignTokens.radius.pill,
-    },
-    navigationItemSelected: {
-      backgroundColor: colors.accent,
-    },
-    navigationIconContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 24,
     },
     navigationLabelSelected: {
       color: colors.onAccent,
       fontSize: 13,
       fontWeight: '800',
     },
-    expandedPlayer: {
+    expandedPlayerShell: {
       backgroundColor: colors.background,
       flex: 1,
+      overflow: 'hidden',
+    },
+    expandedPlayer: {
+      flex: 1,
+    },
+    progressBubble: {
+      alignItems: 'center',
+      backgroundColor: colors.accent,
+      borderRadius: defaultDesignTokens.radius.sm,
+      bottom: 16,
+      marginLeft: -30,
+      paddingVertical: 4,
+      position: 'absolute',
+      width: 60,
+    },
+    progressBubbleText: {
+      color: colors.onAccent,
+      fontFamily: typography.bodyFamily,
+      fontSize: 13,
+      fontVariant: ['tabular-nums'],
+      fontWeight: '700',
+    },
+    miniTrackContent: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
+      minWidth: 0,
+    },
+    navigationIndicator: {
+      backgroundColor: colors.accent,
+      borderRadius: defaultDesignTokens.radius.pill,
+      height: 48,
+      position: 'absolute',
+      top: 5.5,
+    },
+    searchClear: {
+      alignItems: 'center',
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
     },
     expandedHeader: {
       alignItems: 'center',
@@ -1246,10 +1279,6 @@ export function createStyles(tokens: AppDesignTokens) {
       borderColor: colors.border,
       borderRadius: defaultDesignTokens.radius.pill,
       borderWidth: StyleSheet.hairlineWidth,
-    },
-    expandedHeaderIcon: {
-      color: colors.text,
-      fontSize: 26,
     },
     expandedHeaderTitle: {
       alignItems: 'center',
@@ -1282,6 +1311,7 @@ export function createStyles(tokens: AppDesignTokens) {
     },
     expandedTrackText: {
       flex: 1,
+      minHeight: 96,
       minWidth: 0,
     },
     expandedTrackTitle: {
@@ -1290,6 +1320,7 @@ export function createStyles(tokens: AppDesignTokens) {
       fontSize: 28,
       fontWeight: '500',
       letterSpacing: -0.5,
+      lineHeight: 34,
     },
     expandedTrackArtist: {
       color: colors.muted,
@@ -1302,10 +1333,6 @@ export function createStyles(tokens: AppDesignTokens) {
       justifyContent: 'center',
       marginLeft: 12,
       width: 48,
-    },
-    expandedFavoriteIcon: {
-      color: colors.muted,
-      fontSize: 26,
     },
     expandedProgressContainer: {
       marginTop: defaultDesignTokens.spacing.md,
@@ -1350,23 +1377,11 @@ export function createStyles(tokens: AppDesignTokens) {
       justifyContent: 'center',
       width: 48,
     },
-    expandedModeIcon: {
-      color: colors.muted,
-      fontSize: 20,
-      fontWeight: '700',
-    },
-    expandedModeActive: {
-      color: colors.accent,
-    },
     expandedSkipButton: {
       alignItems: 'center',
       height: 56,
       justifyContent: 'center',
       width: 48,
-    },
-    expandedSkipIcon: {
-      color: colors.text,
-      fontSize: 23,
     },
     expandedPlayButton: {
       alignItems: 'center',
@@ -1376,11 +1391,6 @@ export function createStyles(tokens: AppDesignTokens) {
       height: 68,
       justifyContent: 'center',
       width: 68,
-    },
-    expandedPlayIcon: {
-      color: colors.background,
-      fontSize: 27,
-      fontWeight: '900',
     },
     queueButton: {
       alignItems: 'center',
@@ -1479,6 +1489,11 @@ export function createStyles(tokens: AppDesignTokens) {
       justifyContent: 'space-between',
       marginBottom: 18,
     },
+    equalizerHeaderCopy: {
+      flex: 1,
+      marginRight: 12,
+      minWidth: 0,
+    },
     equalizerToggle: {
       alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
@@ -1498,22 +1513,30 @@ export function createStyles(tokens: AppDesignTokens) {
       fontWeight: '700',
     },
     equalizerPresets: {
-      gap: 8,
+      flexDirection: 'row',
+      gap: 6,
       paddingBottom: 18,
     },
     equalizerPreset: {
       alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
       borderRadius: 14,
+      flex: 1,
       justifyContent: 'center',
       minHeight: 48,
-      paddingHorizontal: 14,
+      paddingHorizontal: 4,
       paddingVertical: 9,
+    },
+    equalizerPresetSelected: {
+      backgroundColor: colors.accent,
     },
     equalizerPresetText: {
       color: colors.text,
       fontSize: 12,
       fontWeight: '700',
+    },
+    equalizerPresetTextSelected: {
+      color: colors.onAccent,
     },
     equalizerBands: {
       flexDirection: 'row',
@@ -1716,10 +1739,6 @@ export function createStyles(tokens: AppDesignTokens) {
       justifyContent: 'center',
       width: 48,
     },
-    queueCloseIcon: {
-      color: colors.muted,
-      fontSize: 28,
-    },
     queueTrack: {
       alignItems: 'center',
       backgroundColor: colors.surface,
@@ -1799,11 +1818,6 @@ export function createStyles(tokens: AppDesignTokens) {
       justifyContent: 'center',
       width: 36,
     },
-    queueRemoveIcon: {
-      color: colors.danger,
-      fontSize: 26,
-      fontWeight: '500',
-    },
     queueActionDisabled: {
       opacity: 0.3,
     },
@@ -1814,11 +1828,6 @@ export function createStyles(tokens: AppDesignTokens) {
     },
     queueCurrentTrack: {
       color: colors.accent,
-    },
-    queueCurrentIcon: {
-      color: colors.accent,
-      fontSize: 20,
-      paddingHorizontal: 10,
     },
     queueUndoBar: {
       alignItems: 'center',

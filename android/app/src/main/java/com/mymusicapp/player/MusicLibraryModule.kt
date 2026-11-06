@@ -17,13 +17,13 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.util.Base64
 import android.util.Log
 import androidx.room.withTransaction
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.BaseActivityEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -31,12 +31,14 @@ import com.doublesymmetry.kotlinaudio.audio.EQUALIZER_BAND_COUNT
 import com.doublesymmetry.kotlinaudio.audio.EQUALIZER_MAX_GAIN_DB
 import com.doublesymmetry.kotlinaudio.audio.EQUALIZER_MIN_GAIN_DB
 import com.doublesymmetry.kotlinaudio.audio.SoftwareEqualizer
-import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class MusicLibraryModule(
@@ -120,12 +122,17 @@ class MusicLibraryModule(
 
   override fun getName(): String = "MusicLibrary"
 
-  @Suppress("DEPRECATION")
-  override fun onCatalystInstanceDestroy() {
+  override fun invalidate() {
     context.contentResolver.unregisterContentObserver(audioObserver)
     observerRefresh?.let(observerHandler::removeCallbacks)
     context.removeActivityEventListener(activityEventListener)
-    super.onCatalystInstanceDestroy()
+    pendingDeletion?.promise?.reject(
+      "E_TRACK_DELETE",
+      "La eliminación se canceló porque la aplicación se reinició.",
+    )
+    pendingDeletion = null
+    playlistScope.cancel()
+    super.invalidate()
   }
 
   @ReactMethod
@@ -293,8 +300,8 @@ class MusicLibraryModule(
 
   @ReactMethod
   fun setPlaybackRate(rate: Double, promise: Promise) {
-    if (!rate.isFinite() || rate !in 0.5..2.0) {
-      promise.reject("E_PLAYBACK_RATE_INVALID", "La velocidad debe estar entre 0,5× y 2×.")
+    if (!rate.isFinite() || rate !in 0.75..2.0) {
+      promise.reject("E_PLAYBACK_RATE_INVALID", "La velocidad debe estar entre 0,75× y 2×.")
       return
     }
     try {
@@ -602,6 +609,18 @@ class MusicLibraryModule(
       return
     }
 
+    playlistScope.launch {
+      try {
+        promise.resolve(scanTracks())
+      } catch (error: SecurityException) {
+        promise.reject("E_PERMISSION", "Android denegó el acceso a la biblioteca de audio.", error)
+      } catch (error: Exception) {
+        promise.reject("E_LIBRARY_QUERY", "No se pudo leer la biblioteca de audio.", error)
+      }
+    }
+  }
+
+  private suspend fun scanTracks(): WritableArray {
     val projection = arrayOf(
       MediaStore.Audio.Media._ID,
       MediaStore.Audio.Media.TITLE,
@@ -611,136 +630,171 @@ class MusicLibraryModule(
       MediaStore.Audio.Media.ALBUM_ID,
       MediaStore.Audio.Media.DISPLAY_NAME,
       MediaStore.Audio.Media.DATE_ADDED,
+      MediaStore.Audio.Media.DATE_MODIFIED,
+      MediaStore.Audio.Media.SIZE,
     )
-    try {
-      val cursor = context.contentResolver.query(
-        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-        projection,
-        null,
-        null,
-        "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC",
-      )
+    val dao = playlistDatabase.playlistDao()
+    val cachedMetadata = dao.getTrackMetadata().associateBy { it.trackId }
+    val updatedMetadata = mutableListOf<TrackMetadataEntity>()
+    val scannedTrackIds = mutableSetOf<String>()
+    val artworkByAlbum = mutableMapOf<Long, String?>()
+    val artworkEmittedAlbums = mutableSetOf<Long>()
+    val tracks = Arguments.createArray()
 
-      if (cursor == null) {
-        promise.reject("E_LIBRARY_QUERY", "Android no pudo consultar la biblioteca de audio.")
-        return
-      }
+    val cursor = context.contentResolver.query(
+      MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+      projection,
+      null,
+      null,
+      "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC",
+    ) ?: throw IllegalStateException("Android no pudo consultar la biblioteca de audio.")
 
-      val artworkByAlbum = mutableMapOf<Long, String?>()
-      val artworkEmittedAlbums = mutableSetOf<Long>()
-      val tracks = Arguments.createArray()
+    cursor.use {
+      val idColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+      val titleColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+      val artistColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+      val albumColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+      val durationColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+      val albumIdColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+      val displayNameColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+      val dateAddedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+      val dateModifiedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
+      val sizeColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
 
-      cursor.use {
-        val idColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-        val titleColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-        val artistColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-        val albumColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-        val durationColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-        val albumIdColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
-        val displayNameColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
-        val dateAddedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
-
-        while (it.moveToNext()) {
-          val displayName = it.getString(displayNameColumn).orEmpty()
-          val indexedTitle = it.getString(titleColumn)
-          if (isGeneratedPlaylistFile(displayName) || isGeneratedPlaylistFile(indexedTitle)) {
-            continue
-          }
-
-          val id = it.getLong(idColumn)
-          val albumId = it.getLong(albumIdColumn)
-          val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
-          val retriever = MediaMetadataRetriever()
-          var embeddedArt: ByteArray? = null
-          var extractedTitle: String? = null
-          var extractedArtist: String? = null
-          var extractedAlbum: String? = null
-          var extractedGenre: String? = null
-          var extractedYear: String? = null
-
-          try {
-            retriever.setDataSource(context, uri)
-            extractedTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-            extractedArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-            extractedAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-            extractedGenre = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE)
-            extractedYear = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR)
-            if (artworkByAlbum[albumId] == null) {
-              embeddedArt = retriever.embeddedPicture
-            }
-          } catch (error: RuntimeException) {
-            Log.w(
-              "MusicLibrary",
-              "Could not read metadata for $uri; using MediaStore values.",
-              error,
-            )
-          } finally {
-            retriever.release()
-          }
-
-          val title = indexedTitle
-            .takeUnless { value -> value.isNullOrBlank() || value == "<unknown>" }
-            ?: extractedTitle?.takeUnless(String::isBlank)
-            ?: displayName.substringBeforeLast('.', displayName).ifBlank { "Pista sin título" }
-          val artist = it.getString(artistColumn)
-            .takeUnless { value -> value.isNullOrBlank() || value == "<unknown>" }
-            ?: extractedArtist?.takeUnless(String::isBlank)
-            ?: "Artista desconocido"
-          val album = it.getString(albumColumn)
-            .takeUnless { value -> value.isNullOrBlank() || value == "<unknown>" }
-            ?: extractedAlbum?.takeUnless(String::isBlank)
-            ?: "Álbum desconocido"
-          val genre = extractedGenre
-            ?.trim()
-            ?.takeUnless { value ->
-              value.isBlank() || value.lowercase() in setOf("none", "unknown", "<unknown>", "n/a")
-            }
-          val year = extractedYear
-            ?.take(4)
-            ?.toIntOrNull()
-            ?.takeIf { value -> value in 1000..9999 }
-
-          if (artworkByAlbum[albumId] == null) {
-            readArtwork(albumId, embeddedArt)?.let { artwork ->
-              artworkByAlbum[albumId] = artwork
-            }
-          }
-
-          val track = Arguments.createMap().apply {
-            putString("id", id.toString())
-            putString("uri", uri.toString())
-            putString("title", title.trim())
-            putString("artist", artist.trim())
-            putString("album", album.trim())
-            putString("albumId", albumId.toString())
-            if (genre != null) putString("genre", genre) else putNull("genre")
-            if (year != null) putInt("year", year) else putNull("year")
-            putDouble("duration", it.getLong(durationColumn).toDouble() / 1000.0)
-            putDouble("dateAdded", it.getLong(dateAddedColumn).toDouble())
-            val artwork = artworkByAlbum[albumId]
-            if (artwork != null && artworkEmittedAlbums.add(albumId)) {
-              putString("artwork", artwork)
-            } else {
-              putNull("artwork")
-            }
-          }
-          tracks.pushMap(track)
+      while (it.moveToNext()) {
+        val displayName = it.getString(displayNameColumn).orEmpty()
+        val indexedTitle = it.getString(titleColumn)
+        if (isGeneratedPlaylistFile(displayName) || isGeneratedPlaylistFile(indexedTitle)) {
+          continue
         }
-      }
 
-      promise.resolve(tracks)
-    } catch (error: SecurityException) {
-      promise.reject("E_PERMISSION", "Android denegó el acceso a la biblioteca de audio.", error)
-    } catch (error: IllegalArgumentException) {
-      promise.reject("E_LIBRARY_QUERY", "No se pudo leer la biblioteca de audio.", error)
+        val id = it.getLong(idColumn)
+        val trackId = id.toString()
+        val albumId = it.getLong(albumIdColumn)
+        val dateModified = it.getLong(dateModifiedColumn)
+        val size = it.getLong(sizeColumn)
+        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+        scannedTrackIds.add(trackId)
+
+        if (albumId !in artworkByAlbum) {
+          artworkByAlbum[albumId] = findStoredArtwork(albumId)
+        }
+
+        val cached = cachedMetadata[trackId]?.takeIf { entry ->
+          entry.albumId == albumId && entry.dateModified == dateModified && entry.size == size
+        }
+        val metadata = if (cached != null) {
+          cached
+        } else {
+          val extracted = extractTrackMetadata(
+            uri,
+            TrackMetadataEntity(trackId, albumId, dateModified, size, null, null, null, null, null),
+            readArtwork = artworkByAlbum[albumId] == null,
+          )
+          extracted.embeddedArt?.let { bytes ->
+            saveArtwork(albumId, bytes)?.let { artwork -> artworkByAlbum[albumId] = artwork }
+          }
+          updatedMetadata.add(extracted.metadata)
+          extracted.metadata
+        }
+
+        val title = indexedTitle
+          .takeUnless { value -> value.isNullOrBlank() || value == "<unknown>" }
+          ?: metadata.title?.takeUnless(String::isBlank)
+          ?: displayName.substringBeforeLast('.', displayName).ifBlank { "Pista sin título" }
+        val artist = it.getString(artistColumn)
+          .takeUnless { value -> value.isNullOrBlank() || value == "<unknown>" }
+          ?: metadata.artist?.takeUnless(String::isBlank)
+          ?: "Artista desconocido"
+        val album = it.getString(albumColumn)
+          .takeUnless { value -> value.isNullOrBlank() || value == "<unknown>" }
+          ?: metadata.album?.takeUnless(String::isBlank)
+          ?: "Álbum desconocido"
+        val genre = metadata.genre
+        val year = metadata.year
+
+        val track = Arguments.createMap().apply {
+          putString("id", trackId)
+          putString("uri", uri.toString())
+          putString("title", title.trim())
+          putString("artist", artist.trim())
+          putString("album", album.trim())
+          putString("albumId", albumId.toString())
+          if (genre != null) putString("genre", genre) else putNull("genre")
+          if (year != null) putInt("year", year) else putNull("year")
+          putDouble("duration", it.getLong(durationColumn).toDouble() / 1000.0)
+          putDouble("dateAdded", it.getLong(dateAddedColumn).toDouble())
+          val artwork = artworkByAlbum[albumId]
+          if (artwork != null && artworkEmittedAlbums.add(albumId)) {
+            putString("artwork", artwork)
+          } else {
+            putNull("artwork")
+          }
+        }
+        tracks.pushMap(track)
+      }
+    }
+
+    if (updatedMetadata.isNotEmpty()) {
+      dao.insertTrackMetadata(updatedMetadata)
+    }
+    (cachedMetadata.keys - scannedTrackIds).chunked(METADATA_DELETE_BATCH_SIZE).forEach { trackIds ->
+      dao.deleteTrackMetadata(trackIds)
+    }
+    deleteOrphanedArtwork(artworkByAlbum.keys)
+
+    return tracks
+  }
+
+  private fun extractTrackMetadata(
+    uri: Uri,
+    base: TrackMetadataEntity,
+    readArtwork: Boolean,
+  ): ExtractedTrack {
+    val retriever = MediaMetadataRetriever()
+    try {
+      retriever.setDataSource(context, uri)
+      val genre = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE)
+        ?.trim()
+        ?.takeUnless { value ->
+          value.isBlank() || value.lowercase() in setOf("none", "unknown", "<unknown>", "n/a")
+        }
+      val year = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR)
+        ?.take(4)
+        ?.toIntOrNull()
+        ?.takeIf { value -> value in 1000..9999 }
+      return ExtractedTrack(
+        base.copy(
+          title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),
+          artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST),
+          album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM),
+          genre = genre,
+          year = year,
+        ),
+        if (readArtwork) retriever.embeddedPicture else null,
+      )
+    } catch (error: RuntimeException) {
+      Log.w("MusicLibrary", "Could not read metadata for $uri; using MediaStore values.", error)
+      return ExtractedTrack(base, null)
+    } finally {
+      try {
+        retriever.release()
+      } catch (error: Exception) {
+        Log.w("MusicLibrary", "Could not release the metadata reader for $uri.", error)
+      }
     }
   }
+
+  private class ExtractedTrack(
+    val metadata: TrackMetadataEntity,
+    val embeddedArt: ByteArray?,
+  )
 
   private fun isGeneratedPlaylistFile(name: String?): Boolean =
     name?.startsWith("AutoBackup_", ignoreCase = true) == true ||
       name?.startsWith("AutoPlaylist_", ignoreCase = true) == true
 
-  private fun readArtwork(albumId: Long, embeddedArt: ByteArray?): String? {
+  private fun findStoredArtwork(albumId: Long): String? {
     if (albumId > 0) {
       val albumUri = Uri.parse("content://media/external/audio/albumart/$albumId")
       try {
@@ -750,14 +804,20 @@ class MusicLibraryModule(
       } catch (_: IOException) {
         // The album artwork provider may not have a cached image for this album.
       } catch (_: SecurityException) {
-        // Fall back to the image embedded in the audio file.
+        // Fall back to the image extracted from the audio file.
       }
     }
 
-    return embeddedArt?.let(::toArtworkDataUri)
+    return artworkFile(albumId).takeIf(File::isFile)?.let { Uri.fromFile(it).toString() }
   }
 
-  private fun toArtworkDataUri(bytes: ByteArray): String? {
+  // Stored in filesDir: Android may purge cacheDir, and tracks with cached metadata
+  // are not opened again to recover their image.
+  private fun artworkDirectory() = File(context.filesDir, "artwork")
+
+  private fun artworkFile(albumId: Long) = File(artworkDirectory(), "$albumId.jpg")
+
+  private fun saveArtwork(albumId: Long, bytes: ByteArray): String? {
     val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
     val longestSide = maxOf(bitmap.width, bitmap.height)
     val scaled = if (longestSide > 512) {
@@ -772,20 +832,40 @@ class MusicLibraryModule(
       bitmap
     }
 
-    val output = ByteArrayOutputStream()
-    scaled.compress(Bitmap.CompressFormat.JPEG, 82, output)
-    if (scaled !== bitmap) {
-      scaled.recycle()
-      bitmap.recycle()
-    } else {
+    val file = artworkFile(albumId)
+    val temporaryFile = File(file.path + ".tmp")
+    try {
+      artworkDirectory().mkdirs()
+      FileOutputStream(temporaryFile).use { output ->
+        scaled.compress(Bitmap.CompressFormat.JPEG, 82, output)
+      }
+      if (!temporaryFile.renameTo(file)) {
+        throw IOException("Could not move the artwork file into place.")
+      }
+      return Uri.fromFile(file).toString()
+    } catch (error: IOException) {
+      Log.w("MusicLibrary", "Could not store artwork for album $albumId.", error)
+      temporaryFile.delete()
+      return null
+    } finally {
+      if (scaled !== bitmap) {
+        scaled.recycle()
+      }
       bitmap.recycle()
     }
+  }
 
-    return "data:image/jpeg;base64,${Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)}"
+  private fun deleteOrphanedArtwork(albumIds: Set<Long>) {
+    artworkDirectory().listFiles()?.forEach { file ->
+      if (file.nameWithoutExtension.toLongOrNull() !in albumIds) {
+        file.delete()
+      }
+    }
   }
 
   private companion object {
     const val DELETE_REQUEST_CODE = 7412
     const val LIBRARY_CHANGE_DEBOUNCE_MS = 700L
+    const val METADATA_DELETE_BATCH_SIZE = 500
   }
 }

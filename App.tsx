@@ -17,7 +17,6 @@ import {
   Modal,
   PermissionsAndroid,
   Platform,
-  Pressable,
   ScrollView,
   StatusBar,
   Text,
@@ -26,12 +25,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {
+  Check,
+  ChevronRight,
   Home,
+  Minus,
   MoreVertical,
   Music2,
-  Play,
   Search,
-  SkipForward,
   X,
 } from 'lucide-react-native';
 import {
@@ -111,7 +111,10 @@ import {
   FavoriteSwipeRow,
   PlaylistTrackRow,
 } from './src/components/library/LibraryComponents';
-import { MiniPlayerProgress } from './src/components/player/PlaybackProgress';
+import { MiniPlayer } from './src/components/player/MiniPlayer';
+import { BottomNavigation } from './src/components/navigation/BottomNavigation';
+import { PressableScale } from './src/components/motion/PressableScale';
+import { defaultPlayerThemeId } from './src/theme/playerThemes';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import {
@@ -181,6 +184,7 @@ function AppContent({
     name: string;
     trackIds?: string[];
   } | null>(null);
+  const [playlistActions, setPlaylistActions] = useState<Playlist | null>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(
     null,
   );
@@ -430,7 +434,6 @@ function AppContent({
     activeTab === 'songs' && libraryFilter === 'favorites'
       ? 'favorites'
       : activeTab;
-  const navigationScale = useRef(new Animated.Value(1)).current;
   const screenTransitionProgress = useRef(new Animated.Value(1)).current;
   const libraryScrollRef = useRef<FlatList<Track>>(null);
   const libraryScrollY = useRef(new Animated.Value(0)).current;
@@ -467,17 +470,6 @@ function AppContent({
     selectedGroup,
     selectedPlaylistId,
   ]);
-
-  useEffect(() => {
-    navigationScale.setValue(0.88);
-    Animated.spring(navigationScale, {
-      toValue: 1,
-      damping: 16,
-      mass: 0.7,
-      stiffness: 190,
-      useNativeDriver: true,
-    }).start();
-  }, [primaryScreen, navigationScale]);
 
   useEffect(() => {
     screenTransitionProgress.stopAnimation();
@@ -605,30 +597,25 @@ function AppContent({
 
     async function preparePlayer() {
       try {
-        const savedEqualizer = await getEqualizerSettings();
+        // A damaged preference must not stop playback: keep the defaults instead.
+        const savedEqualizer = await getEqualizerSettings().catch(() => null);
         if (
-          savedEqualizer.bandGainsDb.length !== equalizerBands.length ||
-          savedEqualizer.bandGainsDb.some(
-            gain => !Number.isFinite(gain) || gain < -12 || gain > 12,
+          mounted &&
+          savedEqualizer?.bandGainsDb.length === equalizerBands.length &&
+          savedEqualizer.bandGainsDb.every(
+            gain => Number.isFinite(gain) && gain >= -12 && gain <= 12,
           )
         ) {
-          throw new Error(
-            'La configuración guardada del ecualizador no es válida.',
-          );
-        }
-        if (mounted) {
           setEqualizerSettings(savedEqualizer);
         }
         await setupPlayer();
         const savedRepeatMode = await getPlayerRepeatMode();
-        const savedRate = await getPlaybackRate();
-        if (!playbackRates.includes(savedRate)) {
-          throw new Error('La velocidad guardada no es compatible.');
-        }
-        await setPlayerRate(savedRate);
+        const savedRate = await getPlaybackRate().catch(() => 1);
+        const startupRate = playbackRates.includes(savedRate) ? savedRate : 1;
+        await setPlayerRate(startupRate);
         if (mounted) {
           setRepeatMode(savedRepeatMode);
-          setPlaybackRate(savedRate);
+          setPlaybackRate(startupRate);
           setPlayerReady(true);
         }
       } catch (error) {
@@ -766,14 +753,18 @@ function AppContent({
     getPlayerQueue()
       .then(queue => {
         const tracksById = new Map(tracks.map(track => [track.id, track]));
-        setPlaybackQueue(
-          queue
-            .map(item => tracksById.get(String(item.id)))
-            .filter((track): track is Track => track !== undefined),
-        );
-        originalQueueOrder.current = queue
+        const liveQueue = queue
           .map(item => tracksById.get(String(item.id)))
           .filter((track): track is Track => track !== undefined);
+        setPlaybackQueue(liveQueue);
+        // This runs on every library refresh, when the live queue may be shuffled:
+        // only the first load may define the order that shuffling restores.
+        originalQueueOrder.current =
+          originalQueueOrder.current.length === 0
+            ? liveQueue
+            : originalQueueOrder.current
+                .map(track => tracksById.get(track.id))
+                .filter((track): track is Track => track !== undefined);
       })
       .catch(error => {
         setErrorMessage(
@@ -1948,7 +1939,7 @@ function AppContent({
         onToggleFavorite={() => toggleFavorite(track)}
         trackTitle={track.title}
       >
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`Reproducir ${track.title} de ${track.artist}`}
           accessibilityState={{ selected: isCurrent }}
@@ -1972,22 +1963,22 @@ function AppContent({
               {track.artist}
             </Text>
           </View>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`Más acciones para ${track.title}`}
           onPress={() => setQueueTrackDialog({ track, fromLibrary })}
           style={styles.trackMoreButton}
         >
           <MoreVertical color={colors.muted} size={24} strokeWidth={2} />
-        </Pressable>
+        </PressableScale>
       </FavoriteSwipeRow>
     );
   }
 
   function renderGroupedLibrary(group: GroupedLibraryItem) {
     return (
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={`Abrir ${
           activeTab === 'albums' ? 'álbum' : 'artista'
@@ -2025,8 +2016,8 @@ function AppContent({
               : formatTrackCount(group.tracks.length)}
           </Text>
         </View>
-        <Text style={styles.groupPlay}>›</Text>
-      </Pressable>
+        <ChevronRight color={colors.accent} size={20} />
+      </PressableScale>
     );
   }
 
@@ -2035,7 +2026,7 @@ function AppContent({
     const firstTrack = availableTracks[0];
     return (
       <View style={styles.playlistCard}>
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`Abrir lista ${playlist.name}, ${formatTrackCount(
             availableTracks.length,
@@ -2056,30 +2047,16 @@ function AppContent({
               {formatTrackCount(availableTracks.length)}
             </Text>
           </View>
-          <Text style={styles.groupPlay}>›</Text>
-        </Pressable>
-        <Pressable
+          <ChevronRight color={colors.accent} size={20} />
+        </PressableScale>
+        <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`Renombrar ${playlist.name}`}
-          onPress={() => {
-            setPlaylistDialogError(null);
-            setPlaylistNameDialog({
-              playlistId: playlist.id,
-              name: playlist.name,
-            });
-          }}
+          accessibilityLabel={`Más acciones para ${playlist.name}`}
+          onPress={() => setPlaylistActions(playlist)}
           style={styles.playlistActionButton}
         >
-          <Text style={styles.playlistActionIcon}>✎</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Eliminar ${playlist.name}`}
-          onPress={() => setPlaylistToDelete(playlist)}
-          style={styles.playlistActionButton}
-        >
-          <Text style={styles.playlistDeleteIcon}>×</Text>
-        </Pressable>
+          <MoreVertical color={colors.muted} size={20} />
+        </PressableScale>
       </View>
     );
   }
@@ -2094,7 +2071,7 @@ function AppContent({
         title={track.title}
         trackCount={selectedPlaylist?.trackIds.length ?? 0}
       >
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`Reproducir ${track.title} de ${track.artist} desde ${selectedPlaylist?.name}`}
           onPress={() => playPlaylist(selectedPlaylist!, track)}
@@ -2109,8 +2086,8 @@ function AppContent({
               {track.artist} · {track.album}
             </Text>
           </View>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`Quitar ${track.title} de ${selectedPlaylist?.name}`}
           accessibilityState={{ disabled: savingPlaylist }}
@@ -2119,8 +2096,8 @@ function AppContent({
           onPress={() => removeTrackFromPlaylist(track.id)}
           style={styles.playlistRemoveButton}
         >
-          <Text style={styles.playlistRemoveIcon}>−</Text>
-        </Pressable>
+          <Minus color={colors.danger} size={20} />
+        </PressableScale>
       </PlaylistTrackRow>
     );
   }
@@ -2158,6 +2135,8 @@ function AppContent({
             tracks={tracks}
             playlists={playlists}
             currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            togglePlayback={togglePlayback}
             recentTracks={homeRecentTracks}
             addedTracks={homeAddedTracks}
             favoriteIds={favoriteIds}
@@ -2243,98 +2222,26 @@ function AppContent({
       </Animated.View>
 
       {currentTrack ? (
-        <View style={styles.miniPlayer}>
-          <MiniPlayerProgress
-            duration={currentTrack.duration}
-            onPositionChange={rememberPlaybackPosition}
-          />
-          <View style={styles.miniPlayerRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Abrir reproductor: ${currentTrack.title} de ${currentTrack.artist}`}
-              android_ripple={{ color: colors.ripple }}
-              onPress={() => setPlayerExpanded(true)}
-              style={styles.miniTrackInfo}
-            >
-              <Artwork uri={currentTrack.artwork} size={44} />
-              <View style={styles.nowPlayingDetails}>
-                <Text numberOfLines={1} style={styles.nowPlayingTitle}>
-                  {currentTrack.title}
-                </Text>
-                <Text numberOfLines={1} style={styles.trackSubtitle}>
-                  {currentTrack.artist}
-                </Text>
-              </View>
-            </Pressable>
-            <Pressable
-              accessibilityLabel={isPlaying ? 'Pausar' : 'Reproducir'}
-              onPress={togglePlayback}
-              style={styles.playButton}
-            >
-              {isPlaying ? (
-                <View style={styles.pauseIcon}>
-                  <View style={styles.pauseBar} />
-                  <View style={styles.pauseBar} />
-                </View>
-              ) : (
-                <Play
-                  color={colors.onAccent}
-                  fill={colors.onAccent}
-                  size={20}
-                />
-              )}
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Siguiente canción"
-              onPress={() => skipTrack('next')}
-              style={styles.miniNextButton}
-            >
-              <SkipForward color={colors.text} size={22} />
-            </Pressable>
-          </View>
-        </View>
+        <MiniPlayer
+          colors={colors}
+          isPlaying={isPlaying}
+          onOpen={() => setPlayerExpanded(true)}
+          onPositionChange={rememberPlaybackPosition}
+          onSkip={skipTrack}
+          onTogglePlayback={togglePlayback}
+          styles={styles}
+          track={currentTrack}
+        />
       ) : null}
-      <View style={styles.bottomNavigation}>
-        {navigationItems.map(item => {
-          const selected = primaryScreen === item.id;
-          return (
-            <Pressable
-              key={item.id}
-              accessibilityRole="tab"
-              accessibilityLabel={item.label}
-              accessibilityState={{ selected }}
-              onPress={() => navigateToPrimaryScreen(item.id)}
-              style={[
-                styles.navigationItem,
-                selected && styles.navigationItemSelected,
-              ]}
-            >
-              <Animated.View
-                style={[
-                  styles.navigationIconContainer,
-                  selected && { transform: [{ scale: navigationScale }] },
-                ]}
-              >
-                <item.icon
-                  color={selected ? colors.onAccent : colors.muted}
-                  fill={selected ? colors.onAccent : 'none'}
-                  size={21}
-                  strokeWidth={2}
-                />
-              </Animated.View>
-              {selected ? (
-                <Text numberOfLines={1} style={styles.navigationLabelSelected}>
-                  {item.label}
-                </Text>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
-      <PlayerScreen
+      <BottomNavigation
         colors={colors}
+        items={navigationItems}
+        onSelect={navigateToPrimaryScreen}
+        selectedId={primaryScreen}
         styles={styles}
+      />
+      <PlayerScreen
+        themeId={defaultPlayerThemeId}
         currentTrack={currentTrack}
         expandedArtworkSize={expandedArtworkSize}
         playerExpanded={playerExpanded}
@@ -2393,7 +2300,7 @@ function AppContent({
         visible={filtersVisible}
       >
         <View style={styles.sheetOverlay}>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Cerrar filtros"
             onPress={() => setFiltersVisible(false)}
@@ -2411,14 +2318,14 @@ function AppContent({
                 <Text style={styles.sheetTitle}>Filtros</Text>
                 <Text style={styles.sheetSubtitle}>Género musical</Text>
               </View>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar filtros"
                 onPress={() => setFiltersVisible(false)}
                 style={styles.sheetCloseButton}
               >
                 <X color={colors.text} size={22} />
-              </Pressable>
+              </PressableScale>
             </View>
             <ScrollView
               style={styles.filterSheetScroll}
@@ -2426,7 +2333,7 @@ function AppContent({
             >
               <Text style={styles.filterSectionTitle}>Género</Text>
               <View style={styles.filterChoiceGrid}>
-                <Pressable
+                <PressableScale
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selectedGenre === null }}
                   onPress={() => setSelectedGenre(null)}
@@ -2443,11 +2350,11 @@ function AppContent({
                   >
                     Todos
                   </Text>
-                </Pressable>
+                </PressableScale>
                 {availableGenres.map(genre => {
                   const selected = selectedGenre === genre;
                   return (
-                    <Pressable
+                    <PressableScale
                       key={genre}
                       accessibilityRole="radio"
                       accessibilityState={{ checked: selected }}
@@ -2465,20 +2372,20 @@ function AppContent({
                       >
                         {genre}
                       </Text>
-                    </Pressable>
+                    </PressableScale>
                   );
                 })}
               </View>
             </ScrollView>
             <View style={styles.filterSheetActions}>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 onPress={() => setSelectedGenre(null)}
                 style={styles.filterClearButton}
               >
                 <Text style={styles.filterClearText}>Limpiar</Text>
-              </Pressable>
-              <Pressable
+              </PressableScale>
+              <PressableScale
                 accessibilityRole="button"
                 onPress={() => setFiltersVisible(false)}
                 style={styles.filterApplyButton}
@@ -2486,7 +2393,7 @@ function AppContent({
                 <Text style={styles.filterApplyText}>
                   Ver {formatTrackCount(visibleTracks.length)}
                 </Text>
-              </Pressable>
+              </PressableScale>
             </View>
           </View>
         </View>
@@ -2527,7 +2434,7 @@ function AppContent({
               <Text style={styles.dialogError}>{playlistDialogError}</Text>
             ) : null}
             <View style={styles.dialogActions}>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 disabled={savingPlaylist}
                 onPress={() => {
@@ -2537,8 +2444,8 @@ function AppContent({
                 style={styles.dialogCancelButton}
               >
                 <Text style={styles.dialogCancelText}>Cancelar</Text>
-              </Pressable>
-              <Pressable
+              </PressableScale>
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={
                   playlistNameDialog?.playlistId
@@ -2552,7 +2459,7 @@ function AppContent({
                 <Text style={styles.dialogConfirmText}>
                   {savingPlaylist ? 'Guardando…' : 'Guardar'}
                 </Text>
-              </Pressable>
+              </PressableScale>
             </View>
           </View>
         </View>
@@ -2575,7 +2482,7 @@ function AppContent({
                   )}`
                 : ''}
             </Text>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityState={{
                 selected: queueTrackDialog
@@ -2591,11 +2498,11 @@ function AppContent({
             >
               <Text style={styles.queueMenuActionText}>
                 {queueTrackDialog && favoriteIds.has(queueTrackDialog.track.id)
-                  ? '♥ Quitar de favoritas'
-                  : '♡ Añadir a favoritas'}
+                  ? 'Quitar de favoritas'
+                  : 'Añadir a favoritas'}
               </Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Reproducir ${queueTrackDialog?.track.title} a continuación`}
               onPress={() => {
@@ -2606,10 +2513,10 @@ function AppContent({
               style={styles.queueMenuAction}
             >
               <Text style={styles.queueMenuActionText}>
-                ▶ Reproducir a continuación
+                Reproducir a continuación
               </Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Añadir ${queueTrackDialog?.track.title} al final de la cola`}
               onPress={() => {
@@ -2622,9 +2529,9 @@ function AppContent({
               <Text style={styles.queueMenuActionText}>
                 + Añadir al final de la cola
               </Text>
-            </Pressable>
+            </PressableScale>
             {queueTrackDialog?.fromLibrary ? (
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={`Eliminar ${queueTrackDialog.track.title} del dispositivo`}
                 accessibilityState={{
@@ -2643,15 +2550,68 @@ function AppContent({
                     ? 'Eliminando…'
                     : '⌫ Eliminar del dispositivo'}
                 </Text>
-              </Pressable>
+              </PressableScale>
             ) : null}
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               onPress={() => setQueueTrackDialog(null)}
               style={styles.dialogCancelButton}
             >
               <Text style={styles.dialogCancelText}>Cancelar</Text>
-            </Pressable>
+            </PressableScale>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setPlaylistActions(null)}
+        transparent
+        visible={playlistActions !== null}
+      >
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <Text numberOfLines={1} style={styles.dialogTitle}>
+              {playlistActions?.name}
+            </Text>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={`Renombrar ${playlistActions?.name}`}
+              onPress={() => {
+                if (playlistActions) {
+                  setPlaylistDialogError(null);
+                  setPlaylistNameDialog({
+                    playlistId: playlistActions.id,
+                    name: playlistActions.name,
+                  });
+                }
+                setPlaylistActions(null);
+              }}
+              style={styles.queueMenuAction}
+            >
+              <Text style={styles.queueMenuActionText}>Renombrar</Text>
+            </PressableScale>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={`Eliminar ${playlistActions?.name}`}
+              onPress={() => {
+                setPlaylistToDelete(playlistActions);
+                setPlaylistActions(null);
+              }}
+              style={styles.queueMenuAction}
+            >
+              <Text
+                style={[styles.queueMenuActionText, styles.dangerActionText]}
+              >
+                Eliminar lista
+              </Text>
+            </PressableScale>
+            <PressableScale
+              accessibilityRole="button"
+              onPress={() => setPlaylistActions(null)}
+              style={styles.dialogCancelButton}
+            >
+              <Text style={styles.dialogCancelText}>Cancelar</Text>
+            </PressableScale>
           </View>
         </View>
       </Modal>
@@ -2675,7 +2635,7 @@ function AppContent({
               <Text style={styles.dialogError}>{playlistDialogError}</Text>
             ) : null}
             <View style={styles.dialogActions}>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 disabled={savingPlaylist}
                 onPress={() => {
@@ -2685,8 +2645,8 @@ function AppContent({
                 style={styles.dialogCancelButton}
               >
                 <Text style={styles.dialogCancelText}>Cancelar</Text>
-              </Pressable>
-              <Pressable
+              </PressableScale>
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={`Confirmar eliminación de ${playlistToDelete?.name}`}
                 disabled={savingPlaylist}
@@ -2696,7 +2656,7 @@ function AppContent({
                 <Text style={styles.dialogConfirmText}>
                   {savingPlaylist ? 'Eliminando…' : 'Eliminar'}
                 </Text>
-              </Pressable>
+              </PressableScale>
             </View>
           </View>
         </View>
@@ -2719,7 +2679,7 @@ function AppContent({
                   {draftPlaylistTrackIds.size} seleccionadas
                 </Text>
               </View>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar selección de canciones"
                 onPress={() => {
@@ -2728,8 +2688,8 @@ function AppContent({
                 }}
                 style={styles.queueCloseButton}
               >
-                <Text style={styles.queueCloseIcon}>×</Text>
-              </Pressable>
+                <X color={colors.muted} size={22} />
+              </PressableScale>
             </View>
             <TextInput
               accessibilityLabel="Buscar canciones para añadir"
@@ -2765,7 +2725,7 @@ function AppContent({
                 {visiblePlaylistPickerTracks.map(track => {
                   const selected = draftPlaylistTrackIds.has(track.id);
                   return (
-                    <Pressable
+                    <PressableScale
                       key={track.id}
                       accessibilityRole="checkbox"
                       accessibilityLabel={`${track.title} de ${track.artist}`}
@@ -2788,17 +2748,17 @@ function AppContent({
                           selected && styles.trackPickerCheckboxSelected,
                         ]}
                       >
-                        <Text style={styles.trackPickerCheck}>
-                          {selected ? '✓' : ''}
-                        </Text>
+                        {selected ? (
+                          <Check color={colors.accent} size={20} />
+                        ) : null}
                       </View>
-                    </Pressable>
+                    </PressableScale>
                   );
                 })}
               </ScrollView>
             )}
             <View style={styles.dialogActions}>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 disabled={savingPlaylist}
                 onPress={() => {
@@ -2808,8 +2768,8 @@ function AppContent({
                 style={styles.dialogCancelButton}
               >
                 <Text style={styles.dialogCancelText}>Cancelar</Text>
-              </Pressable>
-              <Pressable
+              </PressableScale>
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel="Guardar canciones seleccionadas"
                 disabled={savingPlaylist}
@@ -2819,7 +2779,7 @@ function AppContent({
                 <Text style={styles.dialogConfirmText}>
                   {savingPlaylist ? 'Guardando…' : 'Guardar selección'}
                 </Text>
-              </Pressable>
+              </PressableScale>
             </View>
           </View>
         </View>

@@ -7,6 +7,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
@@ -49,6 +50,20 @@ data class PlaybackHistoryEntity(
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val trackId: String,
   val playedAt: Long,
+)
+
+/** Tag values read from an audio file, reused until the file changes. */
+@Entity(tableName = "track_metadata")
+data class TrackMetadataEntity(
+  @PrimaryKey val trackId: String,
+  val albumId: Long,
+  val dateModified: Long,
+  val size: Long,
+  val title: String?,
+  val artist: String?,
+  val album: String?,
+  val genre: String?,
+  val year: Int?,
 )
 
 @Dao
@@ -100,6 +115,15 @@ interface PlaylistDao {
 
   @Query("DELETE FROM playback_history")
   suspend fun clearPlaybackHistory()
+
+  @Query("SELECT * FROM track_metadata")
+  suspend fun getTrackMetadata(): List<TrackMetadataEntity>
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun insertTrackMetadata(metadata: List<TrackMetadataEntity>)
+
+  @Query("DELETE FROM track_metadata WHERE trackId IN (:trackIds)")
+  suspend fun deleteTrackMetadata(trackIds: List<String>)
 }
 
 data class RecentPlaybackEntry(
@@ -112,8 +136,9 @@ data class RecentPlaybackEntry(
     PlaylistEntity::class,
     PlaylistTrackEntity::class,
     PlaybackHistoryEntity::class,
+    TrackMetadataEntity::class,
   ],
-  version = 2,
+  version = 3,
   exportSchema = false,
 )
 abstract class PlaylistDatabase : RoomDatabase() {
@@ -138,6 +163,18 @@ abstract class PlaylistDatabase : RoomDatabase() {
       }
     }
 
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          "CREATE TABLE IF NOT EXISTS `track_metadata` " +
+            "(`trackId` TEXT NOT NULL, `albumId` INTEGER NOT NULL, " +
+            "`dateModified` INTEGER NOT NULL, `size` INTEGER NOT NULL, " +
+            "`title` TEXT, `artist` TEXT, `album` TEXT, `genre` TEXT, " +
+            "`year` INTEGER, PRIMARY KEY(`trackId`))",
+        )
+      }
+    }
+
     @Volatile
     private var instance: PlaylistDatabase? = null
 
@@ -147,7 +184,7 @@ abstract class PlaylistDatabase : RoomDatabase() {
           context.applicationContext,
           PlaylistDatabase::class.java,
           "playlists.db",
-        ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
       }
   }
 }

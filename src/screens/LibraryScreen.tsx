@@ -1,16 +1,37 @@
-import type { Dispatch, ReactNode, Ref, SetStateAction } from 'react';
+import {
+  useEffect,
+  useRef,
+  type Dispatch,
+  type ReactNode,
+  type Ref,
+  type SetStateAction,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Pressable,
   RefreshControl,
   ScrollView,
   Text,
   View,
 } from 'react-native';
-import { Play, Shuffle, SlidersHorizontal, X } from 'lucide-react-native';
-import { LibrarySkeleton } from '../components/library/LibraryComponents';
+import {
+  ChevronLeft,
+  ListMusic,
+  Music2,
+  Play,
+  Plus,
+  Shuffle,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react-native';
+import { PressableScale } from '../components/motion/PressableScale';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { motionDuration, motionEasing } from '../theme/motion';
+import {
+  Artwork,
+  LibrarySkeleton,
+} from '../components/library/LibraryComponents';
 import type {
   LibraryTab,
   Playlist,
@@ -151,10 +172,48 @@ export function LibraryScreen(props: LibraryScreenProps) {
     renderPlaylistCard,
     renderPlaylistTrack,
   } = props;
+  const reducedMotion = useReducedMotion();
+  const contentReveal = useRef(new Animated.Value(1)).current;
+  const contentKey = `${activeNavigationItem}:${selectedGroup?.name ?? ''}:${
+    selectedPlaylist?.id ?? ''
+  }`;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      return;
+    }
+    contentReveal.setValue(0);
+    Animated.timing(contentReveal, {
+      toValue: 1,
+      duration: motionDuration.enter,
+      easing: motionEasing.enter,
+      useNativeDriver: true,
+    }).start();
+  }, [contentKey, contentReveal, reducedMotion]);
 
   return (
     <View style={styles.libraryScreen}>
       <View style={styles.header}>
+        {selectedGroup || selectedPlaylist ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={
+              selectedGroup
+                ? `Volver a ${
+                    selectedGroup.kind === 'album' ? 'álbumes' : 'artistas'
+                  }`
+                : 'Volver a las listas'
+            }
+            onPress={() => {
+              setSelectedGroup(null);
+              setSelectedPlaylistId(null);
+              setSearch('');
+            }}
+            style={[styles.refreshButton, styles.headerBackButton]}
+          >
+            <ChevronLeft color={colors.accent} size={24} />
+          </PressableScale>
+        ) : null}
         <View style={styles.headerTitle}>
           <Animated.Text
             style={[
@@ -212,48 +271,22 @@ export function LibraryScreen(props: LibraryScreenProps) {
               : 'Biblioteca'}
           </Animated.Text>
         </View>
-        {selectedGroup || activeTab === 'playlists' ? (
-          <Pressable
+        {activeTab === 'playlists' && !selectedGroup && !selectedPlaylist ? (
+          <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={
-              selectedGroup
-                ? `Volver a ${
-                    selectedGroup.kind === 'album' ? 'álbumes' : 'artistas'
-                  }`
-                : activeTab !== 'playlists'
-                ? activeTab === 'recent'
-                  ? 'Actualizar historial'
-                  : 'Actualizar biblioteca'
-                : selectedPlaylist
-                ? 'Volver a las listas'
-                : 'Crear lista de reproducción'
-            }
+            accessibilityLabel="Crear lista de reproducción"
             onPress={() => {
-              if (selectedGroup) {
-                setSelectedGroup(null);
-                setSearch('');
-              } else if (selectedPlaylist) {
-                setSelectedPlaylistId(null);
-                setSearch('');
-              } else {
-                setPlaylistDialogError(null);
-                setPlaylistNameDialog({ playlistId: null, name: '' });
-              }
+              setPlaylistDialogError(null);
+              setPlaylistNameDialog({ playlistId: null, name: '' });
             }}
             style={styles.refreshButton}
           >
-            <Text style={styles.refreshIcon}>
-              {selectedGroup || selectedPlaylist
-                ? '‹'
-                : activeTab === 'playlists'
-                ? '+'
-                : '↻'}
-            </Text>
-          </Pressable>
+            <Plus color={colors.accent} size={24} />
+          </PressableScale>
         ) : null}
       </View>
 
-      {!selectedPlaylist ? (
+      {!selectedPlaylist && !selectedGroup ? (
         <ScrollView
           horizontal
           style={styles.librarySectionTabs}
@@ -263,7 +296,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
           {librarySections.map(section => {
             const selected = activeNavigationItem === section.id;
             return (
-              <Pressable
+              <PressableScale
                 key={section.id}
                 accessibilityRole="tab"
                 accessibilityLabel={section.label}
@@ -282,7 +315,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
                 >
                   {section.label}
                 </Text>
-              </Pressable>
+              </PressableScale>
             );
           })}
         </ScrollView>
@@ -291,7 +324,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
       {activeTab === 'songs' && !selectedGroup ? (
         <View style={styles.libraryPrimaryActions}>
           <View style={styles.libraryPlaybackActions}>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Reproducir ${visibleTracks.length} canciones`}
               disabled={visibleTracks.length === 0 || !playerReady}
@@ -306,8 +339,8 @@ export function LibraryScreen(props: LibraryScreenProps) {
               ]}
             >
               <Play color={colors.onAccent} fill={colors.onAccent} size={19} />
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Reproducir aleatoriamente ${visibleTracks.length} canciones`}
               disabled={visibleTracks.length === 0 || !playerReady}
@@ -324,10 +357,10 @@ export function LibraryScreen(props: LibraryScreenProps) {
               ]}
             >
               <Shuffle color={colors.text} size={19} />
-            </Pressable>
+            </PressableScale>
           </View>
           <View style={styles.librarySortFilterActions}>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Cambiar orden de canciones: ${
                 trackSorts.find(sort => sort.id === trackSort)?.label
@@ -350,8 +383,8 @@ export function LibraryScreen(props: LibraryScreenProps) {
                   ? 'Z–A'
                   : 'Añadidas'}
               </Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel="Filtrar por género"
               accessibilityState={{ selected: selectedGenre !== null }}
@@ -364,7 +397,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
                   <Text style={styles.filterCountText}>1</Text>
                 </View>
               ) : null}
-            </Pressable>
+            </PressableScale>
           </View>
         </View>
       ) : null}
@@ -373,7 +406,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
         <>
           {selectedGenre ? (
             <View style={styles.activeFilterChips}>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={`Quitar filtro de género ${selectedGenre}`}
                 onPress={() => setSelectedGenre(null)}
@@ -381,7 +414,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
               >
                 <Text style={styles.activeFilterText}>{selectedGenre}</Text>
                 <X color={colors.accent} size={15} />
-              </Pressable>
+              </PressableScale>
             </View>
           ) : null}
         </>
@@ -391,9 +424,12 @@ export function LibraryScreen(props: LibraryScreenProps) {
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{errorMessage}</Text>
           {errorRetryAction ? (
-            <Pressable accessibilityRole="button" onPress={errorRetryAction}>
+            <PressableScale
+              accessibilityRole="button"
+              onPress={errorRetryAction}
+            >
               <Text style={styles.retryText}>Reintentar</Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
         </View>
       ) : null}
@@ -403,247 +439,195 @@ export function LibraryScreen(props: LibraryScreenProps) {
         </View>
       ) : null}
 
-      {selectedGroup ? (
-        <>
-          <View style={styles.libraryHeader}>
-            <Text style={styles.sectionTitle}>Canciones</Text>
-            <Text style={styles.trackCount}>
-              {formatTrackCount(visibleSelectedGroupTracks.length)}
-            </Text>
-          </View>
-          <View style={styles.playlistControls}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Reproducir ${
-                selectedGroup.kind === 'album' ? 'álbum' : 'artista'
-              } ${selectedGroup.name}`}
-              disabled={selectedGroup.tracks.length === 0}
-              onPress={() =>
-                playTracks(
-                  selectedGroup.tracks,
-                  selectedGroup.tracks[0],
-                  selectedGroup.name,
-                )
-              }
-              style={[
-                styles.playlistPrimaryButton,
-                selectedGroup.tracks.length === 0 &&
-                  styles.playlistButtonDisabled,
-              ]}
-            >
-              <Text style={styles.playlistPrimaryButtonText}>▶ Reproducir</Text>
-            </Pressable>
-          </View>
-          {visibleSelectedGroupTracks.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No encontramos resultados</Text>
-              <Text style={styles.emptyDescription}>
-                Prueba con otro título, artista o álbum.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={visibleSelectedGroupTracks}
-              initialNumToRender={12}
-              keyExtractor={track => track.id}
-              maxToRenderPerBatch={8}
-              renderItem={({ item, index }) =>
-                renderTrack(
-                  item,
-                  index,
-                  selectedGroup.tracks,
-                  selectedGroup.name,
-                )
-              }
-              windowSize={7}
-              style={styles.libraryList}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-        </>
-      ) : activeTab === 'playlists' ? (
-        <>
-          <View style={styles.libraryHeader}>
-            <Text style={styles.sectionTitle}>
-              {selectedPlaylist ? 'Canciones' : 'Tus listas de reproducción'}
-            </Text>
-            <Text style={styles.trackCount}>
-              {selectedPlaylist
-                ? formatTrackCount(playlistTracks.length)
-                : visiblePlaylists.length}
-            </Text>
-          </View>
-          {selectedPlaylist ? (
-            <View style={styles.playlistControls}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Reproducir lista ${selectedPlaylist.name}`}
-                disabled={playlistTracks.length === 0}
-                onPress={() => playPlaylist(selectedPlaylist)}
-                style={[
-                  styles.playlistPrimaryButton,
-                  playlistTracks.length === 0 && styles.playlistButtonDisabled,
-                ]}
-              >
-                <Text style={styles.playlistPrimaryButtonText}>
-                  ▶ Reproducir
+      <Animated.View
+        style={[
+          styles.libraryContent,
+          {
+            opacity: contentReveal,
+            transform: [
+              {
+                translateY: contentReveal.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [12, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        {selectedGroup ? (
+          <>
+            <View style={styles.groupDetailHeader}>
+              <Artwork uri={selectedGroup.tracks[0]?.artwork} size={112} />
+              <View style={styles.groupDetailCopy}>
+                {selectedGroup.kind === 'album' ? (
+                  <Text numberOfLines={1} style={styles.trackTitle}>
+                    {selectedGroup.tracks[0]?.artist}
+                  </Text>
+                ) : null}
+                <Text numberOfLines={1} style={styles.trackSubtitle}>
+                  {formatTrackCount(selectedGroup.tracks.length)} ·{' '}
+                  {Math.max(
+                    1,
+                    Math.round(
+                      selectedGroup.tracks.reduce(
+                        (total, track) => total + track.duration,
+                        0,
+                      ) / 60,
+                    ),
+                  )}{' '}
+                  min
                 </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Añadir canciones a ${selectedPlaylist.name}`}
-                onPress={() => openPlaylistTrackPicker(selectedPlaylist)}
-                style={styles.playlistSecondaryButton}
-              >
-                <Text style={styles.playlistSecondaryButtonText}>
-                  + Añadir canciones
-                </Text>
-              </Pressable>
+                <View style={styles.groupDetailActions}>
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={`Reproducir ${
+                      selectedGroup.kind === 'album' ? 'álbum' : 'artista'
+                    } ${selectedGroup.name}`}
+                    disabled={selectedGroup.tracks.length === 0}
+                    onPress={() =>
+                      playTracks(
+                        selectedGroup.tracks,
+                        selectedGroup.tracks[0],
+                        selectedGroup.name,
+                      )
+                    }
+                    style={[
+                      styles.libraryPlayButton,
+                      selectedGroup.tracks.length === 0 &&
+                        styles.playlistButtonDisabled,
+                    ]}
+                  >
+                    <Play
+                      color={colors.onAccent}
+                      fill={colors.onAccent}
+                      size={19}
+                    />
+                  </PressableScale>
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={`Reproducir aleatoriamente ${selectedGroup.name}`}
+                    disabled={selectedGroup.tracks.length === 0}
+                    onPress={() => {
+                      const shuffledTracks = shuffleTracks(
+                        selectedGroup.tracks,
+                      );
+                      if (shuffledTracks[0]) {
+                        playTracks(
+                          shuffledTracks,
+                          shuffledTracks[0],
+                          selectedGroup.name,
+                        );
+                      }
+                    }}
+                    style={[
+                      styles.libraryShuffleButton,
+                      selectedGroup.tracks.length === 0 &&
+                        styles.playlistButtonDisabled,
+                    ]}
+                  >
+                    <Shuffle color={colors.text} size={19} />
+                  </PressableScale>
+                </View>
+              </View>
             </View>
-          ) : null}
-          {loadingPlaylists ? (
-            <View style={styles.emptyState}>
-              <ActivityIndicator color={colors.accent} size="large" />
-              <Text style={styles.emptyTitle}>Cargando tus listas…</Text>
-            </View>
-          ) : selectedPlaylist ? (
-            visiblePlaylistTracks.length === 0 ? (
+            {visibleSelectedGroupTracks.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyNote}>♫</Text>
-                <Text style={styles.emptyTitle}>
-                  {search
-                    ? 'No encontramos resultados'
-                    : 'Esta lista está vacía'}
-                </Text>
+                <Text style={styles.emptyTitle}>No encontramos resultados</Text>
                 <Text style={styles.emptyDescription}>
-                  {search
-                    ? 'Prueba con otro título, artista o álbum.'
-                    : 'Añade canciones de tu biblioteca para empezar.'}
+                  Prueba con otro título, artista o álbum.
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={visiblePlaylistTracks}
-                getItemLayout={(_data, index) => ({
-                  length: 76,
-                  offset: 76 * index,
-                  index,
-                })}
+                data={visibleSelectedGroupTracks}
                 initialNumToRender={12}
                 keyExtractor={track => track.id}
                 maxToRenderPerBatch={8}
-                renderItem={({ item }) => renderPlaylistTrack(item)}
+                renderItem={({ item, index }) =>
+                  renderTrack(
+                    item,
+                    index,
+                    selectedGroup.tracks,
+                    selectedGroup.name,
+                  )
+                }
                 windowSize={7}
                 style={styles.libraryList}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
               />
-            )
-          ) : visiblePlaylists.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyNote}>▤</Text>
-              <Text style={styles.emptyTitle}>
-                {search ? 'No encontramos listas' : 'Aún no tienes listas'}
+            )}
+          </>
+        ) : activeTab === 'playlists' ? (
+          <>
+            <View style={styles.libraryHeader}>
+              <Text style={styles.sectionTitle}>
+                {selectedPlaylist ? 'Canciones' : 'Tus listas de reproducción'}
               </Text>
-              <Text style={styles.emptyDescription}>
-                {search
-                  ? 'Prueba con otro nombre.'
-                  : 'Crea una lista y organiza tus canciones favoritas.'}
+              <Text style={styles.trackCount}>
+                {selectedPlaylist
+                  ? formatTrackCount(playlistTracks.length)
+                  : visiblePlaylists.length}
               </Text>
             </View>
-          ) : (
-            <FlatList
-              data={visiblePlaylists}
-              initialNumToRender={10}
-              keyExtractor={playlist => playlist.id}
-              maxToRenderPerBatch={8}
-              renderItem={({ item }) => renderPlaylistCard(item)}
-              windowSize={7}
-              style={styles.libraryList}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-        </>
-      ) : (
-        <>
-          <View style={styles.libraryHeader}>
-            <Text style={styles.sectionTitle}>
-              {activeTab === 'recent'
-                ? 'Reproducidas recientemente'
-                : activeTab === 'songs'
-                ? libraryFilter === 'favorites'
-                  ? 'Tus favoritas'
-                  : 'Todas las canciones'
-                : activeTab === 'albums'
-                ? 'Tus álbumes'
-                : 'Tus artistas'}
-            </Text>
-            <Text style={styles.trackCount}>
-              {activeTab === 'recent'
-                ? recentTracks.length
-                : activeTab === 'songs'
-                ? visibleTracks.length
-                : new Set(
-                    visibleTracks.map(track =>
-                      activeTab === 'albums'
-                        ? track.albumId && track.albumId !== '0'
-                          ? track.albumId
-                          : `${track.album}\u0000${track.artist}`
-                        : track.artist.toLocaleLowerCase(),
-                    ),
-                  ).size}
-            </Text>
-            {activeTab === 'recent' && recentPlayback.length > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Borrar historial de reproducción"
-                onPress={clearRecentPlayback}
-                style={styles.clearHistoryButton}
-              >
-                <Text style={styles.clearHistoryText}>Borrar</Text>
-              </Pressable>
+            {selectedPlaylist ? (
+              <View style={styles.playlistControls}>
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel={`Reproducir lista ${selectedPlaylist.name}`}
+                  disabled={playlistTracks.length === 0}
+                  onPress={() => playPlaylist(selectedPlaylist)}
+                  style={[
+                    styles.playlistPrimaryButton,
+                    playlistTracks.length === 0 &&
+                      styles.playlistButtonDisabled,
+                  ]}
+                >
+                  <Play
+                    color={colors.onAccent}
+                    fill={colors.onAccent}
+                    size={16}
+                  />
+                  <Text style={styles.playlistPrimaryButtonText}>
+                    Reproducir
+                  </Text>
+                </PressableScale>
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel={`Añadir canciones a ${selectedPlaylist.name}`}
+                  onPress={() => openPlaylistTrackPicker(selectedPlaylist)}
+                  style={styles.playlistSecondaryButton}
+                >
+                  <Text style={styles.playlistSecondaryButtonText}>
+                    Añadir canciones
+                  </Text>
+                </PressableScale>
+              </View>
             ) : null}
-          </View>
-          {activeTab !== 'recent' && loadingLibrary ? (
-            activeTab === 'songs' ? (
-              <LibrarySkeleton />
-            ) : (
+            {loadingPlaylists ? (
               <View style={styles.emptyState}>
                 <ActivityIndicator color={colors.accent} size="large" />
-                <Text style={styles.emptyTitle}>Buscando tu música…</Text>
+                <Text style={styles.emptyTitle}>Cargando tus listas…</Text>
               </View>
-            )
-          ) : (activeTab === 'recent' ? recentTracks : visibleTracks).length ===
-            0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyNote}>♪</Text>
-              <Text style={styles.emptyTitle}>
-                {search
-                  ? 'No encontramos resultados'
-                  : activeTab === 'recent'
-                  ? 'Aún no hay canciones recientes'
-                  : libraryFilter === 'favorites'
-                  ? 'Aún no tienes favoritas'
-                  : 'Tu biblioteca está vacía'}
-              </Text>
-              <Text style={styles.emptyDescription}>
-                {search
-                  ? 'Prueba con otro título, artista o álbum.'
-                  : activeTab === 'recent'
-                  ? 'Las canciones que reproduzcas aparecerán aquí.'
-                  : libraryFilter === 'favorites'
-                  ? 'Marca una canción con el corazón para guardarla aquí.'
-                  : 'Añade archivos de audio al dispositivo y vuelve a escanear.'}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.trackListContainer}>
-              {activeTab === 'songs' || activeTab === 'recent' ? (
-                <Animated.FlatList
-                  ref={activeTab === 'songs' ? libraryScrollRef : undefined}
-                  data={activeTab === 'recent' ? recentTracks : visibleTracks}
+            ) : selectedPlaylist ? (
+              visiblePlaylistTracks.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Music2 color={colors.muted} size={40} />
+                  <Text style={styles.emptyTitle}>
+                    {search
+                      ? 'No encontramos resultados'
+                      : 'Esta lista está vacía'}
+                  </Text>
+                  <Text style={styles.emptyDescription}>
+                    {search
+                      ? 'Prueba con otro título, artista o álbum.'
+                      : 'Añade canciones de tu biblioteca para empezar.'}
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={visiblePlaylistTracks}
                   getItemLayout={(_data, index) => ({
                     length: 76,
                     offset: 76 * index,
@@ -652,65 +636,185 @@ export function LibraryScreen(props: LibraryScreenProps) {
                   initialNumToRender={12}
                   keyExtractor={track => track.id}
                   maxToRenderPerBatch={8}
-                  onScroll={
-                    activeTab === 'songs'
-                      ? Animated.event(
-                          [
-                            {
-                              nativeEvent: {
-                                contentOffset: { y: libraryScrollY },
-                              },
-                            },
-                          ],
-                          { useNativeDriver: true },
-                        )
-                      : undefined
-                  }
-                  refreshControl={
-                    activeTab === 'songs' ? (
-                      <RefreshControl
-                        refreshing={loadingLibrary}
-                        onRefresh={loadLibrary}
-                        tintColor={colors.accent}
-                        colors={[colors.accent]}
-                      />
-                    ) : undefined
-                  }
-                  renderItem={({ item, index }) =>
-                    renderTrack(
-                      item,
-                      index,
-                      activeTab === 'recent' ? recentTracks : visibleTracks,
-                      activeTab === 'recent'
-                        ? 'Recientes'
-                        : libraryFilter === 'favorites'
-                        ? 'Favoritas'
-                        : 'Biblioteca',
-                    )
-                  }
-                  scrollEventThrottle={16}
-                  showsVerticalScrollIndicator={false}
-                  style={styles.libraryList}
-                  contentContainerStyle={styles.listContent}
-                  windowSize={7}
-                />
-              ) : (
-                <FlatList
-                  data={groupedLibrary}
-                  initialNumToRender={12}
-                  keyExtractor={group => group.key}
-                  maxToRenderPerBatch={8}
-                  renderItem={({ item }) => renderGroupedLibrary(item)}
+                  renderItem={({ item }) => renderPlaylistTrack(item)}
                   windowSize={7}
                   style={styles.libraryList}
                   contentContainerStyle={styles.listContent}
                   showsVerticalScrollIndicator={false}
                 />
-              )}
+              )
+            ) : visiblePlaylists.length === 0 ? (
+              <View style={styles.emptyState}>
+                <ListMusic color={colors.muted} size={40} />
+                <Text style={styles.emptyTitle}>
+                  {search ? 'No encontramos listas' : 'Aún no tienes listas'}
+                </Text>
+                <Text style={styles.emptyDescription}>
+                  {search
+                    ? 'Prueba con otro nombre.'
+                    : 'Crea una lista y organiza tus canciones favoritas.'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={visiblePlaylists}
+                initialNumToRender={10}
+                keyExtractor={playlist => playlist.id}
+                maxToRenderPerBatch={8}
+                renderItem={({ item }) => renderPlaylistCard(item)}
+                windowSize={7}
+                style={styles.libraryList}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            <View style={styles.libraryHeader}>
+              <Text style={styles.sectionTitle}>
+                {activeTab === 'recent'
+                  ? 'Reproducidas recientemente'
+                  : activeTab === 'songs'
+                  ? libraryFilter === 'favorites'
+                    ? 'Tus favoritas'
+                    : 'Todas las canciones'
+                  : activeTab === 'albums'
+                  ? 'Tus álbumes'
+                  : 'Tus artistas'}
+              </Text>
+              <Text style={styles.trackCount}>
+                {activeTab === 'recent'
+                  ? recentTracks.length
+                  : activeTab === 'songs'
+                  ? visibleTracks.length
+                  : new Set(
+                      visibleTracks.map(track =>
+                        activeTab === 'albums'
+                          ? track.albumId && track.albumId !== '0'
+                            ? track.albumId
+                            : `${track.album}\u0000${track.artist}`
+                          : track.artist.toLocaleLowerCase(),
+                      ),
+                    ).size}
+              </Text>
+              {activeTab === 'recent' && recentPlayback.length > 0 ? (
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel="Borrar historial de reproducción"
+                  onPress={clearRecentPlayback}
+                  style={styles.clearHistoryButton}
+                >
+                  <Text style={styles.clearHistoryText}>Borrar</Text>
+                </PressableScale>
+              ) : null}
             </View>
-          )}
-        </>
-      )}
+            {activeTab !== 'recent' && loadingLibrary ? (
+              activeTab === 'songs' ? (
+                <LibrarySkeleton />
+              ) : (
+                <View style={styles.emptyState}>
+                  <ActivityIndicator color={colors.accent} size="large" />
+                  <Text style={styles.emptyTitle}>Buscando tu música…</Text>
+                </View>
+              )
+            ) : (activeTab === 'recent' ? recentTracks : visibleTracks)
+                .length === 0 ? (
+              <View style={styles.emptyState}>
+                <Music2 color={colors.muted} size={40} />
+                <Text style={styles.emptyTitle}>
+                  {search
+                    ? 'No encontramos resultados'
+                    : activeTab === 'recent'
+                    ? 'Aún no hay canciones recientes'
+                    : libraryFilter === 'favorites'
+                    ? 'Aún no tienes favoritas'
+                    : 'Tu biblioteca está vacía'}
+                </Text>
+                <Text style={styles.emptyDescription}>
+                  {search
+                    ? 'Prueba con otro título, artista o álbum.'
+                    : activeTab === 'recent'
+                    ? 'Las canciones que reproduzcas aparecerán aquí.'
+                    : libraryFilter === 'favorites'
+                    ? 'Marca una canción con el corazón para guardarla aquí.'
+                    : 'Añade archivos de audio al dispositivo y vuelve a escanear.'}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.trackListContainer}>
+                {activeTab === 'songs' || activeTab === 'recent' ? (
+                  <Animated.FlatList
+                    ref={activeTab === 'songs' ? libraryScrollRef : undefined}
+                    data={activeTab === 'recent' ? recentTracks : visibleTracks}
+                    getItemLayout={(_data, index) => ({
+                      length: 76,
+                      offset: 76 * index,
+                      index,
+                    })}
+                    initialNumToRender={12}
+                    keyExtractor={track => track.id}
+                    maxToRenderPerBatch={8}
+                    onScroll={
+                      activeTab === 'songs'
+                        ? Animated.event(
+                            [
+                              {
+                                nativeEvent: {
+                                  contentOffset: { y: libraryScrollY },
+                                },
+                              },
+                            ],
+                            { useNativeDriver: true },
+                          )
+                        : undefined
+                    }
+                    refreshControl={
+                      activeTab === 'songs' ? (
+                        <RefreshControl
+                          refreshing={loadingLibrary}
+                          onRefresh={loadLibrary}
+                          tintColor={colors.accent}
+                          colors={[colors.accent]}
+                        />
+                      ) : undefined
+                    }
+                    renderItem={({ item, index }) =>
+                      renderTrack(
+                        item,
+                        index,
+                        activeTab === 'recent' ? recentTracks : visibleTracks,
+                        activeTab === 'recent'
+                          ? 'Recientes'
+                          : libraryFilter === 'favorites'
+                          ? 'Favoritas'
+                          : 'Biblioteca',
+                      )
+                    }
+                    scrollEventThrottle={16}
+                    showsVerticalScrollIndicator={false}
+                    style={styles.libraryList}
+                    contentContainerStyle={styles.listContent}
+                    windowSize={7}
+                  />
+                ) : (
+                  <FlatList
+                    data={groupedLibrary}
+                    initialNumToRender={12}
+                    keyExtractor={group => group.key}
+                    maxToRenderPerBatch={8}
+                    renderItem={({ item }) => renderGroupedLibrary(item)}
+                    windowSize={7}
+                    style={styles.libraryList}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                  />
+                )}
+              </View>
+            )}
+          </>
+        )}
+      </Animated.View>
     </View>
   );
 }

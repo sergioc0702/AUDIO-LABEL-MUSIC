@@ -1,17 +1,19 @@
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Animated, Easing, ScrollView, Text, View } from 'react-native';
 import {
   Album,
   Clock3,
   Heart,
   ListMusic,
-  Music2,
   Play,
+  RefreshCw,
 } from 'lucide-react-native';
 import type { Playlist, Track } from '../types/Track';
 import type { createStyles } from '../theme/createStyles';
 import type { AppDesignTokens } from '../theme/tokens';
 import { Artwork } from '../components/library/LibraryComponents';
+import { PressableScale } from '../components/motion/PressableScale';
+import { PlayPauseIcon } from '../components/player/PlayPauseIcon';
 import { formatTrackCount } from '../utils/formatTrackCount';
 
 type ScreenStyles = ReturnType<typeof createStyles>;
@@ -30,6 +32,8 @@ type HomeScreenProps = {
   tracks: Track[];
   playlists: Playlist[];
   currentTrack: Track | null;
+  isPlaying: boolean;
+  togglePlayback: () => void;
   recentTracks: Track[];
   addedTracks: Track[];
   favoriteIds: Set<string>;
@@ -58,6 +62,8 @@ export function HomeScreen({
   tracks,
   playlists,
   currentTrack,
+  isPlaying,
+  togglePlayback,
   recentTracks,
   addedTracks,
   favoriteIds,
@@ -77,6 +83,42 @@ export function HomeScreen({
     hour < 12 ? 'BUENOS DÍAS' : hour < 19 ? 'BUENAS TARDES' : 'BUENAS NOCHES';
   const featuredTrack =
     currentTrack ?? recentTracks[0] ?? addedTracks[0] ?? null;
+  const featuredIsCurrent =
+    featuredTrack !== null && currentTrack?.id === featuredTrack.id;
+  const recentRowTracks = recentTracks.filter(
+    track => track.id !== featuredTrack?.id,
+  );
+  const refreshSpin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!loadingLibrary) {
+      return;
+    }
+    const spin = Animated.loop(
+      Animated.timing(refreshSpin, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    spin.start();
+    return () => {
+      spin.stop();
+      refreshSpin.setValue(0);
+    };
+  }, [loadingLibrary, refreshSpin]);
+
+  const openFeaturedTrack = () => {
+    if (!featuredTrack) {
+      navigateToPrimaryScreen('library');
+    } else if (featuredIsCurrent) {
+      setPlayerExpanded(true);
+    } else {
+      const homeQueue = recentTracks.length ? recentTracks : tracks;
+      playTracks(homeQueue, featuredTrack, 'Continuar escuchando');
+    }
+  };
   const favoriteTracks = tracks.filter(track => favoriteIds.has(track.id));
   const albumCount = new Set(
     tracks.map(track =>
@@ -128,33 +170,38 @@ export function HomeScreen({
             <Text style={styles.homeGreeting}>{greeting}</Text>
             <Text style={styles.homeHeading}>Tu música</Text>
           </View>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Actualizar biblioteca"
             onPress={() => loadLibrary()}
             style={styles.homeRefreshButton}
           >
-            <Music2 color={colors.accent} size={21} />
-          </Pressable>
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: refreshSpin.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <RefreshCw color={colors.accent} size={21} />
+            </Animated.View>
+          </PressableScale>
         </View>
 
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={
             featuredTrack
               ? `Continuar escuchando ${featuredTrack.title}`
               : 'Abrir biblioteca para buscar canciones'
           }
-          onPress={() => {
-            if (!featuredTrack) {
-              navigateToPrimaryScreen('library');
-            } else if (currentTrack?.id === featuredTrack.id) {
-              setPlayerExpanded(true);
-            } else {
-              const homeQueue = recentTracks.length ? recentTracks : tracks;
-              playTracks(homeQueue, featuredTrack, 'Continuar escuchando');
-            }
-          }}
+          onPress={openFeaturedTrack}
+          pressedScale={0.98}
           style={[styles.homeHero, !featuredTrack && styles.homeHeroEmpty]}
         >
           {featuredTrack ? (
@@ -176,24 +223,49 @@ export function HomeScreen({
                 ? 'Buscando canciones en el dispositivo…'
                 : 'Añade canciones para empezar'}
             </Text>
-            <View style={styles.homeHeroPlay}>
-              <Play color={colors.onAccent} fill={colors.onAccent} size={19} />
-            </View>
+            {featuredIsCurrent ? (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={`${isPlaying ? 'Pausar' : 'Reanudar'} ${
+                  featuredTrack.title
+                }`}
+                onPress={togglePlayback}
+                pressedScale={0.88}
+                style={styles.homeHeroPlay}
+              >
+                <PlayPauseIcon
+                  color={colors.onAccent}
+                  isPlaying={isPlaying}
+                  size={19}
+                />
+              </PressableScale>
+            ) : (
+              <View style={styles.homeHeroPlay}>
+                <Play
+                  color={colors.onAccent}
+                  fill={colors.onAccent}
+                  size={19}
+                />
+              </View>
+            )}
           </View>
           <Text style={styles.homeHeroNote}>
             {tracks.length
               ? `${formatTrackCount(tracks.length)} en tu biblioteca`
               : 'Explora tu biblioteca'}
           </Text>
-        </Pressable>
+        </PressableScale>
 
         {errorMessage ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{errorMessage}</Text>
             {errorRetryAction ? (
-              <Pressable accessibilityRole="button" onPress={errorRetryAction}>
+              <PressableScale
+                accessibilityRole="button"
+                onPress={errorRetryAction}
+              >
                 <Text style={styles.retryText}>Reintentar</Text>
-              </Pressable>
+              </PressableScale>
             ) : null}
           </View>
         ) : null}
@@ -205,22 +277,22 @@ export function HomeScreen({
 
         <View style={styles.homeSectionHeader}>
           <Text style={styles.homeSectionTitle}>Escuchado recientemente</Text>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Ver historial reciente"
             onPress={() => navigateTo('recent')}
           >
             <Text style={styles.homeSectionAction}>Ver todo</Text>
-          </Pressable>
+          </PressableScale>
         </View>
-        {recentTracks.length ? (
+        {recentRowTracks.length ? (
           <ScrollView
             horizontal
             contentContainerStyle={styles.homeRecentList}
             showsHorizontalScrollIndicator={false}
           >
-            {recentTracks.map(track => (
-              <Pressable
+            {recentRowTracks.map(track => (
+              <PressableScale
                 key={track.id}
                 accessibilityRole="button"
                 accessibilityLabel={`Reproducir ${track.title} de ${track.artist}`}
@@ -234,21 +306,21 @@ export function HomeScreen({
                 <Text numberOfLines={1} style={styles.homeRecentArtist}>
                   {track.artist}
                 </Text>
-              </Pressable>
+              </PressableScale>
             ))}
           </ScrollView>
-        ) : (
+        ) : recentTracks.length === 0 ? (
           <Text style={styles.homeEmptyHint}>
             Las canciones que reproduzcas aparecerán aquí.
           </Text>
-        )}
+        ) : null}
 
         <View style={styles.homeSectionHeader}>
           <Text style={styles.homeSectionTitle}>Tu colección</Text>
         </View>
         <View style={styles.homeShortcutGrid}>
           {shortcuts.map(shortcut => (
-            <Pressable
+            <PressableScale
               key={shortcut.id}
               accessibilityRole="button"
               accessibilityLabel={`Abrir ${shortcut.label}`}
@@ -262,19 +334,19 @@ export function HomeScreen({
                 <Text style={styles.homeShortcutTitle}>{shortcut.label}</Text>
                 <Text style={styles.homeShortcutDetail}>{shortcut.detail}</Text>
               </View>
-            </Pressable>
+            </PressableScale>
           ))}
         </View>
 
         <View style={styles.homeSectionHeader}>
           <Text style={styles.homeSectionTitle}>Añadidas recientemente</Text>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Abrir toda la biblioteca"
             onPress={() => navigateTo('songs')}
           >
             <Text style={styles.homeSectionAction}>Ver todo</Text>
-          </Pressable>
+          </PressableScale>
         </View>
         {addedTracks.length ? (
           <View style={styles.homeAddedList}>
@@ -299,7 +371,7 @@ export function HomeScreen({
                 : 'Añade archivos de audio y actualiza la biblioteca.'}
             </Text>
             {!loadingLibrary ? (
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 onPress={() => loadLibrary()}
                 style={styles.homeEmptyButton}
@@ -307,7 +379,7 @@ export function HomeScreen({
                 <Text style={styles.homeEmptyButtonText}>
                   Actualizar biblioteca
                 </Text>
-              </Pressable>
+              </PressableScale>
             ) : null}
           </View>
         )}

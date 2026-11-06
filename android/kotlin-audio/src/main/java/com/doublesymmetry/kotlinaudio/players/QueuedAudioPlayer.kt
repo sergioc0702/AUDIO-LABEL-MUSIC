@@ -7,8 +7,13 @@ import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.IllegalSeekPositionException
 import com.google.android.exoplayer2.source.MediaSource
 import java.util.*
-import kotlin.math.max
 import kotlin.math.min
+
+/** Leaves the item at the same final index as ExoPlayer's moveMediaItem. */
+internal fun <T> MutableList<T>.moveItem(fromIndex: Int, toIndex: Int) {
+    val item = removeAt(fromIndex)
+    add(min(toIndex, size), item)
+}
 
 class QueuedAudioPlayer(
     context: Context,
@@ -183,9 +188,7 @@ class QueuedAudioPlayer(
      */
     fun move(fromIndex: Int, toIndex: Int) {
         exoPlayer.moveMediaItem(fromIndex, toIndex)
-        val item = queue[fromIndex]
-        queue.removeAt(fromIndex)
-        queue.add(max(0, min(items.size, if (toIndex > fromIndex) toIndex else toIndex - 1)), item)
+        queue.moveItem(fromIndex, toIndex)
     }
 
     /**
