@@ -4,14 +4,12 @@
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Alert, BackHandler, DeviceEventEmitter, Text } from 'react-native';
+import { Alert, BackHandler, DeviceEventEmitter } from 'react-native';
 import TrackPlayer, {
-  RepeatMode,
   useActiveTrack,
   type Track as PlayerTrack,
 } from 'react-native-track-player';
 import App from '../App';
-import { AlphabetScrubber } from '../src/components/library/LibraryComponents';
 import PlaybackService from '../src/services/PlaybackService';
 import {
   createPlaylist,
@@ -22,7 +20,8 @@ import {
   getPlaybackRate,
   getPlaylists,
   getRecentPlayback,
-  recordPlaybackHistory,
+  getStoredSession,
+  getTopPlayed,
   renamePlaylist,
   setEqualizerSettings,
   setPlaybackRate,
@@ -34,34 +33,10 @@ jest.mock('lucide-react-native', () => {
   const ReactModule = jest.requireActual('react');
   const ReactNative = jest.requireActual('react-native');
   const Icon = () => ReactModule.createElement(ReactNative.View);
-  return {
-    Album: Icon,
-    Check: Icon,
-    ChevronDown: Icon,
-    ChevronLeft: Icon,
-    ChevronRight: Icon,
-    Clock3: Icon,
-    Gauge: Icon,
-    GripVertical: Icon,
-    Heart: Icon,
-    Home: Icon,
-    ListMusic: Icon,
-    Minus: Icon,
-    MoreVertical: Icon,
-    Music2: Icon,
-    Pause: Icon,
-    Play: Icon,
-    Plus: Icon,
-    RefreshCw: Icon,
-    Repeat: Icon,
-    Repeat1: Icon,
-    Search: Icon,
-    Shuffle: Icon,
-    SkipBack: Icon,
-    SkipForward: Icon,
-    SlidersHorizontal: Icon,
-    X: Icon,
-  };
+  return new Proxy(
+    {},
+    { get: (_target, name) => (name === '__esModule' ? true : Icon) },
+  );
 });
 
 jest.mock(
@@ -91,17 +66,20 @@ jest.mock('react-native-track-player', () => ({
     add: jest.fn().mockResolvedValue(undefined),
     getQueue: jest.fn().mockResolvedValue([]),
     getActiveTrackIndex: jest.fn().mockResolvedValue(undefined),
+    getProgress: jest.fn().mockResolvedValue({ position: 0 }),
     getRepeatMode: jest.fn().mockResolvedValue(0),
     move: jest.fn().mockResolvedValue(undefined),
     remove: jest.fn().mockResolvedValue(undefined),
     skip: jest.fn().mockResolvedValue(undefined),
     play: jest.fn().mockResolvedValue(undefined),
     pause: jest.fn().mockResolvedValue(undefined),
+    stop: jest.fn().mockResolvedValue(undefined),
     skipToNext: jest.fn().mockResolvedValue(undefined),
     skipToPrevious: jest.fn().mockResolvedValue(undefined),
     seekTo: jest.fn().mockResolvedValue(undefined),
     seekBy: jest.fn().mockResolvedValue(undefined),
     setRate: jest.fn().mockResolvedValue(undefined),
+    setPlayWhenReady: jest.fn().mockResolvedValue(undefined),
     removeUpcomingTracks: jest.fn().mockResolvedValue(undefined),
     setRepeatMode: jest.fn().mockResolvedValue(undefined),
   },
@@ -113,7 +91,7 @@ jest.mock('react-native-track-player', () => ({
     SkipToPrevious: 'skip-to-previous',
     SeekTo: 'seek-to',
   },
-  State: { Playing: 'playing' },
+  State: { Playing: 'playing', Paused: 'paused' },
   Event: {
     RemotePlay: 'remote-play',
     RemotePause: 'remote-pause',
@@ -123,6 +101,9 @@ jest.mock('react-native-track-player', () => ({
     RemoteSeek: 'remote-seek',
     RemoteJumpForward: 'remote-jump-forward',
     RemoteJumpBackward: 'remote-jump-backward',
+    PlaybackActiveTrackChanged: 'playback-active-track-changed',
+    PlaybackProgressUpdated: 'playback-progress-updated',
+    PlaybackState: 'playback-state',
   },
   RepeatMode: { Off: 0, Track: 1, Queue: 2 },
   useActiveTrack: jest.fn().mockReturnValue(undefined),
@@ -142,13 +123,16 @@ jest.mock('../src/native/musicLibrary', () => ({
   setTrackFavorite: jest.fn().mockResolvedValue(undefined),
   getPlaylists: jest.fn().mockResolvedValue([]),
   getRecentPlayback: jest.fn().mockResolvedValue([]),
+  getTopPlayed: jest.fn().mockResolvedValue([]),
   deleteTrackFromDevice: jest.fn().mockResolvedValue(true),
   recordPlaybackHistory: jest.fn().mockResolvedValue(undefined),
   setPlaybackRate: jest.fn().mockResolvedValue(undefined),
   setEqualizerSettings: jest.fn().mockResolvedValue(undefined),
+  storeSession: jest.fn().mockResolvedValue(undefined),
+  getStoredSession: jest.fn().mockResolvedValue(null),
   createPlaylist: jest.fn().mockResolvedValue({
     id: 'playlist-1',
-    name: 'Favoritas para correr',
+    name: 'Para correr',
     createdAt: 1,
     trackIds: [],
   }),
@@ -159,2001 +143,622 @@ jest.mock('../src/native/musicLibrary', () => ({
 
 jest.mock('react-native-safe-area-context', () => {
   const ReactModule = jest.requireActual('react');
-  const ReactNative = jest.requireActual('react-native');
   return {
     SafeAreaProvider: ReactModule.Fragment,
-    SafeAreaView: ReactNative.View,
     useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
   };
 });
+
+function makeTrack(id: string, overrides: Partial<Track> = {}): Track {
+  return {
+    id,
+    uri: `file:///${id}.mp3`,
+    title: `Tema ${id}`,
+    artist: 'Artista',
+    album: 'Álbum',
+    albumId: 'album-1',
+    duration: 180,
+    dateAdded: 1,
+    artwork: null,
+    folder: 'Music',
+    ...overrides,
+  };
+}
+
+function toQueue(tracks: Track[]): PlayerTrack[] {
+  return tracks.map(track => ({
+    id: track.id,
+    url: track.uri,
+    title: track.title,
+    artist: track.artist,
+  }));
+}
+
+let renderer: ReactTestRenderer.ReactTestRenderer;
+
+const settle = () =>
+  ReactTestRenderer.act(async () => {
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+
+async function renderApp(initialScreen?: 'home' | 'search' | 'library') {
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App initialScreen={initialScreen} />);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+  await settle();
+}
+
+const byLabel = (label: string) =>
+  renderer.root.findAll(
+    node =>
+      node.props.accessibilityLabel === label &&
+      typeof node.props.onPress === 'function',
+    { deep: false },
+  );
+
+const screenText = () =>
+  renderer.root
+    .findAll(node => (node.type as unknown) === 'Text')
+    .map(node => [node.props.children].flat().join(''))
+    .join(' | ');
+
+const hasLabel = (label: string) =>
+  renderer.root.findAll(node => node.props.accessibilityLabel === label, {
+    deep: false,
+  }).length > 0;
+
+async function press(label: string) {
+  const [node] = byLabel(label);
+  if (!node) {
+    throw new Error(`No encontré: ${label}`);
+  }
+  await ReactTestRenderer.act(async () => {
+    await node.props.onPress();
+  });
+  await settle();
+}
+
+function setActive(track: Track) {
+  jest.mocked(useActiveTrack).mockReturnValue({
+    id: track.id,
+    url: track.uri,
+    title: track.title,
+  });
+}
+
+function mockLiveQueue(tracks: Track[]) {
+  const queue = toQueue(tracks);
+  jest.mocked(TrackPlayer.getQueue).mockImplementation(async () => queue);
+  jest.mocked(TrackPlayer.getActiveTrackIndex).mockResolvedValue(0);
+  jest.mocked(TrackPlayer.move).mockImplementation(async (from, to) => {
+    const [moved] = queue.splice(from, 1);
+    queue.splice(to, 0, moved);
+  });
+  jest.mocked(TrackPlayer.remove).mockImplementation(async index => {
+    queue.splice(index as number, 1);
+  });
+  return queue;
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getDeviceTracks).mockReset().mockResolvedValue([]);
   jest.mocked(getPlaylists).mockReset().mockResolvedValue([]);
   jest.mocked(getRecentPlayback).mockReset().mockResolvedValue([]);
+  jest.mocked(getTopPlayed).mockReset().mockResolvedValue([]);
+  jest.mocked(getStoredSession).mockReset().mockResolvedValue(null);
   jest.mocked(useActiveTrack).mockReset().mockReturnValue(undefined);
-  jest.mocked(TrackPlayer.add).mockReset().mockResolvedValue(undefined);
-  jest.mocked(TrackPlayer.move).mockReset().mockResolvedValue(undefined);
-  jest.mocked(TrackPlayer.pause).mockReset().mockResolvedValue(undefined);
-  jest.mocked(TrackPlayer.play).mockReset().mockResolvedValue(undefined);
-  jest.mocked(TrackPlayer.reset).mockReset().mockResolvedValue(undefined);
   jest.mocked(TrackPlayer.getQueue).mockReset().mockResolvedValue([]);
+  jest.mocked(TrackPlayer.move).mockReset().mockResolvedValue(undefined);
+  jest.mocked(TrackPlayer.remove).mockReset().mockResolvedValue(undefined);
   jest
     .mocked(TrackPlayer.getActiveTrackIndex)
     .mockReset()
     .mockResolvedValue(undefined);
-  jest.mocked(TrackPlayer.getRepeatMode).mockReset().mockResolvedValue(0);
 });
 
-function findPlayerOpenButton(renderer: ReactTestRenderer.ReactTestRenderer) {
-  return renderer.root.find(
-    node =>
-      typeof node.props.accessibilityLabel === 'string' &&
-      node.props.accessibilityLabel.startsWith('Abrir reproductor:'),
-  );
-}
-
-function createLibraryApp() {
-  return ReactTestRenderer.create(<App initialScreen="library" />);
-}
-
-test('captures alphabet scrubbing and skips repeated letters', () => {
-  const onSelect = jest.fn();
-  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
-  ReactTestRenderer.act(() => {
-    renderer = ReactTestRenderer.create(
-      <AlphabetScrubber height={270} onSelect={onSelect} />,
-    );
-  });
-  const scrubber = renderer!.root.findByProps({
-    accessibilityLabel: 'Índice alfabético de canciones',
-  });
-
-  expect(scrubber.props.onResponderTerminationRequest()).toBe(false);
-  expect(
-    scrubber.props.onStartShouldSetResponderCapture({
-      nativeEvent: { touches: [] },
-      touchHistory: { numberActiveTouches: 0 },
-    } as never),
-  ).toBe(true);
-  const responderEventAt = (pageY: number, timeStamp: number) =>
-    ({
-      nativeEvent: { pageY, touches: [] },
-      touchHistory: {
-        numberActiveTouches: 1,
-        indexOfSingleActiveTouch: 0,
-        mostRecentTimeStamp: timeStamp,
-        touchBank: [
-          {
-            touchActive: true,
-            currentTimeStamp: timeStamp,
-            currentPageX: 0,
-            currentPageY: pageY,
-            previousPageX: 0,
-            previousPageY: pageY - 1,
-          },
-        ],
-      },
-    } as never);
-  ReactTestRenderer.act(() => {
-    scrubber.props.onResponderGrant(responderEventAt(1, 1));
-    scrubber.props.onResponderMove(responderEventAt(2, 2));
-    scrubber.props.onResponderMove(responderEventAt(25, 3));
-  });
-
-  expect(onSelect.mock.calls.map(([letter]) => letter)).toEqual(['#', 'B']);
-  ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('orders the alphabet index in the same direction as the song list', () => {
-  const onSelect = jest.fn();
-  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
-  ReactTestRenderer.act(() => {
-    renderer = ReactTestRenderer.create(
-      <AlphabetScrubber descending height={270} onSelect={onSelect} />,
-    );
-  });
-  const scrubber = renderer!.root.findByProps({
-    accessibilityLabel: 'Índice alfabético de canciones',
-  });
-
-  expect(
-    scrubber
-      .findAll(node => node.type === Text)
-      .map(node => node.props.children),
-  ).toEqual([...'ZYXWVUTSRQPONMLKJIHGFEDCBA#']);
-  ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('renders correctly', async () => {
-  let renderer: ReactTestRenderer.ReactTestRenderer;
+afterEach(async () => {
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    renderer?.unmount();
   });
+});
 
-  expect(renderer!.root.findByProps({ children: 'Tu música' })).toBeTruthy();
-  expect(
-    renderer!.root.findByProps({ accessibilityLabel: 'Inicio' }),
-  ).toBeTruthy();
-  expect(
-    renderer!.root.findByProps({ accessibilityLabel: 'Buscar' }),
-  ).toBeTruthy();
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Buscar canciones, artistas o álbumes',
-    }),
-  ).toHaveLength(0);
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Biblioteca' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findAllByProps({ children: 'Canciones' }).length,
-  ).toBeGreaterThan(0);
-  expect(renderer!.root.findByProps({ children: 'Favoritas' })).toBeTruthy();
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Reproducir 0 canciones',
-    }),
-  ).toBeTruthy();
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Reproducir aleatoriamente 0 canciones',
-    }),
-  ).toBeTruthy();
-  expect(
-    renderer!.root.findAllByProps({ children: 'Reproducir' }),
-  ).toHaveLength(0);
-  expect(renderer!.root.findAllByProps({ children: 'Aleatorio' })).toHaveLength(
-    0,
+test('shows the three tabs and the home shortcuts', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  await renderApp();
+
+  ['Inicio', 'Buscar', 'Biblioteca', 'Favoritas', 'Más escuchadas'].forEach(
+    label => expect(hasLabel(label)).toBe(true),
   );
-  expect(
-    renderer!.root.findByProps({ accessibilityLabel: 'Filtrar por género' }),
-  ).toBeTruthy();
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Buscar' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Buscar canciones, artistas o álbumes',
-    }),
-  ).toBeTruthy();
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Biblioteca' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findByProps({ accessibilityLabel: 'Biblioteca' }),
-  ).toBeTruthy();
 }, 30_000);
 
-test('retries a library loading failure with the library loader', async () => {
+test('explains how to continue when the library is empty', async () => {
+  await renderApp();
+
+  expect(screenText()).toContain('No encontramos música');
+});
+
+test('retries a library loading failure', async () => {
   jest
     .mocked(getDeviceTracks)
-    .mockRejectedValueOnce(new Error('falló el escaneo'))
-    .mockResolvedValueOnce([]);
+    .mockRejectedValueOnce(new Error('Error de lectura'))
+    .mockResolvedValue([makeTrack('1')]);
+  await renderApp();
+  expect(screenText()).toContain('Error de lectura');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  expect(
-    renderer!.root.findByProps({ children: 'falló el escaneo' }),
-  ).toBeTruthy();
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .find(
-        node =>
-          node.props.accessibilityRole === 'button' &&
-          typeof node.props.onPress === 'function' &&
-          node.findAll(child => child.props.children === 'Reintentar').length >
-            0,
-      )
-      .props.onPress();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
+  await press('Reintentar');
 
   expect(getDeviceTracks).toHaveBeenCalledTimes(2);
-  expect(
-    renderer!.root.findAllByProps({ children: 'Reintentar' }),
-  ).toHaveLength(0);
-  await ReactTestRenderer.act(() => renderer!.unmount());
 });
 
-test('does not show the alphabet column in Library or Search', async () => {
-  const tracks: Track[] = Array.from({ length: 14 }, (_, index) => ({
-    id: `song-${index}`,
-    uri: `file:///song-${index}.mp3`,
-    title: `Canción ${String.fromCharCode(65 + index)}`,
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: index,
-    artwork: null,
-  }));
-  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  const songList = renderer!.root.find(
-    node =>
-      Array.isArray(node.props.data) &&
-      node.props.data.some((track: Track) => track.id === 'song-0'),
-  );
-  const contentStyles = Array.isArray(songList.props.contentContainerStyle)
-    ? songList.props.contentContainerStyle
-    : [songList.props.contentContainerStyle];
-  expect(
-    contentStyles.some(
-      (style: unknown) =>
-        typeof style === 'object' &&
-        style !== null &&
-        'paddingRight' in style &&
-        style.paddingRight === 40,
-    ),
-  ).toBe(false);
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Índice alfabético de canciones',
-    }),
-  ).toHaveLength(0);
-
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Buscar' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Índice alfabético de canciones',
-    }),
-  ).toHaveLength(0);
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('registers headset and notification transport controls', async () => {
+test('registers headset, notification and session events', async () => {
   await PlaybackService();
+  const events = jest
+    .mocked(TrackPlayer.addEventListener)
+    .mock.calls.map(([event]) => event);
 
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-play',
-    expect.any(Function),
-  );
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-pause',
-    expect.any(Function),
-  );
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-stop',
-    expect.any(Function),
-  );
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-next',
-    expect.any(Function),
-  );
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-previous',
-    expect.any(Function),
-  );
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-seek',
-    expect.any(Function),
-  );
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-jump-forward',
-    expect.any(Function),
-  );
-  expect(TrackPlayer.addEventListener).toHaveBeenCalledWith(
-    'remote-jump-backward',
-    expect.any(Function),
+  expect(events).toEqual(
+    expect.arrayContaining([
+      'remote-play',
+      'remote-pause',
+      'remote-next',
+      'remote-previous',
+      'remote-seek',
+      'playback-active-track-changed',
+      'playback-progress-updated',
+    ]),
   );
 });
 
-test('opens the genre filter without year, artist or duration options', async () => {
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Filtrar por género' })
-      .props.onPress();
-  });
-
-  expect(renderer!.root.findByProps({ children: 'Género' })).toBeTruthy();
-  expect(
-    renderer!.root.findByProps({ children: 'Género musical' }),
-  ).toBeTruthy();
-  expect(renderer!.root.findAllByProps({ children: 'Año' })).toHaveLength(0);
-  expect(renderer!.root.findAllByProps({ children: 'Duración' })).toHaveLength(
-    0,
-  );
-  expect(
-    renderer!.root.findAllByProps({ children: 'Ordenar canciones' }),
-  ).toHaveLength(0);
-  await ReactTestRenderer.act(async () => {
-    renderer!.unmount();
-  });
-});
-
-test('cycles the library sort without opening a menu', async () => {
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  const sortButton = () =>
-    renderer!.root.find(
-      node =>
-        typeof node.props.accessibilityLabel === 'string' &&
-        node.props.accessibilityLabel.startsWith('Cambiar orden de canciones:'),
-    );
-
-  expect(sortButton().props.accessibilityLabel).toBe(
-    'Cambiar orden de canciones: Nombre A–Z',
-  );
-  await ReactTestRenderer.act(() => sortButton().props.onPress());
-  expect(sortButton().props.accessibilityLabel).toBe(
-    'Cambiar orden de canciones: Nombre Z–A',
-  );
-  await ReactTestRenderer.act(() => sortButton().props.onPress());
-  expect(sortButton().props.accessibilityLabel).toBe(
-    'Cambiar orden de canciones: Añadidas',
-  );
-  await ReactTestRenderer.act(() => sortButton().props.onPress());
-  expect(sortButton().props.accessibilityLabel).toBe(
-    'Cambiar orden de canciones: Nombre A–Z',
-  );
-  expect(
-    renderer!.root.findAllByProps({ children: 'Ordenar canciones' }),
-  ).toHaveLength(0);
-  await ReactTestRenderer.act(async () => {
-    renderer!.unmount();
-  });
-});
-
-test('shows recently played tracks in playback order', async () => {
-  const tracks: Track[] = [
-    {
-      id: 'song-recent',
-      uri: 'file:///recent.mp3',
-      title: 'Reproducida',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 1,
-      artwork: null,
-    },
-  ];
+test('plays the whole library from the Library tab', async () => {
+  const tracks = [makeTrack('2'), makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  await renderApp('library');
+
+  await press('Reproducir 2 canciones');
+
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: '1' }),
+    expect.objectContaining({ id: '2' }),
+  ]);
+  expect(TrackPlayer.play).toHaveBeenCalled();
+});
+
+test('sorts songs from the sort sheet', async () => {
   jest
-    .mocked(getRecentPlayback)
-    .mockResolvedValue([{ trackId: 'song-recent', playedAt: 10 }]);
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([makeTrack('1'), makeTrack('2')]);
+  await renderApp('library');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Recientes' })
-      .props.onPress();
-  });
+  await press('Ordenar: Nombre A–Z');
+  await press('Nombre Z–A');
+  await press('Reproducir 2 canciones');
 
-  expect(renderer!.root.findByProps({ children: 'Reproducida' })).toBeTruthy();
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('restores repeat mode from the active playback service', async () => {
-  const track: Track = {
-    id: 'song-repeat',
-    uri: 'file:///repeat.mp3',
-    title: 'Repetición',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValue([track]);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: track.id,
-    url: track.uri,
-    title: track.title,
-    artist: track.artist,
-    album: track.album,
-    duration: track.duration,
-  } satisfies PlayerTrack);
-  jest.mocked(TrackPlayer.getRepeatMode).mockResolvedValue(RepeatMode.Queue);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    findPlayerOpenButton(renderer!).props.onPress();
-  });
-
-  expect(TrackPlayer.getRepeatMode).toHaveBeenCalled();
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Desactivar repetición',
-    }).props.accessibilityState.selected,
-  ).toBe(true);
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('records playback and changes the persisted playback speed', async () => {
-  const track: Track = {
-    id: 'song-speed',
-    uri: 'file:///speed.mp3',
-    title: 'Velocidad',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValue([track]);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: track.id,
-    url: track.uri,
-    title: track.title,
-    artist: track.artist,
-    album: track.album,
-    duration: track.duration,
-  } satisfies PlayerTrack);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  expect(recordPlaybackHistory).toHaveBeenCalledWith(track.id);
-
-  await ReactTestRenderer.act(() => {
-    findPlayerOpenButton(renderer!).props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Velocidad de reproducción 1×' })
-      .props.onPress();
-    await Promise.resolve();
-  });
-  expect(TrackPlayer.setRate).toHaveBeenLastCalledWith(1.25);
-  expect(setPlaybackRate).toHaveBeenCalledWith(1.25);
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('opens the software equalizer and persists its enabled state', async () => {
-  const track: Track = {
-    id: 'song-equalizer',
-    uri: 'file:///equalizer.mp3',
-    title: 'Ecualizador',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValue([track]);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: track.id,
-    url: track.uri,
-    title: track.title,
-    artist: track.artist,
-    album: track.album,
-    duration: track.duration,
-  } satisfies PlayerTrack);
-  jest.mocked(getEqualizerSettings).mockResolvedValue({
-    enabled: false,
-    bandGainsDb: [0, 0, 0, 0, 0],
-  });
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    findPlayerOpenButton(renderer!).props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Abrir ecualizador' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findByProps({
-      children: 'Ajuste de sonido integrado al reproductor',
-    }),
-  ).toBeTruthy();
-
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Activar ecualizador' })
-      .props.onPress();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  expect(setEqualizerSettings).toHaveBeenLastCalledWith(true, [0, 0, 0, 0, 0]);
-  const firstBand = renderer!.root.findByProps({
-    accessibilityLabel: 'Graves, 60 Hz',
-  });
-  expect(firstBand).toBeTruthy();
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Usar perfil Graves' })
-      .props.onPress();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  expect(setEqualizerSettings).toHaveBeenLastCalledWith(true, [5, 4, 0, 0, 0]);
-  await ReactTestRenderer.act(async () => {
-    firstBand.props.onAccessibilityAction({
-      nativeEvent: { actionName: 'increment' },
-    });
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  expect(setEqualizerSettings).toHaveBeenLastCalledWith(true, [6, 4, 0, 0, 0]);
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('reorders playlist tracks and saves the order', async () => {
-  const tracks: Track[] = [
-    {
-      id: 'song-a',
-      uri: 'file:///a.mp3',
-      title: 'Tema A',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 1,
-      artwork: null,
-    },
-    {
-      id: 'song-b',
-      uri: 'file:///b.mp3',
-      title: 'Tema B',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 2,
-      artwork: null,
-    },
-  ];
-  const playlist: Playlist = {
-    id: 'playlist-order',
-    name: 'Ordenada',
-    createdAt: 1,
-    trackIds: ['song-a', 'song-b'],
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-  jest.mocked(getPlaylists).mockResolvedValue([playlist]);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Listas' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Abrir lista Ordenada, 2 canciones' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    const dragHandle = renderer!.root.findByProps({
-      accessibilityLabel: 'Arrastrar Tema B para reordenar',
-    });
-    dragHandle.props.onAccessibilityAction({
-      nativeEvent: { actionName: 'decrement' },
-    });
-    await Promise.resolve();
-  });
-
-  expect(setPlaylistTracks).toHaveBeenCalledWith('playlist-order', [
-    'song-b',
-    'song-a',
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: '2' }),
+    expect.objectContaining({ id: '1' }),
   ]);
-  await ReactTestRenderer.act(() => renderer!.unmount());
 });
 
-test('saves the current playback queue as an ordered playlist', async () => {
-  const tracks: Track[] = [
-    {
-      id: 'queue-a',
-      uri: 'file:///queue-a.mp3',
-      title: 'Cola A',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 1,
-      artwork: null,
-    },
-    {
-      id: 'queue-b',
-      uri: 'file:///queue-b.mp3',
-      title: 'Cola B',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 2,
-      artwork: null,
-    },
-  ];
-  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: 'queue-a',
-    url: tracks[0].uri,
-    title: tracks[0].title,
-  });
-  jest.mocked(TrackPlayer.getQueue).mockResolvedValue(
-    tracks.map(track => ({
-      id: track.id,
-      url: track.uri,
-      title: track.title,
-      artist: track.artist,
-      album: track.album,
-    })),
-  );
-  jest.mocked(createPlaylist).mockResolvedValue({
-    id: 'saved-queue',
-    name: 'Mi cola',
-    createdAt: 1,
-    trackIds: [],
-  });
+test('plays only the selected album and keeps same-title albums apart', async () => {
+  jest
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([
+      makeTrack('a', { album: 'Homónimo', albumId: 'x' }),
+      makeTrack('b', { album: 'Homónimo', albumId: 'y' }),
+    ]);
+  await renderApp('library');
+  await press('Álbumes');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    findPlayerOpenButton(renderer!).props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir cola de reproducción con 2 canciones',
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Guardar cola como lista' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Nombre de la lista' })
-      .props.onChangeText('Mi cola');
-  });
-  await ReactTestRenderer.act(async () => {
-    await renderer!.root
-      .findByProps({ accessibilityLabel: 'Crear lista' })
-      .props.onPress();
-  });
+  expect(byLabel('Abrir álbum Homónimo')).toHaveLength(2);
+  await press('Abrir álbum Homónimo');
+  await press('Reproducir álbum Homónimo');
 
-  expect(createPlaylist).toHaveBeenCalledWith('Mi cola');
-  expect(setPlaylistTracks).toHaveBeenCalledWith('saved-queue', [
-    'queue-a',
-    'queue-b',
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: 'a' }),
   ]);
-  await ReactTestRenderer.act(() => renderer!.unmount());
 });
 
-test('clears only upcoming tracks and keeps current playback', async () => {
-  const alertSpy = jest.spyOn(Alert, 'alert');
-  const tracks: Track[] = [
-    {
-      id: 'queue-current',
-      uri: 'file:///current.mp3',
-      title: 'Actual',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 1,
-      artwork: null,
-    },
-    {
-      id: 'queue-next',
-      uri: 'file:///next.mp3',
-      title: 'Siguiente',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 2,
-      artwork: null,
-    },
-  ];
-  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: 'queue-current',
-    url: tracks[0].uri,
-    title: tracks[0].title,
-  });
-  jest.mocked(TrackPlayer.getQueue).mockResolvedValue(
-    tracks.map(track => ({
-      id: track.id,
-      url: track.uri,
-      title: track.title,
-    })),
-  );
+test('groups songs by folder', async () => {
+  jest
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([
+      makeTrack('1', { folder: 'Music/Rock' }),
+      makeTrack('2', { folder: 'Download' }),
+    ]);
+  await renderApp('library');
+  await press('Carpetas');
+  await press('Abrir carpeta Rock');
+  await press('Reproducir Rock');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    findPlayerOpenButton(renderer!).props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir cola de reproducción con 2 canciones',
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Vaciar canciones siguientes' })
-      .props.onPress();
-  });
-  const confirmClear = alertSpy.mock.calls[0][2]?.find(
-    button => button.text === 'Vaciar',
-  );
-  await ReactTestRenderer.act(async () => {
-    confirmClear?.onPress?.();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  expect(TrackPlayer.removeUpcomingTracks).toHaveBeenCalledTimes(1);
-  expect(TrackPlayer.reset).not.toHaveBeenCalled();
-  await ReactTestRenderer.act(() => renderer!.unmount());
-  alertSpy.mockRestore();
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: '1' }),
+  ]);
 });
 
-test('plays only the selected album or artist and keeps same-title albums separate', async () => {
-  const tracks: Track[] = [
-    {
-      id: 'album-a-1',
-      uri: 'file:///album-a-1.mp3',
-      title: 'Tema A1',
-      artist: 'Artista A',
-      album: 'Homónimo',
-      albumId: 'album-a',
-      duration: 180,
-      dateAdded: 1,
-      artwork: null,
-    },
-    {
-      id: 'album-a-2',
-      uri: 'file:///album-a-2.mp3',
-      title: 'Tema A2',
-      artist: 'Artista A',
-      album: 'Homónimo',
-      albumId: 'album-a',
-      duration: 180,
-      dateAdded: 2,
-      artwork: null,
-    },
-    {
-      id: 'album-b-1',
-      uri: 'file:///album-b-1.mp3',
-      title: 'Tema B1',
-      artist: 'Artista B',
-      album: 'Homónimo',
-      albumId: 'album-b',
-      duration: 180,
-      dateAdded: 3,
-      artwork: null,
-    },
-  ];
-  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Álbumes' })
-      .props.onPress();
-  });
-  const albumButtons = renderer!.root.findAll(
+test('search groups results and ignores accents', async () => {
+  jest
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([
+      makeTrack('1', { title: 'Canción de Ñandú', artist: 'María' }),
+      makeTrack('2', { title: 'Otra', artist: 'Pedro' }),
+    ]);
+  await renderApp('search');
+  const input = renderer.root.findAll(
     node =>
-      node.props.accessibilityLabel === 'Abrir álbum Homónimo' &&
-      typeof node.props.onPress === 'function',
+      node.props.accessibilityLabel ===
+        'Buscar canciones, artistas o álbumes' &&
+      typeof node.props.onChangeText === 'function',
     { deep: false },
-  );
-  expect(albumButtons).toHaveLength(2);
-  await ReactTestRenderer.act(() => {
-    albumButtons[0].props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Reproducir álbum Homónimo' })
-      .props.onPress();
-  });
-  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
-    expect.objectContaining({ id: 'album-a-1' }),
-    expect.objectContaining({ id: 'album-a-2' }),
-  ]);
-  expect(TrackPlayer.skip).toHaveBeenLastCalledWith(0);
-  expect(
-    renderer!.root.findAllByProps({ accessibilityLabel: 'Artistas' }),
-  ).toHaveLength(0);
+  )[0];
 
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Volver a álbumes' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Artistas' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Abrir artista Artista B' })
-      .props.onPress();
-  });
   await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Reproducir artista Artista B' })
-      .props.onPress();
+    input.props.onChangeText('maria');
   });
-  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
-    expect.objectContaining({ id: 'album-b-1' }),
-  ]);
-  expect(TrackPlayer.skip).toHaveBeenLastCalledWith(0);
+  await settle();
 
-  await ReactTestRenderer.act(() => {
-    renderer!.unmount();
-  });
+  expect(hasLabel('Abrir artista María')).toBe(true);
+  expect(hasLabel('Reproducir Otra de Pedro')).toBe(false);
+  await press('Reproducir Canción de Ñandú de María');
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: '1' }),
+  ]);
 });
 
-test('shuffles upcoming tracks in the live queue and restores their prior order', async () => {
-  const tracks: Track[] = ['song-1', 'song-2', 'song-3'].map((id, index) => ({
-    id,
-    uri: `file:///${id}.mp3`,
-    title: `Tema ${index + 1}`,
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: index,
-    artwork: null,
-  }));
-  const nativeQueue: PlayerTrack[] = tracks.map(track => ({
-    id: track.id,
-    url: track.uri,
-    title: track.title,
-    artist: track.artist,
-  }));
+test('shows most played songs in their order', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: 'song-1',
-    url: 'file:///song-1.mp3',
-    title: 'Tema 1',
-  });
-  jest.mocked(TrackPlayer.getActiveTrackIndex).mockResolvedValue(0);
-  jest.mocked(TrackPlayer.getQueue).mockImplementation(async () => nativeQueue);
-  jest.mocked(TrackPlayer.move).mockImplementation(async (from, to) => {
-    const [movedTrack] = nativeQueue.splice(from, 1);
-    nativeQueue.splice(to, 0, movedTrack);
-  });
-  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir reproductor: Tema 1 de Artista',
-      })
-      .props.onPress();
-  });
-
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Activar mezcla' })
-      .props.onPress();
-    await Promise.resolve();
-  });
-  expect(nativeQueue.map(track => track.id)).toEqual([
-    'song-1',
-    'song-3',
-    'song-2',
+  jest.mocked(getTopPlayed).mockResolvedValue([
+    { trackId: '2', plays: 9 },
+    { trackId: '1', plays: 1 },
   ]);
-  expect(TrackPlayer.move).toHaveBeenCalledWith(2, 1);
+  await renderApp();
 
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Desactivar mezcla' })
-      .props.onPress();
-    await Promise.resolve();
-  });
-  expect(nativeQueue.map(track => track.id)).toEqual([
-    'song-1',
-    'song-2',
-    'song-3',
+  await press('Más escuchadas');
+  await press('Reproducir Más escuchadas');
+
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith([
+    expect.objectContaining({ id: '2' }),
+    expect.objectContaining({ id: '1' }),
   ]);
-  expect(TrackPlayer.move).toHaveBeenLastCalledWith(2, 1);
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-  randomSpy.mockRestore();
 });
 
-test('restores the pre-shuffle order after the library refreshes', async () => {
-  const tracks: Track[] = ['song-1', 'song-2', 'song-3'].map((id, index) => ({
-    id,
-    uri: `file:///${id}.mp3`,
-    title: `Tema ${index + 1}`,
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: index,
-    artwork: null,
-  }));
-  const nativeQueue: PlayerTrack[] = tracks.map(track => ({
-    id: track.id,
-    url: track.uri,
-    title: track.title,
-    artist: track.artist,
-  }));
+test('restores the saved queue and position without starting playback', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredSession).mockResolvedValue(
+    JSON.stringify({
+      trackIds: ['1', 'borrada', '2'],
+      originalTrackIds: ['1', '2'],
+      index: 2,
+      position: 42,
+      sourceLabel: 'Biblioteca',
+      shuffle: false,
+      repeatMode: 2,
+    }),
+  );
+  await renderApp();
+
+  expect(TrackPlayer.add).toHaveBeenCalledWith([
+    expect.objectContaining({ id: '1' }),
+    expect.objectContaining({ id: '2' }),
+  ]);
+  expect(TrackPlayer.skip).toHaveBeenCalledWith(1, 42);
+  expect(TrackPlayer.setPlayWhenReady).toHaveBeenCalledWith(false);
+  expect(TrackPlayer.setRepeatMode).toHaveBeenCalledWith(2);
+  expect(TrackPlayer.play).not.toHaveBeenCalled();
+});
+
+test('keeps the live queue instead of a saved session', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(TrackPlayer.getQueue).mockResolvedValue(toQueue(tracks));
+  jest
+    .mocked(getStoredSession)
+    .mockResolvedValue(JSON.stringify({ trackIds: ['1'], index: 0 }));
+  await renderApp();
+
+  expect(TrackPlayer.add).not.toHaveBeenCalled();
+});
+
+test('ignores a damaged saved session', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  jest.mocked(getStoredSession).mockResolvedValue('{no es json');
+  await renderApp();
+
+  expect(TrackPlayer.add).not.toHaveBeenCalled();
+});
+
+test('shuffle keeps the current song and restores the order after a library refresh', async () => {
+  const tracks = ['1', '2', '3'].map(id => makeTrack(id));
   jest
     .mocked(getDeviceTracks)
     .mockImplementation(async () => tracks.map(track => ({ ...track })));
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: 'song-1',
-    url: 'file:///song-1.mp3',
-    title: 'Tema 1',
-  });
-  jest.mocked(TrackPlayer.getActiveTrackIndex).mockResolvedValue(0);
-  jest.mocked(TrackPlayer.getQueue).mockImplementation(async () => nativeQueue);
-  jest.mocked(TrackPlayer.move).mockImplementation(async (from, to) => {
-    const [movedTrack] = nativeQueue.splice(from, 1);
-    nativeQueue.splice(to, 0, movedTrack);
-  });
+  const queue = mockLiveQueue(tracks);
+  setActive(tracks[0]);
   const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  await renderApp('library');
+  await press('Abrir reproductor: Tema 1 de Artista');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir reproductor: Tema 1 de Artista',
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Activar mezcla' })
-      .props.onPress();
-    await Promise.resolve();
-  });
+  await press('Activar mezcla');
   randomSpy.mockRestore();
-  expect(nativeQueue.map(track => track.id)).toEqual([
-    'song-1',
-    'song-3',
-    'song-2',
-  ]);
+  expect(queue.map(item => item.id)).toEqual(['1', '3', '2']);
 
   await ReactTestRenderer.act(async () => {
     DeviceEventEmitter.emit('musicLibraryChanged');
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
   });
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Desactivar mezcla' })
-      .props.onPress();
-    await Promise.resolve();
-  });
+  await settle();
+  await press('Desactivar mezcla');
 
-  expect(nativeQueue.map(track => track.id)).toEqual([
-    'song-1',
-    'song-2',
-    'song-3',
-  ]);
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
+  expect(queue.map(item => item.id)).toEqual(['1', '2', '3']);
 });
 
-test('starts the player at normal speed when the saved rate is invalid', async () => {
+test('starts the player with an invalid saved rate', async () => {
   jest.mocked(getPlaybackRate).mockResolvedValueOnce(3);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
+  await renderApp();
 
   expect(TrackPlayer.setRate).toHaveBeenCalledWith(1);
-  expect(JSON.stringify(renderer!.toJSON())).not.toContain(
-    'No se pudo iniciar el reproductor',
-  );
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
+  expect(screenText()).not.toContain('No se pudo iniciar');
 });
 
-test('starts the player when the saved equalizer is invalid', async () => {
+test('starts the player with an invalid saved equalizer', async () => {
   jest.mocked(getEqualizerSettings).mockResolvedValueOnce({
     enabled: true,
     bandGainsDb: [40, 0, 0, 0, 0],
   });
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
+  await renderApp();
 
   expect(TrackPlayer.setRate).toHaveBeenCalledWith(1);
-  expect(JSON.stringify(renderer!.toJSON())).not.toContain(
-    'No se pudo iniciar el reproductor',
-  );
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
+  expect(screenText()).not.toContain('No se pudo iniciar');
 });
 
-test('starts the player when the saved equalizer cannot be read', async () => {
-  jest
-    .mocked(getEqualizerSettings)
-    .mockRejectedValueOnce(new Error('Ajustes dañados'));
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  expect(TrackPlayer.setRate).toHaveBeenCalledWith(1);
-  expect(JSON.stringify(renderer!.toJSON())).not.toContain(
-    'No se pudo iniciar el reproductor',
-  );
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('adds a song to the next position without replacing the active queue', async () => {
-  const tracks: Track[] = ['song-1', 'song-2'].map((id, index) => ({
-    id,
-    uri: `file:///${id}.mp3`,
-    title: `Tema ${index + 1}`,
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: index,
-    artwork: null,
-  }));
+test('changes and persists the playback speed from its sheet', async () => {
+  const tracks = [makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: 'song-1',
-    url: 'file:///song-1.mp3',
-    title: 'Tema 1',
-  });
-  jest.mocked(TrackPlayer.getQueue).mockResolvedValue([
-    {
-      id: 'song-1',
-      url: 'file:///song-1.mp3',
-      title: 'Tema 1',
-      artist: 'Artista',
-    },
-  ]);
+  jest.mocked(TrackPlayer.getQueue).mockResolvedValue(toQueue(tracks));
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  await press('Velocidad de reproducción 1×');
+  await press('1.5×');
+
+  expect(TrackPlayer.setRate).toHaveBeenLastCalledWith(1.5);
+  expect(setPlaybackRate).toHaveBeenCalledWith(1.5);
+});
+
+test('applies an equalizer preset and persists it', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  await renderApp();
+  await press('Ajustes');
+  await press('Ecualizador');
+
+  await press('Usar perfil Graves');
+
+  expect(setEqualizerSettings).toHaveBeenLastCalledWith(false, [5, 4, 0, 0, 0]);
+});
+
+test('adds a song next without replacing the queue', async () => {
+  const tracks = ['1', '2', '3'].map(id => makeTrack(id));
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(TrackPlayer.getQueue)
+    .mockResolvedValue(toQueue(tracks.slice(0, 2)));
   jest.mocked(TrackPlayer.getActiveTrackIndex).mockResolvedValue(0);
+  setActive(tracks[0]);
+  await renderApp('library');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Más acciones para Tema 2',
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Reproducir Tema 2 a continuación',
-      })
-      .props.onPress();
-    await Promise.resolve();
-  });
+  await press('Más acciones para Tema 3');
+  await press('Reproducir Tema 3 a continuación');
 
-  expect(TrackPlayer.add).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'song-2' }),
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: '3' }),
     1,
   );
   expect(TrackPlayer.reset).not.toHaveBeenCalled();
-  expect(TrackPlayer.play).not.toHaveBeenCalled();
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
 });
 
-test('refreshes the library after MediaStore reports a change', async () => {
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  const callsBeforeChange = jest.mocked(getDeviceTracks).mock.calls.length;
-  await ReactTestRenderer.act(async () => {
-    DeviceEventEmitter.emit('musicLibraryChanged');
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  expect(jest.mocked(getDeviceTracks).mock.calls.length).toBeGreaterThan(
-    callsBeforeChange,
-  );
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('offers device deletion from a library track menu and confirms it', async () => {
-  const track: Track = {
-    id: 'song-delete',
-    uri: 'content://media/external/audio/media/9',
-    title: 'Tema para eliminar',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
+test('adds a song to an existing list from its menu', async () => {
+  const playlist: Playlist = {
+    id: 'p1',
+    name: 'Gym',
+    createdAt: 1,
+    trackIds: ['1'],
   };
-  jest.mocked(getDeviceTracks).mockResolvedValueOnce([track]);
-  jest.mocked(deleteTrackFromDevice).mockResolvedValue(true);
-  let alertButtons: Parameters<typeof Alert.alert>[2] | undefined;
-  const alertSpy = jest
-    .spyOn(Alert, 'alert')
-    .mockImplementation((_title, _message, buttons) => {
-      alertButtons = buttons;
-    });
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Más acciones para Tema para eliminar',
-      })
-      .props.onPress();
-  });
-
-  const deleteAction = renderer!.root.findByProps({
-    accessibilityLabel: 'Eliminar Tema para eliminar del dispositivo',
-  });
-  await ReactTestRenderer.act(() => deleteAction.props.onPress());
-  expect(alertSpy).toHaveBeenCalledWith(
-    'Eliminar del dispositivo',
-    expect.stringContaining('Esta acción no se puede deshacer'),
-    expect.any(Array),
-  );
-  expect(deleteTrackFromDevice).not.toHaveBeenCalled();
-
-  await ReactTestRenderer.act(async () => {
-    alertButtons?.find(button => button.text === 'Eliminar')?.onPress?.();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  expect(deleteTrackFromDevice).toHaveBeenCalledWith(track.id);
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-  alertSpy.mockRestore();
-});
-
-test('does not offer device deletion from the home feed', async () => {
-  const track: Track = {
-    id: 'song-home',
-    uri: 'content://media/external/audio/media/11',
-    title: 'Tema de inicio',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValueOnce([track]);
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Más acciones para Tema de inicio' })
-      .props.onPress();
-  });
-
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Eliminar Tema de inicio del dispositivo',
-    }),
-  ).toHaveLength(0);
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-});
-
-test('canceling the app confirmation leaves the track untouched', async () => {
-  const track: Track = {
-    id: 'song-delete-cancel',
-    uri: 'content://media/external/audio/media/10',
-    title: 'Tema para conservar',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValue([track]);
-  let alertButtons: Parameters<typeof Alert.alert>[2] | undefined;
-  const alertSpy = jest
-    .spyOn(Alert, 'alert')
-    .mockImplementation((_title, _message, buttons) => {
-      alertButtons = buttons;
-    });
-
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Más acciones para Tema para conservar',
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Eliminar Tema para conservar del dispositivo',
-      })
-      .props.onPress();
-  });
-
-  await ReactTestRenderer.act(() => {
-    alertButtons?.find(button => button.text === 'Cancelar')?.onPress?.();
-  });
-  expect(deleteTrackFromDevice).not.toHaveBeenCalled();
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Más acciones para Tema para conservar',
-    }),
-  ).toBeTruthy();
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-  alertSpy.mockRestore();
-});
-
-test('deleting the active track pauses and removes it from the player queue', async () => {
-  const activeTrack: Track = {
-    id: 'song-active-delete',
-    uri: 'content://media/external/audio/media/11',
-    title: 'Tema en reproducción',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  const nextTrack: Track = {
-    ...activeTrack,
-    id: 'song-next-delete',
-    uri: 'content://media/external/audio/media/12',
-    title: 'Tema siguiente',
-    dateAdded: 2,
-  };
-  const playerTrack = (track: Track): PlayerTrack =>
-    ({
-      id: track.id,
-      url: track.uri,
-      title: track.title,
-      artist: track.artist,
-    } as PlayerTrack);
-
   jest
     .mocked(getDeviceTracks)
-    .mockResolvedValueOnce([activeTrack, nextTrack])
-    .mockResolvedValueOnce([nextTrack]);
-  jest.mocked(useActiveTrack).mockReturnValue(playerTrack(activeTrack));
+    .mockResolvedValue([makeTrack('1'), makeTrack('2')]);
+  jest.mocked(getPlaylists).mockResolvedValue([playlist]);
+  await renderApp('library');
+
+  await press('Más acciones para Tema 2');
+  await press('Añadir Tema 2 a una lista');
+  await press('Añadir a Gym');
+
+  expect(setPlaylistTracks).toHaveBeenCalledWith('p1', ['1', '2']);
+});
+
+test('opens the album of a song from its menu', async () => {
   jest
-    .mocked(TrackPlayer.getQueue)
-    .mockResolvedValue([playerTrack(activeTrack), playerTrack(nextTrack)]);
-  jest.mocked(TrackPlayer.getActiveTrackIndex).mockResolvedValue(0);
-  jest.mocked(deleteTrackFromDevice).mockResolvedValue(true);
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([makeTrack('1', { album: 'Corsa', albumId: 'c' })]);
+  await renderApp('library');
 
-  let alertButtons: Parameters<typeof Alert.alert>[2] | undefined;
-  const alertSpy = jest
-    .spyOn(Alert, 'alert')
-    .mockImplementation((_title, _message, buttons) => {
-      alertButtons = buttons;
-    });
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Más acciones para Tema en reproducción',
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Eliminar Tema en reproducción del dispositivo',
-      })
-      .props.onPress();
-  });
+  await press('Más acciones para Tema 1');
+  await press('Ir al álbum');
 
-  await ReactTestRenderer.act(async () => {
-    alertButtons?.find(button => button.text === 'Eliminar')?.onPress?.();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  expect(deleteTrackFromDevice).toHaveBeenCalledWith(activeTrack.id);
-  expect(TrackPlayer.pause).toHaveBeenCalled();
-  expect(TrackPlayer.remove).toHaveBeenCalledWith(0);
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Más acciones para Tema en reproducción',
-    }),
-  ).toHaveLength(0);
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Más acciones para Tema siguiente',
-    }),
-  ).toBeTruthy();
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-  alertSpy.mockRestore();
+  expect(hasLabel('Reproducir álbum Corsa')).toBe(true);
 });
 
-test('keeps playlist track actions focused on playback, dragging, and removal', async () => {
-  const track: Track = {
-    id: 'song-in-playlist',
-    uri: 'file:///song-in-playlist.mp3',
-    title: 'Tema de lista',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  const playlist: Playlist = {
-    id: 'playlist-delete-scope',
-    name: 'Mi lista',
-    createdAt: 1,
-    trackIds: [track.id],
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValue([track]);
-  jest.mocked(getPlaylists).mockResolvedValue([playlist]);
+test('refreshes the library when MediaStore reports a change', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  await renderApp();
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    DeviceEventEmitter.emit('musicLibraryChanged');
   });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Listas' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir lista Mi lista, 1 canción',
-      })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Arrastrar Tema de lista para reordenar',
-    }),
-  ).toBeTruthy();
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Quitar Tema de lista de Mi lista',
-    }),
-  ).toBeTruthy();
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Añadir Tema de lista a favoritos',
-    }),
-  ).toHaveLength(0);
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Más acciones para Tema de lista',
-    }),
-  ).toHaveLength(0);
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Eliminar Tema de lista del dispositivo',
-    }),
-  ).toHaveLength(0);
-  const sectionTabLabels = [
-    'Canciones',
-    'Álbumes',
-    'Artistas',
-    'Favoritas',
-    'Recientes',
-    'Listas',
-  ];
-  expect(
-    renderer!.root.findAll(
-      node =>
-        node.props.accessibilityRole === 'tab' &&
-        sectionTabLabels.includes(node.props.accessibilityLabel),
-    ),
-  ).toHaveLength(0);
-  expect(
-    renderer!.root.findAll(node => node.props.children === '01'),
-  ).toHaveLength(0);
+  await settle();
 
-  await ReactTestRenderer.act(() => renderer!.unmount());
+  expect(getDeviceTracks).toHaveBeenCalledTimes(2);
 });
 
-test('sleep timer pauses at its selected deadline and can be canceled', async () => {
-  const track: Track = {
-    id: 'timer-song',
-    uri: 'file:///timer-song.mp3',
-    title: 'Tema con temporizador',
-    artist: 'Artista',
-    album: 'Álbum',
-    albumId: 'album-1',
-    duration: 180,
-    dateAdded: 1,
-    artwork: null,
-  };
-  jest.mocked(getDeviceTracks).mockResolvedValue([track]);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: track.id,
-    url: track.uri,
-    title: track.title,
-  });
+test('deletes a song from the device only after confirming', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  await renderApp('library');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
+  await press('Más acciones para Tema 1');
+  await press('Eliminar Tema 1 del dispositivo');
+  expect(deleteTrackFromDevice).not.toHaveBeenCalled();
+
+  const buttons = alert.mock.calls[0][2] ?? [];
   await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    buttons.find(button => button.text === 'Eliminar')?.onPress?.();
   });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: `Abrir reproductor: ${track.title} de Artista`,
-      })
-      .props.onPress();
-  });
-  jest.useFakeTimers();
+  await settle();
 
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Configurar temporizador de apagado' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Pausar en 15 minutos' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Temporizador, 15:00 restantes',
-    }),
-  ).toBeTruthy();
-
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Temporizador, 15:00 restantes',
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Cancelar temporizador' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Configurar temporizador de apagado',
-    }),
-  ).toBeTruthy();
-
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Configurar temporizador de apagado' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Pausar en 15 minutos' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    await jest.advanceTimersByTimeAsync(15 * 60 * 1000);
-  });
-  expect(TrackPlayer.pause).toHaveBeenCalled();
-
-  await ReactTestRenderer.act(() => renderer!.unmount());
-  jest.useRealTimers();
+  expect(deleteTrackFromDevice).toHaveBeenCalledWith('1');
+  alert.mockRestore();
 });
 
-test('hardware back returns from playlist detail, then returns to the library', async () => {
-  const playlist: Playlist = {
-    id: 'playlist-back',
-    name: 'Para después',
-    createdAt: 1,
-    trackIds: ['missing-track'],
+test('hides device deletion for songs inside a list', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  jest
+    .mocked(getPlaylists)
+    .mockResolvedValue([
+      { id: 'p1', name: 'Gym', createdAt: 1, trackIds: ['1'] },
+    ]);
+  await renderApp('library');
+  await press('Listas');
+  await press('Abrir lista Gym, 1 canción');
+
+  await press('Más acciones para Tema 1');
+
+  expect(hasLabel('Eliminar Tema 1 del dispositivo')).toBe(false);
+});
+
+test('hardware back closes a detail, then returns to Home', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  const addListener = jest.spyOn(BackHandler, 'addEventListener');
+  await renderApp('library');
+  await press('Álbumes');
+  await press('Abrir álbum Álbum');
+  expect(hasLabel('Reproducir álbum Álbum')).toBe(true);
+  const back = () => {
+    const calls = addListener.mock.calls;
+    return (calls[calls.length - 1][1] as () => boolean)();
   };
-  type BackHandlerCallback = Parameters<typeof BackHandler.addEventListener>[1];
-  const handlers: BackHandlerCallback[] = [];
-  const remove = jest.fn();
-  const addListener = jest
-    .spyOn(BackHandler, 'addEventListener')
-    .mockImplementation((_eventName, listener) => {
-      handlers.push(listener);
-      return { remove };
-    });
-  jest.mocked(getPlaylists).mockResolvedValue([playlist]);
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    expect(back()).toBe(true);
   });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Listas' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Abrir lista Para después, 0 canciones',
-    }),
-  ).toBeTruthy();
+  await settle();
+  expect(hasLabel('Reproducir álbum Álbum')).toBe(false);
 
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir lista Para después, 0 canciones',
-      })
-      .props.onPress();
+  await ReactTestRenderer.act(async () => {
+    expect(back()).toBe(true);
   });
-  expect(renderer!.root.findByProps({ children: 'Para después' })).toBeTruthy();
-
-  await ReactTestRenderer.act(() => {
-    expect(handlers[handlers.length - 1]({} as never)).toBe(true);
-  });
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Abrir lista Para después, 0 canciones',
-    }),
-  ).toBeTruthy();
-
-  await ReactTestRenderer.act(() => {
-    expect(handlers[handlers.length - 1]({} as never)).toBe(true);
-  });
-  expect(
-    renderer!.root.findAllByProps({ children: 'Biblioteca' }).length,
-  ).toBeGreaterThan(0);
-  await ReactTestRenderer.act(() => {
-    renderer!.unmount();
-  });
-  expect(remove).toHaveBeenCalled();
+  await settle();
+  expect(hasLabel('Ajustes')).toBe(true);
   addListener.mockRestore();
 });
 
-test('creates a playlist, adds songs, and plays only its saved tracks', async () => {
-  const tracks: Track[] = [
-    {
-      id: 'song-1',
-      uri: 'file:///song-1.mp3',
-      title: 'Tema uno',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 1,
-      artwork: null,
-    },
-    {
-      id: 'song-2',
-      uri: 'file:///song-2.mp3',
-      title: 'Tema dos',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 200,
-      dateAdded: 2,
-      artwork: null,
-    },
-  ];
-  const playlist: Playlist = {
+test('creates a list, adds songs and plays them', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  const created: Playlist = {
     id: 'playlist-1',
-    name: 'Favoritas para correr',
+    name: 'Para correr',
     createdAt: 1,
     trackIds: [],
   };
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(createPlaylist).mockResolvedValue(created);
+  await renderApp('library');
+  await press('Listas');
+
+  await press('Crear lista de reproducción');
+  const nameInput = renderer.root.findAll(
+    node =>
+      node.props.accessibilityLabel === 'Nombre de la lista' &&
+      typeof node.props.onChangeText === 'function',
+    { deep: false },
+  )[0];
+  await ReactTestRenderer.act(async () => {
+    nameInput.props.onChangeText('Para correr');
+  });
+  jest.mocked(getPlaylists).mockResolvedValue([created]);
+  await press('Guardar nombre de la lista');
+
+  expect(createPlaylist).toHaveBeenCalledWith('Para correr');
+  await press('Opciones de Para correr');
+  await press('Añadir canciones a Para correr');
+  await press('Tema 2 de Artista');
   jest
     .mocked(getPlaylists)
-    .mockResolvedValueOnce([])
-    .mockResolvedValueOnce([playlist])
-    .mockResolvedValueOnce([{ ...playlist, trackIds: ['song-2'] }]);
-  jest.mocked(createPlaylist).mockResolvedValue(playlist);
+    .mockResolvedValue([{ ...created, trackIds: ['2'] }]);
+  await press('Guardar canciones de la lista');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Listas' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Crear lista de reproducción' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Nombre de la lista' })
-      .props.onChangeText(playlist.name);
-  });
-  await ReactTestRenderer.act(async () => {
-    await renderer!.root
-      .findByProps({ accessibilityLabel: 'Crear lista' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: `Añadir canciones a ${playlist.name}`,
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Tema dos de Artista' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    await renderer!.root
-      .findByProps({ accessibilityLabel: 'Guardar canciones seleccionadas' })
-      .props.onPress();
-  });
-
-  expect(createPlaylist).toHaveBeenCalledWith(playlist.name);
-  expect(setPlaylistTracks).toHaveBeenCalledWith('playlist-1', ['song-2']);
-
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: `Reproducir lista ${playlist.name}`,
-      })
-      .props.onPress();
-    await Promise.resolve();
-  });
+  expect(setPlaylistTracks).toHaveBeenCalledWith('playlist-1', ['2']);
+  await press('Reproducir lista Para correr');
   expect(TrackPlayer.add).toHaveBeenLastCalledWith([
-    expect.objectContaining({ id: 'song-2', url: 'file:///song-2.mp3' }),
+    expect.objectContaining({ id: '2' }),
   ]);
-  expect(TrackPlayer.skip).toHaveBeenLastCalledWith(0);
-
-  await ReactTestRenderer.act(() => {
-    renderer!.unmount();
-  });
 });
 
-test('renames and deletes a playlist without deleting its audio', async () => {
+test('renames and deletes a list without touching its audio', async () => {
   const playlist: Playlist = {
-    id: 'playlist-2',
-    name: 'Entrenamiento',
-    createdAt: 2,
-    trackIds: ['song-1'],
+    id: 'p1',
+    name: 'Gym',
+    createdAt: 1,
+    trackIds: [],
   };
-  const renamedPlaylist = { ...playlist, name: 'Correr' };
-  jest.mocked(getDeviceTracks).mockResolvedValue([]);
-  jest
-    .mocked(getPlaylists)
-    .mockReset()
-    .mockResolvedValueOnce([playlist])
-    .mockResolvedValueOnce([renamedPlaylist])
-    .mockResolvedValueOnce([]);
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  jest.mocked(getPlaylists).mockResolvedValue([playlist]);
+  await renderApp('library');
+  await press('Listas');
+  await press('Abrir lista Gym, 0 canciones');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Listas' })
-      .props.onPress();
-  });
-  expect(
-    renderer!.root.findAllByProps({
-      accessibilityLabel: 'Eliminar Entrenamiento',
-    }),
-  ).toHaveLength(0);
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Más acciones para Entrenamiento' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Renombrar Entrenamiento' })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: 'Nombre de la lista' })
-      .props.onChangeText(renamedPlaylist.name);
-  });
-  await ReactTestRenderer.act(async () => {
-    await renderer!.root
-      .findByProps({ accessibilityLabel: 'Guardar nombre de la lista' })
-      .props.onPress();
-  });
+  await press('Opciones de Gym');
+  await press('Renombrar Gym');
+  await press('Guardar nombre de la lista');
+  expect(renamePlaylist).toHaveBeenCalledWith('p1', 'Gym');
 
-  expect(renamePlaylist).toHaveBeenCalledWith(
-    playlist.id,
-    renamedPlaylist.name,
-  );
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: `Más acciones para ${renamedPlaylist.name}`,
-      })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({ accessibilityLabel: `Eliminar ${renamedPlaylist.name}` })
-      .props.onPress();
-  });
-  await ReactTestRenderer.act(async () => {
-    await renderer!.root
-      .findByProps({
-        accessibilityLabel: `Confirmar eliminación de ${renamedPlaylist.name}`,
-      })
-      .props.onPress();
-  });
+  await press('Opciones de Gym');
+  await press('Eliminar Gym');
+  await press('Confirmar eliminación de Gym');
 
-  expect(deletePlaylist).toHaveBeenCalledWith(playlist.id);
-  expect(
-    renderer!.root.findByProps({ children: 'Aún no tienes listas' }),
-  ).toBeTruthy();
-  await ReactTestRenderer.act(() => {
-    renderer!.unmount();
-  });
+  expect(deletePlaylist).toHaveBeenCalledWith('p1');
+  expect(deleteTrackFromDevice).not.toHaveBeenCalled();
 });
 
-test('reorders and removes songs from the playback queue', async () => {
-  const tracks: Track[] = [
-    {
-      id: 'song-1',
-      uri: 'file:///song-1.mp3',
-      title: 'Tema uno',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 180,
-      dateAdded: 1,
-      artwork: null,
-    },
-    {
-      id: 'song-2',
-      uri: 'file:///song-2.mp3',
-      title: 'Tema dos',
-      artist: 'Artista',
-      album: 'Álbum',
-      albumId: 'album-1',
-      duration: 200,
-      dateAdded: 2,
-      artwork: null,
-    },
-  ];
-  const queue = tracks.map(track => ({
-    id: track.id,
-    url: track.uri,
-    title: track.title,
-    artist: track.artist,
-  }));
+test('removes a song from the queue and can undo it', async () => {
+  const tracks = ['1', '2'].map(id => makeTrack(id));
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-  jest.mocked(useActiveTrack).mockReturnValue({
-    id: 'song-1',
-    url: 'file:///song-1.mp3',
-    title: 'Tema uno',
-  });
-  jest
-    .mocked(TrackPlayer.getQueue)
-    .mockResolvedValueOnce(queue)
-    .mockResolvedValueOnce([queue[1], queue[0]])
-    .mockResolvedValueOnce([queue[0]])
-    .mockResolvedValueOnce([queue[1], queue[0]]);
+  mockLiveQueue(tracks);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+  await press('Abrir cola de reproducción con 2 canciones');
 
-  let renderer: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = createLibraryApp();
-    await new Promise<void>(resolve => {
-      setTimeout(() => resolve(), 0);
-    });
-  });
+  await press('Quitar Tema 2 de la cola');
+  expect(TrackPlayer.remove).toHaveBeenCalledWith(1);
 
-  await ReactTestRenderer.act(() => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir reproductor: Tema uno de Artista',
-      })
-      .props.onPress();
-  });
-  const progressSlider = renderer!.root.findByProps({
-    accessibilityLabel: 'Avanzar en la canción',
-  });
-  await ReactTestRenderer.act(() => {
-    progressSlider.props.onLayout({
-      nativeEvent: { layout: { width: 300 } },
-    });
-  });
-  const createTouchEvent = (
-    locationX: number,
-    previousX: number,
-    currentX: number,
-    timestamp: number,
-  ) => ({
-    nativeEvent: { locationX },
-    touchHistory: {
-      indexOfSingleActiveTouch: 0,
-      mostRecentTimeStamp: timestamp,
-      numberActiveTouches: 1,
-      touchBank: [
-        {
-          currentPageX: currentX,
-          currentPageY: 0,
-          currentTimeStamp: timestamp,
-          previousPageX: previousX,
-          previousPageY: 0,
-          touchActive: true,
-        },
-      ],
-    },
-  });
-  await ReactTestRenderer.act(async () => {
-    const tapEvent = createTouchEvent(225, 225, 225, 1);
-    progressSlider.props.onResponderGrant(tapEvent);
-    progressSlider.props.onResponderRelease(tapEvent);
-    await Promise.resolve();
-  });
-  expect(TrackPlayer.seekTo).toHaveBeenLastCalledWith(135);
-
-  await ReactTestRenderer.act(async () => {
-    progressSlider.props.onResponderGrant(createTouchEvent(60, 60, 60, 2));
-    progressSlider.props.onResponderMove(createTouchEvent(60, 60, 150, 3));
-  });
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Avanzar en la canción',
-    }).props.accessibilityValue.now,
-  ).toBe(90);
-  await ReactTestRenderer.act(async () => {
-    progressSlider.props.onResponderRelease({});
-    await Promise.resolve();
-  });
-  expect(TrackPlayer.seekTo).toHaveBeenLastCalledWith(90);
-
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Abrir cola de reproducción con 2 canciones',
-      })
-      .props.onPress();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-  const dragHandle = renderer!.root.findByProps({
-    accessibilityLabel: 'Arrastrar Tema dos para reordenar',
-  });
-  expect(dragHandle.props.onStartShouldSetResponder({})).toBe(true);
-  await ReactTestRenderer.act(async () => {
-    dragHandle.props.onAccessibilityAction({
-      nativeEvent: { actionName: 'increment' },
-    });
-    await Promise.resolve();
-  });
-  expect(TrackPlayer.move).toHaveBeenCalledWith(1, 0);
-  const removeTrackButton = renderer!.root.findByProps({
-    accessibilityLabel: 'Quitar Tema dos de la cola',
-  });
-  expect(removeTrackButton.props.accessibilityState).toEqual({
-    disabled: false,
-  });
-  await ReactTestRenderer.act(async () => {
-    removeTrackButton.props.onPress();
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  });
-
-  expect(TrackPlayer.move).toHaveBeenCalledWith(1, 0);
-  expect(TrackPlayer.remove).toHaveBeenCalledWith(0);
-  expect(
-    renderer!.root.findByProps({
-      accessibilityLabel: 'Deshacer eliminación, 3 segundos',
-    }),
-  ).toBeTruthy();
-  await ReactTestRenderer.act(async () => {
-    renderer!.root
-      .findByProps({
-        accessibilityLabel: 'Deshacer eliminación, 3 segundos',
-      })
-      .props.onPress();
-    await Promise.resolve();
-  });
-  expect(TrackPlayer.add).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'song-2' }),
-    0,
+  await press('Deshacer eliminación, 3 segundos');
+  expect(TrackPlayer.add).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: '2' }),
+    1,
   );
-  await ReactTestRenderer.act(() => {
-    renderer!.unmount();
-  });
+});
+
+test('marks favorites from the player', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  await press('Añadir a favoritas');
+
+  expect(hasLabel('Quitar de favoritas')).toBe(true);
 });

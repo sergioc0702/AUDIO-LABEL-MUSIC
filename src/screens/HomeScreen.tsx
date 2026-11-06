@@ -1,389 +1,387 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Easing, ScrollView, Text, View } from 'react-native';
+import { useMemo, type ReactNode } from 'react';
 import {
-  Album,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
   Clock3,
   Heart,
   ListMusic,
-  Play,
-  RefreshCw,
+  Plus,
+  Settings,
+  Shuffle,
+  TrendingUp,
 } from 'lucide-react-native';
-import type { Playlist, Track } from '../types/Track';
-import type { createStyles } from '../theme/createStyles';
-import type { AppDesignTokens } from '../theme/tokens';
-import { Artwork } from '../components/library/LibraryComponents';
-import { PressableScale } from '../components/motion/PressableScale';
-import { PlayPauseIcon } from '../components/player/PlayPauseIcon';
-import { formatTrackCount } from '../utils/formatTrackCount';
+import { useApp } from '../state/AppContext';
+import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
+import { Button, IconButton } from '../ui/Buttons';
+import { Cover } from '../ui/Cover';
+import { SectionHeader } from '../ui/Rows';
+import { Tap } from '../ui/Tap';
+import { groupAlbums, groupArtists } from '../utils/collections';
+import { shuffleTracks } from '../utils/shuffleQueue';
 
-type ScreenStyles = ReturnType<typeof createStyles>;
-type LibraryDestination =
-  | 'songs'
-  | 'albums'
-  | 'artists'
-  | 'recent'
-  | 'playlists'
-  | 'favorites';
-
-type HomeScreenProps = {
-  colors: AppDesignTokens['colors'];
-  styles: ScreenStyles;
-  safeAreaTop: number;
-  tracks: Track[];
-  playlists: Playlist[];
-  currentTrack: Track | null;
-  isPlaying: boolean;
-  togglePlayback: () => void;
-  recentTracks: Track[];
-  addedTracks: Track[];
-  favoriteIds: Set<string>;
-  loadingLibrary: boolean;
-  errorMessage: string | null;
-  errorRetryAction: (() => void) | null;
-  queueNotice: string | null;
-  loadLibrary: () => void;
-  navigateTo: (destination: LibraryDestination) => void;
-  navigateToPrimaryScreen: (screen: 'home' | 'search' | 'library') => void;
-  setPlayerExpanded: (expanded: boolean) => void;
-  playTracks: (tracks: Track[], track: Track, sourceLabel?: string) => void;
-  renderTrack: (
-    track: Track,
-    index: number,
-    queueTracks: Track[],
-    sourceLabel: string,
-    fromLibrary: boolean,
-  ) => ReactNode;
-};
-
-export function HomeScreen({
-  colors,
-  styles,
-  safeAreaTop,
-  tracks,
-  playlists,
-  currentTrack,
-  isPlaying,
-  togglePlayback,
-  recentTracks,
-  addedTracks,
-  favoriteIds,
-  loadingLibrary,
-  errorMessage,
-  errorRetryAction,
-  queueNotice,
-  loadLibrary,
-  navigateTo,
-  navigateToPrimaryScreen,
-  setPlayerExpanded,
-  playTracks,
-  renderTrack,
-}: HomeScreenProps) {
+function greeting() {
   const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? 'BUENOS DÍAS' : hour < 19 ? 'BUENAS TARDES' : 'BUENAS NOCHES';
-  const featuredTrack =
-    currentTrack ?? recentTracks[0] ?? addedTracks[0] ?? null;
-  const featuredIsCurrent =
-    featuredTrack !== null && currentTrack?.id === featuredTrack.id;
-  const recentRowTracks = recentTracks.filter(
-    track => track.id !== featuredTrack?.id,
-  );
-  const refreshSpin = useRef(new Animated.Value(0)).current;
+  return hour < 12
+    ? 'Buenos días'
+    : hour < 19
+    ? 'Buenas tardes'
+    : 'Buenas noches';
+}
 
-  useEffect(() => {
-    if (!loadingLibrary) {
-      return;
-    }
-    const spin = Animated.loop(
-      Animated.timing(refreshSpin, {
-        toValue: 1,
-        duration: 900,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    spin.start();
-    return () => {
-      spin.stop();
-      refreshSpin.setValue(0);
-    };
-  }, [loadingLibrary, refreshSpin]);
-
-  const openFeaturedTrack = () => {
-    if (!featuredTrack) {
-      navigateToPrimaryScreen('library');
-    } else if (featuredIsCurrent) {
-      setPlayerExpanded(true);
-    } else {
-      const homeQueue = recentTracks.length ? recentTracks : tracks;
-      playTracks(homeQueue, featuredTrack, 'Continuar escuchando');
-    }
-  };
-  const favoriteTracks = tracks.filter(track => favoriteIds.has(track.id));
-  const albumCount = new Set(
-    tracks.map(track =>
-      track.albumId && track.albumId !== '0'
-        ? track.albumId
-        : `${track.album}\u0000${track.artist}`,
-    ),
-  ).size;
-  const shortcuts = [
-    {
-      id: 'favorites' as const,
-      label: 'Favoritas',
-      detail: formatTrackCount(favoriteTracks.length),
-      icon: Heart,
-    },
-    {
-      id: 'playlists' as const,
-      label: 'Listas',
-      detail: `${playlists.length} ${
-        playlists.length === 1 ? 'lista' : 'listas'
-      }`,
-      icon: ListMusic,
-    },
-    {
-      id: 'albums' as const,
-      label: 'Álbumes',
-      detail: `${albumCount} ${albumCount === 1 ? 'álbum' : 'álbumes'}`,
-      icon: Album,
-    },
-    {
-      id: 'recent' as const,
-      label: 'Recientes',
-      detail: formatTrackCount(recentTracks.length),
-      icon: Clock3,
-    },
-  ];
-
+function Shortcut({
+  label,
+  icon,
+  onPress,
+}: {
+  label: string;
+  icon: ReactNode;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.homeScreen}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.homeContent,
-          { paddingTop: Math.max(20, safeAreaTop + 10) },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.homeHeader}>
-          <View>
-            <Text style={styles.homeGreeting}>{greeting}</Text>
-            <Text style={styles.homeHeading}>Tu música</Text>
-          </View>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Actualizar biblioteca"
-            onPress={() => loadLibrary()}
-            style={styles.homeRefreshButton}
-          >
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    rotate: refreshSpin.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg'],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <RefreshCw color={colors.accent} size={21} />
-            </Animated.View>
-          </PressableScale>
-        </View>
-
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel={
-            featuredTrack
-              ? `Continuar escuchando ${featuredTrack.title}`
-              : 'Abrir biblioteca para buscar canciones'
-          }
-          onPress={openFeaturedTrack}
-          pressedScale={0.98}
-          style={[styles.homeHero, !featuredTrack && styles.homeHeroEmpty]}
-        >
-          {featuredTrack ? (
-            <View style={styles.homeHeroArtwork}>
-              <Artwork uri={featuredTrack.artwork} size={128} />
-            </View>
-          ) : null}
-          <View style={styles.homeHeroCopy}>
-            <Text style={styles.homeHeroEyebrow}>
-              {featuredTrack ? 'CONTINUAR ESCUCHANDO' : 'TU COLECCIÓN'}
-            </Text>
-            <Text numberOfLines={2} style={styles.homeHeroTitle}>
-              {featuredTrack ? featuredTrack.title : 'Tu música, a tu manera'}
-            </Text>
-            <Text numberOfLines={1} style={styles.homeHeroArtist}>
-              {featuredTrack
-                ? featuredTrack.artist
-                : loadingLibrary
-                ? 'Buscando canciones en el dispositivo…'
-                : 'Añade canciones para empezar'}
-            </Text>
-            {featuredIsCurrent ? (
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel={`${isPlaying ? 'Pausar' : 'Reanudar'} ${
-                  featuredTrack.title
-                }`}
-                onPress={togglePlayback}
-                pressedScale={0.88}
-                style={styles.homeHeroPlay}
-              >
-                <PlayPauseIcon
-                  color={colors.onAccent}
-                  isPlaying={isPlaying}
-                  size={19}
-                />
-              </PressableScale>
-            ) : (
-              <View style={styles.homeHeroPlay}>
-                <Play
-                  color={colors.onAccent}
-                  fill={colors.onAccent}
-                  size={19}
-                />
-              </View>
-            )}
-          </View>
-          <Text style={styles.homeHeroNote}>
-            {tracks.length
-              ? `${formatTrackCount(tracks.length)} en tu biblioteca`
-              : 'Explora tu biblioteca'}
-          </Text>
-        </PressableScale>
-
-        {errorMessage ? (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-            {errorRetryAction ? (
-              <PressableScale
-                accessibilityRole="button"
-                onPress={errorRetryAction}
-              >
-                <Text style={styles.retryText}>Reintentar</Text>
-              </PressableScale>
-            ) : null}
-          </View>
-        ) : null}
-        {queueNotice ? (
-          <View accessibilityLiveRegion="polite" style={styles.queueNotice}>
-            <Text style={styles.queueNoticeText}>{queueNotice}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.homeSectionHeader}>
-          <Text style={styles.homeSectionTitle}>Escuchado recientemente</Text>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Ver historial reciente"
-            onPress={() => navigateTo('recent')}
-          >
-            <Text style={styles.homeSectionAction}>Ver todo</Text>
-          </PressableScale>
-        </View>
-        {recentRowTracks.length ? (
-          <ScrollView
-            horizontal
-            contentContainerStyle={styles.homeRecentList}
-            showsHorizontalScrollIndicator={false}
-          >
-            {recentRowTracks.map(track => (
-              <PressableScale
-                key={track.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Reproducir ${track.title} de ${track.artist}`}
-                onPress={() => playTracks(recentTracks, track, 'Recientes')}
-                style={styles.homeRecentCard}
-              >
-                <Artwork uri={track.artwork} size={116} />
-                <Text numberOfLines={1} style={styles.homeRecentTitle}>
-                  {track.title}
-                </Text>
-                <Text numberOfLines={1} style={styles.homeRecentArtist}>
-                  {track.artist}
-                </Text>
-              </PressableScale>
-            ))}
-          </ScrollView>
-        ) : recentTracks.length === 0 ? (
-          <Text style={styles.homeEmptyHint}>
-            Las canciones que reproduzcas aparecerán aquí.
-          </Text>
-        ) : null}
-
-        <View style={styles.homeSectionHeader}>
-          <Text style={styles.homeSectionTitle}>Tu colección</Text>
-        </View>
-        <View style={styles.homeShortcutGrid}>
-          {shortcuts.map(shortcut => (
-            <PressableScale
-              key={shortcut.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Abrir ${shortcut.label}`}
-              onPress={() => navigateTo(shortcut.id)}
-              style={styles.homeShortcut}
-            >
-              <View style={styles.homeShortcutIcon}>
-                <shortcut.icon color={colors.accent} size={20} />
-              </View>
-              <View style={styles.homeShortcutCopy}>
-                <Text style={styles.homeShortcutTitle}>{shortcut.label}</Text>
-                <Text style={styles.homeShortcutDetail}>{shortcut.detail}</Text>
-              </View>
-            </PressableScale>
-          ))}
-        </View>
-
-        <View style={styles.homeSectionHeader}>
-          <Text style={styles.homeSectionTitle}>Añadidas recientemente</Text>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Abrir toda la biblioteca"
-            onPress={() => navigateTo('songs')}
-          >
-            <Text style={styles.homeSectionAction}>Ver todo</Text>
-          </PressableScale>
-        </View>
-        {addedTracks.length ? (
-          <View style={styles.homeAddedList}>
-            {addedTracks.map((track, index) =>
-              renderTrack(
-                track,
-                index,
-                addedTracks,
-                'Añadidas recientemente',
-                false,
-              ),
-            )}
-          </View>
-        ) : (
-          <View style={styles.homeEmptyLibrary}>
-            <Text style={styles.homeEmptyTitle}>
-              {loadingLibrary ? 'Buscando música…' : 'Biblioteca vacía'}
-            </Text>
-            <Text style={styles.homeEmptyHint}>
-              {loadingLibrary
-                ? 'Estamos revisando las canciones del dispositivo.'
-                : 'Añade archivos de audio y actualiza la biblioteca.'}
-            </Text>
-            {!loadingLibrary ? (
-              <PressableScale
-                accessibilityRole="button"
-                onPress={() => loadLibrary()}
-                style={styles.homeEmptyButton}
-              >
-                <Text style={styles.homeEmptyButtonText}>
-                  Actualizar biblioteca
-                </Text>
-              </PressableScale>
-            ) : null}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+    <Tap
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={styles.shortcut}
+    >
+      <View style={styles.shortcutIcon}>{icon}</View>
+      <Text numberOfLines={2} style={[type.label, styles.shortcutLabel]}>
+        {label}
+      </Text>
+    </Tap>
   );
 }
+
+function CoverCard({
+  title,
+  subtitle,
+  artwork,
+  round = false,
+  accessibilityLabel,
+  onPress,
+}: {
+  title: string;
+  subtitle?: string;
+  artwork: string | null | undefined;
+  round?: boolean;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  return (
+    <Tap
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={styles.card}
+    >
+      <Cover uri={artwork} size={136} round={round} />
+      <Text
+        numberOfLines={1}
+        style={[type.label, styles.cardTitle, round && styles.centered]}
+      >
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text
+          numberOfLines={1}
+          style={[type.caption, round && styles.centered]}
+        >
+          {subtitle}
+        </Text>
+      ) : null}
+    </Tap>
+  );
+}
+
+export function HomeScreen() {
+  const { music, nav, setLibraryFilter } = useApp();
+  const insets = useSafeAreaInsets();
+  const {
+    tracks,
+    playlists,
+    playlistTracksById,
+    recentTracks,
+    loadingLibrary,
+    permissionDenied,
+    loadLibrary,
+    playTracks,
+    setPlaylistNameDialog,
+    setPlaylistDialogError,
+  } = music;
+  const albums = useMemo(() => groupAlbums(tracks).slice(0, 12), [tracks]);
+  const artists = useMemo(() => groupArtists(tracks).slice(0, 12), [tracks]);
+  const open = (kind: 'favorites' | 'recent' | 'top' | 'added') =>
+    nav.push({ name: 'collection', ref: { kind } });
+  const iconSize = 20;
+
+  return (
+    <ScrollView
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + spacing.md },
+      ]}
+      refreshControl={
+        <RefreshControl
+          colors={[colors.accent]}
+          onRefresh={() => loadLibrary(false)}
+          progressBackgroundColor={colors.surfaceHigh}
+          refreshing={false}
+        />
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.header}>
+        <Text style={type.display}>{greeting()}</Text>
+        <IconButton
+          label="Ajustes"
+          onPress={() => nav.push({ name: 'settings' })}
+        >
+          <Settings color={colors.text} size={24} />
+        </IconButton>
+      </View>
+
+      {permissionDenied ? (
+        <View style={styles.notice}>
+          <Text style={type.title}>Permite el acceso a tu música</Text>
+          <Text style={type.secondary}>
+            Sin este permiso no podemos mostrar las canciones del teléfono.
+          </Text>
+          <Button label="Dar permiso" onPress={() => loadLibrary()} />
+        </View>
+      ) : !loadingLibrary && tracks.length === 0 ? (
+        <View style={styles.notice}>
+          <Text style={type.title}>No encontramos música</Text>
+          <Text style={type.secondary}>
+            Copia archivos de audio al teléfono y actualiza la biblioteca.
+          </Text>
+          <Button
+            label="Actualizar biblioteca"
+            onPress={() => loadLibrary(false)}
+          />
+        </View>
+      ) : (
+        <View style={styles.shortcuts}>
+          <Shortcut
+            icon={<Heart color={colors.accent} size={iconSize} />}
+            label="Favoritas"
+            onPress={() => open('favorites')}
+          />
+          <Shortcut
+            icon={<Shuffle color={colors.accent} size={iconSize} />}
+            label="Mezclar todo"
+            onPress={() => {
+              const shuffled = shuffleTracks(tracks);
+              if (shuffled[0]) {
+                playTracks(shuffled, shuffled[0], 'Mezcla de tu biblioteca');
+              }
+            }}
+          />
+          <Shortcut
+            icon={<TrendingUp color={colors.accent} size={iconSize} />}
+            label="Más escuchadas"
+            onPress={() => open('top')}
+          />
+          <Shortcut
+            icon={<Clock3 color={colors.accent} size={iconSize} />}
+            label="Recientes"
+            onPress={() => open('recent')}
+          />
+          <Shortcut
+            icon={<Plus color={colors.accent} size={iconSize} />}
+            label="Añadidas"
+            onPress={() => open('added')}
+          />
+          <Shortcut
+            icon={<ListMusic color={colors.accent} size={iconSize} />}
+            label="Tus listas"
+            onPress={() => {
+              setLibraryFilter('playlists');
+              nav.selectTab('library');
+            }}
+          />
+        </View>
+      )}
+
+      {recentTracks.length > 0 ? (
+        <>
+          <SectionHeader
+            action="Ver todo"
+            onAction={() => open('recent')}
+            title="Escuchado recientemente"
+          />
+          <ScrollView
+            contentContainerStyle={styles.row}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {recentTracks.slice(0, 12).map(track => (
+              <CoverCard
+                key={track.id}
+                accessibilityLabel={`Reproducir ${track.title} de ${track.artist}`}
+                artwork={track.artwork}
+                onPress={() => playTracks(recentTracks, track, 'Recientes')}
+                subtitle={track.artist}
+                title={track.title}
+              />
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+
+      {playlists.length > 0 ? (
+        <>
+          <SectionHeader title="Tus listas" />
+          <ScrollView
+            contentContainerStyle={styles.row}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {playlists.map(playlist => {
+              const items = playlistTracksById.get(playlist.id) ?? [];
+              return (
+                <CoverCard
+                  key={playlist.id}
+                  accessibilityLabel={`Abrir lista ${playlist.name}`}
+                  artwork={items[0]?.artwork}
+                  onPress={() =>
+                    nav.push({
+                      name: 'collection',
+                      ref: { kind: 'playlist', id: playlist.id },
+                    })
+                  }
+                  subtitle={`${items.length} ${
+                    items.length === 1 ? 'canción' : 'canciones'
+                  }`}
+                  title={playlist.name}
+                />
+              );
+            })}
+          </ScrollView>
+        </>
+      ) : tracks.length > 0 ? (
+        <View style={styles.createList}>
+          <Button
+            label="Crear una lista"
+            onPress={() => {
+              setPlaylistDialogError(null);
+              setPlaylistNameDialog({ playlistId: null, name: '' });
+            }}
+            variant="tonal"
+          />
+        </View>
+      ) : null}
+
+      {albums.length > 0 ? (
+        <>
+          <SectionHeader title="Álbumes" />
+          <ScrollView
+            contentContainerStyle={styles.row}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {albums.map(album => (
+              <CoverCard
+                key={album.key}
+                accessibilityLabel={`Abrir álbum ${album.name}`}
+                artwork={album.artwork}
+                onPress={() =>
+                  nav.push({
+                    name: 'collection',
+                    ref: { kind: 'group', key: album.key, title: album.name },
+                  })
+                }
+                subtitle={album.artist}
+                title={album.name}
+              />
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+
+      {artists.length > 0 ? (
+        <>
+          <SectionHeader title="Artistas" />
+          <ScrollView
+            contentContainerStyle={styles.row}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {artists.map(artist => (
+              <CoverCard
+                key={artist.key}
+                accessibilityLabel={`Abrir artista ${artist.name}`}
+                artwork={artist.artwork}
+                onPress={() =>
+                  nav.push({
+                    name: 'collection',
+                    ref: { kind: 'group', key: artist.key, title: artist.name },
+                  })
+                }
+                round
+                title={artist.name}
+              />
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { paddingBottom: spacing.xl },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: spacing.md,
+    paddingLeft: screenPadding,
+    paddingRight: spacing.xs,
+  },
+  notice: {
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.xl,
+  },
+  shortcuts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingHorizontal: screenPadding,
+  },
+  shortcut: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    flexBasis: '48%',
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: spacing.md,
+    height: 56,
+    overflow: 'hidden',
+  },
+  shortcutIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceHigh,
+    height: 56,
+    justifyContent: 'center',
+    width: 56,
+  },
+  shortcutLabel: { flex: 1, paddingRight: spacing.sm },
+  row: { gap: spacing.md, paddingHorizontal: screenPadding },
+  card: { width: 136 },
+  cardTitle: { marginTop: spacing.sm },
+  centered: { textAlign: 'center' },
+  createList: {
+    alignItems: 'flex-start',
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.xl,
+  },
+});

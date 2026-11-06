@@ -76,3 +76,8 @@ yarn-error.log
 
 # Instalable generado por scripts/build-apk.ps1
 /MiMusica.apk
+
+# Archivos de trabajo del proceso de diseño
+/.impeccable/mocks/
+/.impeccable/questions/
+/.impeccable/review/

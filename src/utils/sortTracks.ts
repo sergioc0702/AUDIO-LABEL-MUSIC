@@ -46,6 +46,8 @@ const spanishGenres: Record<string, string> = {
   jazz: 'Jazz',
   'k-pop': 'K-pop',
   latin: 'Latina',
+  'lateinamerikanische musik': 'Latina',
+  'rap/hip hop': 'Rap y hip hop',
   metal: 'Metal',
   'heavy metal': 'Heavy metal',
   'new age': 'New age',

@@ -1,161 +1,70 @@
 # Mi Música (Android)
 
-Reproductor local creado con React Native y TypeScript. La biblioteca se obtiene
-de `MediaStore` y completa título, artista, álbum y carátula con
-`MediaMetadataRetriever` cuando faltan datos en el índice de Android. Las
-etiquetas leídas se guardan en Room y cada archivo solo se vuelve a abrir si
-cambia; las carátulas incrustadas se guardan como archivos de la app.
+Reproductor de música local hecho con React Native y TypeScript. Funciona con
+los archivos del teléfono, sin cuenta y sin internet. La biblioteca sale de
+`MediaStore`; las etiquetas leídas se guardan en Room y cada archivo solo se
+vuelve a abrir si cambia.
 
-## Pasos para ejecutar
+## Funciones
 
-1. Instala Node.js 22.11 o posterior, Android Studio, Android SDK y un JDK
-   compatible con la versión de Android Gradle Plugin del proyecto.
-2. Configura `ANDROID_HOME` y prepara un emulador Android o conecta un teléfono
-   con depuración USB activada.
-3. En la raíz del proyecto, ejecuta `npm install`.
-4. Inicia Metro con `npm start`.
-5. En otra terminal, ejecuta `npm run android`.
-6. Acepta el permiso de audio para escanear el dispositivo. La biblioteca se
-   actualiza al detectar cambios de MediaStore y al volver a abrir la app;
-   también puedes usar el botón ↻ para volver a escanear manualmente. Android
-   no mantiene este monitoreo continuo cuando el proceso está cerrado.
+- **Inicio:** accesos a favoritas, más escuchadas, recientes, añadidas y listas,
+  mezcla de toda la biblioteca, y filas de recientes, listas, álbumes y artistas.
+- **Buscar:** resultados agrupados en canciones, artistas, álbumes y listas, sin
+  distinguir acentos. Sin texto, muestra los géneros disponibles.
+- **Biblioteca:** canciones, álbumes, artistas, listas y carpetas, con orden por
+  nombre o por fecha de incorporación.
+- **Reproductor:** cola editable con arrastre y deshacer, mezcla que conserva la
+  canción actual y permite recuperar el orden, repetición, velocidad de 0,75× a
+  2× y ecualizador de cinco bandas con perfiles. Se abre deslizando hacia arriba
+  el mini-reproductor, se cierra deslizando hacia abajo y la carátula cambia de
+  canción al deslizarla a los lados.
+- **La sesión se recuerda:** al reabrir la app vuelven la cola, la canción, la
+  posición, la mezcla y la repetición, sin que empiece a sonar sola.
+- **Temporizador:** 15 a 90 minutos o al terminar la canción. Funciona en segundo
+  plano porque vive en el servicio de reproducción.
+- **Menú de cada canción:** reproducir a continuación, añadir a la cola o a una
+  lista, favoritas, ir al álbum o al artista, y eliminar del dispositivo.
+- **Listas:** crear, renombrar, eliminar, reordenar y guardar la cola como lista.
+- Reproducción en segundo plano, notificación, botones de audífonos y paso sin
+  silencios entre canciones.
 
-## Generar o actualizar el APK
+## Ejecutar
 
-La compilación release para distribuir requiere un keystore privado propio.
-Configura estas variables de entorno antes de ejecutar `npm run build:apk`:
+1. Instala Node.js 22.11 o posterior, Android Studio, el SDK y un JDK compatible.
+2. Conecta un teléfono con depuración USB o abre un emulador.
+3. Ejecuta `npm install`, luego `npm start` y, en otra terminal, `npm run android`.
 
-- `MYMUSICAPP_RELEASE_STORE_FILE`: ruta absoluta al keystore.
-- `MYMUSICAPP_RELEASE_STORE_PASSWORD`
-- `MYMUSICAPP_RELEASE_KEY_ALIAS`
-- `MYMUSICAPP_RELEASE_KEY_PASSWORD`
+## Generar el APK
 
-Guarda el keystore y sus contraseñas fuera del repositorio; en CI, usa el
-almacén de secretos del proveedor. Gradle detiene la compilación release si
-falta alguna variable o el keystore no existe. La variante debug conserva su
-firma de depuración y no necesita estas variables.
-
-Con la firma configurada, el script compila una versión instalable con el
-bundle de JavaScript incluido y copia el resultado a `MiMusica.apk` en la raíz
-del proyecto, reemplazando el APK anterior solo después de una compilación
-exitosa. Después de copiarlo, elimina los APK intermedios de release y debug
-para conservar un único instalable en el proyecto. El APK existente no cambia
-si falta la firma o falla la compilación.
-
-Para uso personal se puede compilar explícitamente con la clave debug incluida
-en Android:
+Para uso personal, sin firma propia:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-apk.ps1 -UseDebugSigningForPersonalRelease
 ```
 
-Ese APK incluye el bundle y no necesita Metro, pero no es apropiado para
-distribución ni puede actualizar una instalación firmada con otro certificado.
-Al completar correctamente esa compilación, el script elimina también el
-keystore release y la contraseña cifrada guardados en
-`%LOCALAPPDATA%\MiMusicApp\signing`.
+El resultado queda en `MiMusica.apk`. Esa firma usa la clave pública de depuración
+de Android. Para firmar con una clave propia, define estas variables y ejecuta
+`npm run build:apk`; guarda el keystore fuera del repositorio:
 
-## Funcionalidad incluida
+- `MYMUSICAPP_RELEASE_STORE_FILE` (ruta absoluta)
+- `MYMUSICAPP_RELEASE_STORE_PASSWORD`
+- `MYMUSICAPP_RELEASE_KEY_ALIAS`
+- `MYMUSICAPP_RELEASE_KEY_PASSWORD`
 
-- Biblioteca de canciones, álbumes y artistas con búsqueda; al reproducir un
-  álbum o artista, la cola se limita a ese grupo. Los álbumes se identifican
-  por su ID de MediaStore para distinguir títulos repetidos.
-- Listas de reproducción locales: crear, renombrar y eliminar listas; añadir o
-  quitar canciones, reordenarlas y reproducirlas en el orden guardado. También
-  se puede guardar la cola actual como una lista. Los datos se conservan en una
-  base de datos Room del dispositivo; eliminar una lista no borra los archivos
-  de audio.
-- Orden cíclico de canciones por nombre ascendente, nombre descendente y fecha
-  de incorporación, sin abrir menús.
-- Biblioteca con acciones de reproducir todo y aleatorio, selector de orden,
-  filtro de género en hoja inferior con chip removible, actualización automática
-  al detectar nuevas canciones indexadas por Android y al volver a primer
-  plano, actualización al arrastrar hacia abajo e índice alfabético. El escaneo
-  incluye las carpetas de audio indexadas por MediaStore, no solo una carpeta
-  elegida en la app. Las listas de canciones y reproducciones recientes se
-  virtualizan para dibujar solo las filas cercanas a la pantalla. Los géneros
-  conocidos se presentan en español sin cambiar las etiquetas originales
-  almacenadas.
-- Filas de canción compactas con indicador animado para la pista activa, menú
-  contextual de duración y favoritos y gesto lateral para alternar favoritos.
-  La búsqueda queda fija, el título se contrae al desplazarse y la carga inicial
-  usa skeletons.
-- Detalle de álbumes y artistas con su listado completo de pistas; reproducir
-  una canción desde el detalle mantiene la cola limitada al grupo.
-- Favoritos persistentes en el dispositivo y filtro para ver solo esas canciones.
-- Acciones por canción para reproducirla a continuación o añadirla al final de
-  la cola, sin reemplazar lo que ya está sonando. Si ya está en la cola, se
-  evita duplicarla y se informa al usuario.
-- Eliminación física de una canción desde el menú de opciones de la biblioteca,
-  con confirmación previa y autorización del sistema; también se quitan sus
-  referencias guardadas de favoritos, listas, historial y cola. El menú de las
-  canciones dentro de listas no ofrece esta acción.
-- Pantalla de Inicio con acceso a reproducción reciente, favoritas, listas,
-  álbumes y canciones añadidas; navegación inferior de Inicio, Buscar y
-  Biblioteca, con las secciones de colección dentro de Biblioteca.
-- Mini-reproductor persistente, vista ampliada de
-  reproducción y cola accesible desde el reproductor; permite arrastrar pistas
-  desde el asa sin fondo para reordenarlas con una indicación visible del destino.
-  El asa toma el gesto directamente y pausa el desplazamiento normal de la lista
-  mientras se arrastra; la cola también se desplaza automáticamente cerca de sus
-  bordes. La pista arrastrada se eleva sobre las demás; también se pueden quitar
-  deslizándolas a la derecha, con opción de deshacer durante tres segundos.
-- Mezcla efectiva de la cola en reproducción: conserva la pista actual, baraja
-  las siguientes y permite volver al orden previo mientras no se modifique
-  manualmente la cola.
-- El botón Atrás de Android cierra primero los modales y vuelve desde los
-  detalles de álbum, artista o lista a su listado; desde las demás secciones
-  regresa a la biblioteca.
-- Barra de progreso táctil con área amplia: permite saltar a un punto con un toque
-  o arrastrar el indicador, con posición previsualizada y tiempos sincronizados.
-- Lectura de etiquetas y carátulas del álbum o incrustadas en cada pista.
-- Filtro de género a partir de las etiquetas que Android puede extraer; las
-  pistas sin esa etiqueta siguen disponibles en la biblioteca general.
-- Reproducción en segundo plano, controles de notificación y controles básicos
-  del reproductor; los botones multimedia permiten reproducir, pausar, detener,
-  avanzar, retroceder y buscar posiciones.
-- Historial persistente de las canciones reproducidas recientemente, con opción
-  de borrarlo. El historial guarda hasta 500 reproducciones y muestra hasta 100
-  canciones distintas.
-- Velocidad de reproducción ajustable entre 0,75× y 2×, guardada en el
-  dispositivo.
-- La cola permite quitar todas las canciones siguientes sin detener la actual.
-- Temporizador de apagado de 15, 30, 45 o 60 minutos, con cuenta regresiva,
-  cancelación y pausa automática de la reproducción.
-- Ecualizador software de cinco bandas (60 Hz, 250 Hz, 1 kHz, 4 kHz y 12 kHz),
-  con controles de −12 a +12 dB, perfiles y ajustes persistentes. Procesa el
-  PCM en el audio sink de ExoPlayer, sin efectos globales ni ID de sesión de
-  audio. La cadena PCM se mantiene para aplicar cambios en tiempo real, por lo
-  que no hay passthrough/offload de audio comprimido; al desactivar el
-  ecualizador, los samples pasan sin cambios. La señal se atenúa según la mayor
-  ganancia positiva para evitar el recorte, por lo que subir una banda baja el
-  volumen de las demás en lugar de subir el volumen total.
-- Permisos de audio adaptados a Android 13 y versiones anteriores.
-- La interfaz adopta el diseño oscuro con acento lima del prototipo
-  `brutal-player-rn`; los colores, tipografía, espaciado, radios y movimiento
-  están definidos mediante tokens en `src/theme/tokens.ts`. El índice
-  alfabético y el filtro de géneros se apoyan en `src/utils/sortTracks.ts`.
-
-El proyecto solo incluye el destino Android. La disponibilidad de formatos y
-la calidad de los metadatos dependen de los archivos y de la versión del sistema.
-El módulo local de KotlinAudio conserva su licencia Apache 2.0 en
-`android/kotlin-audio/LICENSE`.
+Android no permite actualizar una app instalada con otra firma: cambiarla obliga a
+desinstalar, y eso borra listas, favoritas e historial.
 
 ## Organización del código
 
-- `App.tsx` compone la interfaz, administra el estado de navegación y conecta
-  las acciones de pantalla con los servicios de la aplicación.
-- `src/theme/playerThemes.ts` define los temas del reproductor: cada uno declara
-  su paleta y su escena animada. Para añadir uno basta una entrada en esa lista
-  (y una escena nueva en `src/components/player/scenes/` si la necesita); el test
-  `__tests__/playerThemes.test.ts` comprueba que sus textos sigan siendo legibles.
-- `src/components/motion/` agrupa las piezas de movimiento reutilizables. Las
-  animaciones respetan el ajuste de Android para quitar animaciones.
-- `src/services/player.ts` concentra las operaciones de `react-native-track-player`,
-  como preparar el reproductor, gestionar la cola y ejecutar controles de
-  reproducción.
-- `src/services/PlaybackService.ts` registra el servicio de reproducción en
-  segundo plano.
-- `src/native/` contiene el acceso a la biblioteca local y su persistencia;
-  `src/theme/`, `src/types/` y `src/utils/` agrupan tokens visuales, tipos y
-  lógica reutilizable respectivamente.
+- `App.tsx`: estructura general, pestañas y avisos.
+- `src/state/useMusicController.ts`: toda la lógica de biblioteca, cola y listas,
+  sin interfaz. `src/state/AppContext.tsx`: navegación y estado compartido.
+- `src/screens/`: Inicio, Buscar, Biblioteca, detalle y Ajustes.
+- `src/player/`: reproductor, mini-reproductor, cola, ecualizador, temporizador y
+  menús.
+- `src/ui/`: componentes reutilizables. `src/theme/theme.ts`: colores y tipografía.
+- `src/services/`: reproductor, sesión guardada y temporizador.
+- `src/native/` y `android/app/`: acceso a MediaStore y base de datos Room.
+- `android/kotlin-audio/`: copia local de KotlinAudio (licencia Apache 2.0, en su
+  carpeta) con el ecualizador por software y correcciones de la cola.
+- `PRODUCT.md`: qué es el producto y para quién.

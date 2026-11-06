@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { Pause, Play } from 'lucide-react-native';
-import { motionDuration, motionEasing } from '../../theme/motion';
+import { motionDuration, motionEasing } from '../theme/motion';
 
-/** Turns one symbol into the other so the change of state reads as a single gesture. */
 export function PlayPauseIcon({
   isPlaying,
   color,
@@ -34,35 +33,12 @@ export function PlayPauseIcon({
               inputRange: [0, 1],
               outputRange: [1, 0],
             }),
-            transform: [
-              {
-                scale: progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0.5],
-                }),
-              },
-            ],
           },
         ]}
       >
         <Play color={color} fill={color} size={size} />
       </Animated.View>
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            opacity: progress,
-            transform: [
-              {
-                scale: progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.5, 1],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: progress }]}>
         <Pause color={color} fill={color} size={size} />
       </Animated.View>
     </View>

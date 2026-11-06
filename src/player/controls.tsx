@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Pressable, Text, View } from 'react-native';
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { GripVertical, Minus, Music2 } from 'lucide-react-native';
-import { Artwork } from '../library/LibraryComponents';
-import { useDesignTokens } from '../../theme/DesignThemeContext';
-import { createStyles } from '../../theme/createStyles';
-import { formatTime } from '../../utils/formatTime';
-import type { Track } from '../../types/Track';
+import { useProgress } from 'react-native-track-player';
+import { colors, radius, spacing, typeValues } from '../theme/theme';
+import type { Track } from '../types/Track';
+import { Cover } from '../ui/Cover';
+import { formatTime } from '../utils/formatTime';
 
-export const queueRowHeight = 66;
+export const queueRowHeight = 60;
 
 export function ProgressSlider({
   duration,
@@ -20,8 +27,6 @@ export function ProgressSlider({
   onSeek: (position: number) => Promise<void>;
   disabled: boolean;
 }) {
-  const tokens = useDesignTokens();
-  const styles = useMemo(() => createStyles(tokens), [tokens]);
   const [width, setWidth] = useState(0);
   const [previewPosition, setPreviewPosition] = useState<number | null>(null);
   const dragStartX = useRef(0);
@@ -176,8 +181,6 @@ export function EqualizerBandControl({
   value: number;
   onChange: (value: number) => void;
 }) {
-  const tokens = useDesignTokens();
-  const styles = useMemo(() => createStyles(tokens), [tokens]);
   const sliderHeight = useRef(144);
   const startY = useRef(0);
   const propsRef = useRef({ onChange, value });
@@ -296,8 +299,6 @@ export function QueueTrackRow({
   ) => void;
   onRemove: () => Promise<boolean>;
 }) {
-  const tokens = useDesignTokens();
-  const styles = useMemo(() => createStyles(tokens), [tokens]);
   const translateY = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current;
   const dragTargetIndex = useRef(index);
@@ -515,7 +516,7 @@ export function QueueTrackRow({
             disabled && styles.queueActionDisabled,
           ]}
         >
-          <GripVertical color={tokens.colors.accent} size={20} />
+          <GripVertical color={colors.textSecondary} size={20} />
         </View>
         <Pressable
           accessibilityRole="button"
@@ -529,7 +530,7 @@ export function QueueTrackRow({
           }}
           style={styles.queueTrackMain}
         >
-          <Artwork uri={track.artwork} size={44} />
+          <Cover uri={track.artwork} size={44} />
           <View style={styles.trackDetails}>
             <Text
               numberOfLines={1}
@@ -541,7 +542,7 @@ export function QueueTrackRow({
               {track.artist}
             </Text>
           </View>
-          {isCurrent ? <Music2 color={tokens.colors.accent} size={20} /> : null}
+          {isCurrent ? <Music2 color={colors.accent} size={20} /> : null}
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -557,9 +558,180 @@ export function QueueTrackRow({
             disabled && styles.queueActionDisabled,
           ]}
         >
-          <Minus color={tokens.colors.danger} size={20} />
+          <Minus color={colors.textSecondary} size={20} />
         </Pressable>
       </Animated.View>
     </View>
   );
 }
+
+export function MiniProgress({
+  duration,
+  onPositionChange,
+}: {
+  duration: number;
+  onPositionChange: (position: number) => void;
+}) {
+  const { position } = useProgress(1000);
+
+  useEffect(() => {
+    onPositionChange(position);
+  }, [onPositionChange, position]);
+
+  const progress =
+    duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+
+  return (
+    <View style={styles.miniTrack}>
+      <View style={[styles.miniFill, { width: `${progress}%` }]} />
+    </View>
+  );
+}
+
+export function PlayerProgress({
+  fallbackDuration,
+  onSeek,
+  disabled,
+}: {
+  fallbackDuration: number;
+  onSeek: (position: number) => Promise<void>;
+  disabled: boolean;
+}) {
+  const progress = useProgress(250);
+
+  return (
+    <ProgressSlider
+      duration={progress.duration > 0 ? progress.duration : fallbackDuration}
+      position={progress.position}
+      onSeek={onSeek}
+      disabled={disabled}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  miniTrack: { backgroundColor: colors.outline, height: 2 },
+  miniFill: { backgroundColor: colors.text, height: 2 },
+  expandedProgressContainer: { width: '100%' },
+  expandedProgressTouchArea: { height: 36, justifyContent: 'center' },
+  expandedProgressTrack: {
+    backgroundColor: colors.outline,
+    borderRadius: 2,
+    height: 4,
+    width: '100%',
+  },
+  progressFill: {
+    backgroundColor: colors.text,
+    borderRadius: 2,
+    height: 4,
+  },
+  progressThumb: {
+    backgroundColor: colors.text,
+    borderRadius: 7,
+    height: 14,
+    marginLeft: -7,
+    position: 'absolute',
+    top: -5,
+    width: 14,
+  },
+  progressBubble: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceHigh,
+    borderRadius: radius.sm,
+    bottom: 16,
+    marginLeft: -30,
+    paddingVertical: 4,
+    position: 'absolute',
+    width: 60,
+  },
+  progressBubbleText: {
+    ...typeValues.label,
+    fontVariant: ['tabular-nums'],
+  },
+  expandedTimes: { flexDirection: 'row', justifyContent: 'space-between' },
+  trackSubtitle: {
+    ...typeValues.caption,
+    fontVariant: ['tabular-nums'],
+  },
+  queueActionDisabled: { opacity: 0.45 },
+  equalizerBand: { alignItems: 'center', flex: 1, gap: spacing.xs },
+  equalizerBandFrequency: typeValues.caption,
+  equalizerSliderTouchArea: {
+    alignItems: 'center',
+    height: 144,
+    width: 48,
+  },
+  equalizerSliderTrack: {
+    backgroundColor: colors.outline,
+    borderRadius: 2,
+    height: '100%',
+    width: 4,
+  },
+  equalizerSliderFill: {
+    backgroundColor: colors.accent,
+    position: 'absolute',
+    width: 4,
+  },
+  equalizerSliderThumb: {
+    backgroundColor: colors.text,
+    borderRadius: 8,
+    height: 16,
+    position: 'absolute',
+    width: 28,
+  },
+  equalizerBandValue: typeValues.label,
+  equalizerBandLabel: typeValues.caption,
+  queueRowContainer: { height: queueRowHeight },
+  queueRowContainerDragging: { zIndex: 2 },
+  queueDropMarker: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    left: spacing.lg,
+    position: 'absolute',
+    right: spacing.lg,
+    top: -8,
+    zIndex: 1,
+  },
+  queueDropMarkerDot: {
+    backgroundColor: colors.accent,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  queueDropMarkerText: typeValues.caption,
+  queueDropMarkerLine: { backgroundColor: colors.accent, flex: 1, height: 2 },
+  queueTrack: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    height: queueRowHeight,
+    paddingRight: spacing.xs,
+  },
+  queueTrackDragging: {
+    backgroundColor: colors.surfaceHigh,
+    borderRadius: radius.md,
+    elevation: 6,
+  },
+  queueDragHandle: {
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  queueTrackMain: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minWidth: 0,
+  },
+  trackDetails: { flex: 1, gap: 2, minWidth: 0 },
+  trackTitle: typeValues.body,
+  queueCurrentTrack: { color: colors.accent, fontWeight: '600' },
+  queueRemoveButton: {
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+});

@@ -110,6 +110,12 @@ interface PlaylistDao {
   )
   suspend fun prunePlaybackHistory()
 
+  @Query(
+    "SELECT trackId, COUNT(*) AS plays FROM playback_history " +
+      "GROUP BY trackId ORDER BY plays DESC, MAX(playedAt) DESC LIMIT 50",
+  )
+  suspend fun getTopPlayed(): List<TopPlayedEntry>
+
   @Query("DELETE FROM playback_history WHERE trackId = :trackId")
   suspend fun deletePlaybackHistoryForTrack(trackId: String)
 
@@ -125,6 +131,11 @@ interface PlaylistDao {
   @Query("DELETE FROM track_metadata WHERE trackId IN (:trackIds)")
   suspend fun deleteTrackMetadata(trackIds: List<String>)
 }
+
+data class TopPlayedEntry(
+  val trackId: String,
+  val plays: Int,
+)
 
 data class RecentPlaybackEntry(
   val trackId: String,

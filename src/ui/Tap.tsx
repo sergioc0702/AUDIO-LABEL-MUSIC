@@ -8,28 +8,25 @@ import {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-type PressableScaleProps = Omit<
-  ComponentProps<typeof AnimatedPressable>,
-  'style'
-> & {
+type TapProps = Omit<ComponentProps<typeof AnimatedPressable>, 'style'> & {
   pressedScale?: number;
   style?: StyleProp<ViewStyle>;
 };
 
-/** Pressable that gives way under the finger and settles back on release. */
-export function PressableScale({
-  pressedScale = 0.96,
+/** Pressable with a small, quick response to the finger. */
+export function Tap({
+  pressedScale = 0.97,
   onPressIn,
   onPressOut,
   style,
   ...props
-}: PressableScaleProps) {
+}: TapProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const animateTo = (toValue: number) => {
     Animated.spring(scale, {
       toValue,
       speed: 50,
-      bounciness: toValue === 1 ? 6 : 0,
+      bounciness: 0,
       useNativeDriver: true,
     }).start();
   };

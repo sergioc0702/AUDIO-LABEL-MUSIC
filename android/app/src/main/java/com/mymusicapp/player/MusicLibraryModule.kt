@@ -279,6 +279,37 @@ class MusicLibraryModule(
   }
 
   @ReactMethod
+  fun getTopPlayed(promise: Promise) {
+    runPlaylistOperation(promise, "E_HISTORY_READ", "No se pudo leer el historial.") {
+      Arguments.createArray().apply {
+        playlistDatabase.playlistDao().getTopPlayed().forEach { entry ->
+          pushMap(Arguments.createMap().apply {
+            putString("trackId", entry.trackId)
+            putInt("plays", entry.plays)
+          })
+        }
+      }
+    }
+  }
+
+  @ReactMethod
+  fun saveSession(session: String, promise: Promise) {
+    context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+      .edit()
+      .putString("playback_session", session)
+      .apply()
+    promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun getSession(promise: Promise) {
+    promise.resolve(
+      context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+        .getString("playback_session", null),
+    )
+  }
+
+  @ReactMethod
   fun clearPlaybackHistory(promise: Promise) {
     runPlaylistOperation(promise, "E_HISTORY_CLEAR", "No se pudo borrar el historial.") {
       playlistDatabase.playlistDao().clearPlaybackHistory()
@@ -632,6 +663,7 @@ class MusicLibraryModule(
       MediaStore.Audio.Media.DATE_ADDED,
       MediaStore.Audio.Media.DATE_MODIFIED,
       MediaStore.Audio.Media.SIZE,
+      folderColumn(),
     )
     val dao = playlistDatabase.playlistDao()
     val cachedMetadata = dao.getTrackMetadata().associateBy { it.trackId }
@@ -660,6 +692,7 @@ class MusicLibraryModule(
       val dateAddedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
       val dateModifiedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
       val sizeColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+      val folderIndex = it.getColumnIndexOrThrow(folderColumn())
 
       while (it.moveToNext()) {
         val displayName = it.getString(displayNameColumn).orEmpty()
@@ -724,6 +757,7 @@ class MusicLibraryModule(
           if (year != null) putInt("year", year) else putNull("year")
           putDouble("duration", it.getLong(durationColumn).toDouble() / 1000.0)
           putDouble("dateAdded", it.getLong(dateAddedColumn).toDouble())
+          putString("folder", folderPath(it.getString(folderIndex)))
           val artwork = artworkByAlbum[albumId]
           if (artwork != null && artworkEmittedAlbums.add(albumId)) {
             putString("artwork", artwork)
@@ -744,6 +778,24 @@ class MusicLibraryModule(
     deleteOrphanedArtwork(artworkByAlbum.keys)
 
     return tracks
+  }
+
+  // RELATIVE_PATH exists from Android 10; older versions only expose the absolute path.
+  @Suppress("DEPRECATION")
+  private fun folderColumn() =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      MediaStore.Audio.Media.RELATIVE_PATH
+    } else {
+      MediaStore.Audio.Media.DATA
+    }
+
+  private fun folderPath(value: String?): String {
+    val path = value.orEmpty()
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      path.trimEnd('/')
+    } else {
+      path.substringBeforeLast('/', "")
+    }
   }
 
   private fun extractTrackMetadata(

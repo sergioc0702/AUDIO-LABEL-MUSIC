@@ -28,6 +28,7 @@ export async function setupPlayer(): Promise<void> {
       Capability.SkipToPrevious,
       Capability.SeekTo,
     ],
+    progressUpdateEventInterval: 5,
     forwardJumpInterval: 15,
     backwardJumpInterval: 15,
   });

@@ -1,5 +1,10 @@
 import { NativeModules } from 'react-native';
-import type { Playlist, RecentPlayback, Track } from '../types/Track';
+import type {
+  Playlist,
+  RecentPlayback,
+  TopPlayed,
+  Track,
+} from '../types/Track';
 
 type MusicLibraryModule = {
   getTracks(): Promise<Track[]>;
@@ -13,7 +18,10 @@ type MusicLibraryModule = {
   setPlaylistTracks(playlistId: string, trackIds: string[]): Promise<void>;
   recordPlaybackHistory(trackId: string): Promise<void>;
   getRecentPlayback(): Promise<RecentPlayback[]>;
+  getTopPlayed(): Promise<TopPlayed[]>;
   clearPlaybackHistory(): Promise<void>;
+  saveSession(session: string): Promise<void>;
+  getSession(): Promise<string | null>;
   getPlaybackRate(): Promise<number>;
   setPlaybackRate(rate: number): Promise<void>;
   getEqualizerSettings(): Promise<EqualizerSettings>;
@@ -126,6 +134,27 @@ export function getRecentPlayback(): Promise<RecentPlayback[]> {
     throw new Error('El módulo nativo de música no está disponible.');
   }
   return musicLibrary.getRecentPlayback();
+}
+
+export function getTopPlayed(): Promise<TopPlayed[]> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.getTopPlayed();
+}
+
+export function storeSession(session: string): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.saveSession(session);
+}
+
+export function getStoredSession(): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.getSession();
 }
 
 export function clearPlaybackHistory(): Promise<void> {
