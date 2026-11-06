@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState, type ElementRef } from 'react';
-import { FlatList, StyleSheet, Switch, Text, View } from 'react-native';
+import {
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { Check } from 'lucide-react-native';
 import {
   getSleepTimer,
@@ -11,6 +18,7 @@ import {
 } from '../services/sleepTimer';
 import { useApp } from '../state/AppContext';
 import { playbackRates } from '../state/useMusicController';
+import { playerThemes } from '../theme/playerThemes';
 import { colors, radius, spacing, type } from '../theme/theme';
 import type { Track } from '../types/Track';
 import { Button } from '../ui/Buttons';
@@ -218,6 +226,67 @@ export function EqualizerSheet() {
   );
 }
 
+export function ThemeSheet() {
+  const { playerSheet, setPlayerSheet, playerTheme, selectPlayerTheme } =
+    useApp();
+
+  return (
+    <Sheet
+      closeLabel="Cerrar temas"
+      onClose={() => setPlayerSheet(null)}
+      subtitle="Se aplica al reproductor"
+      title="Tema"
+      visible={playerSheet === 'theme'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.themes}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {playerThemes.map(theme => {
+          const selected = theme.id === playerTheme.id;
+          return (
+            <Tap
+              key={theme.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Usar tema ${theme.name}`}
+              accessibilityState={{ selected }}
+              onPress={() => selectPlayerTheme(theme.id)}
+              style={[
+                styles.theme,
+                { backgroundColor: theme.palette.background },
+                selected && styles.themeSelected,
+              ]}
+            >
+              <View style={styles.themeColors}>
+                {[theme.palette.accent, theme.palette.control]
+                  .concat(theme.sceneColors.slice(1, 2))
+                  .map((color, index) => (
+                    <View
+                      key={index}
+                      style={[styles.themeColor, { backgroundColor: color }]}
+                    />
+                  ))}
+              </View>
+              <Text
+                numberOfLines={1}
+                style={[type.label, { color: theme.palette.text }]}
+              >
+                {theme.name}
+              </Text>
+              {selected ? (
+                <View style={styles.themeCheck}>
+                  <Check color={theme.palette.text} size={18} />
+                </View>
+              ) : null}
+            </Tap>
+          );
+        })}
+      </ScrollView>
+    </Sheet>
+  );
+}
+
 export function QueueSheet() {
   const { music } = useApp();
   const {
@@ -358,6 +427,25 @@ export function QueueSheet() {
 }
 
 const styles = StyleSheet.create({
+  themes: {
+    gap: spacing.md,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.xl,
+  },
+  theme: {
+    borderColor: colors.outline,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.sm,
+    height: 112,
+    justifyContent: 'flex-end',
+    padding: spacing.md,
+    width: 112,
+  },
+  themeSelected: { borderColor: colors.text, borderWidth: 2 },
+  themeColors: { flexDirection: 'row', gap: spacing.xs },
+  themeColor: { borderRadius: 7, height: 14, width: 14 },
+  themeCheck: { position: 'absolute', right: spacing.sm, top: spacing.sm },
   equalizer: { gap: spacing.lg, paddingHorizontal: spacing.lg },
   equalizerHeader: {
     alignItems: 'center',

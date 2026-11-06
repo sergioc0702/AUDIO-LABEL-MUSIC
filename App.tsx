@@ -20,6 +20,7 @@ import {
   QueueSheet,
   SleepTimerSheet,
   SpeedSheet,
+  ThemeSheet,
 } from './src/player/Sheets';
 import {
   AddToPlaylistSheet,
@@ -143,6 +144,7 @@ function AppContent() {
       <SleepTimerSheet />
       <SpeedSheet />
       <EqualizerSheet />
+      <ThemeSheet />
       <TrackMenu />
       <AddToPlaylistSheet />
       <PlaylistTrackPicker />

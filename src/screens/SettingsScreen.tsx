@@ -5,6 +5,7 @@ import {
   Clock3,
   Gauge,
   History,
+  Palette,
   RefreshCw,
   SlidersHorizontal,
 } from 'lucide-react-native';
@@ -14,7 +15,7 @@ import { IconButton } from '../ui/Buttons';
 import { ListRow, SquareIcon } from '../ui/Rows';
 
 export function SettingsScreen() {
-  const { music, nav, setPlayerSheet } = useApp();
+  const { music, nav, setPlayerSheet, playerTheme } = useApp();
   const insets = useSafeAreaInsets();
   const { tracks, playbackRate, equalizerSettings, loadLibrary } = music;
   const iconProps = { color: colors.textSecondary, size: 22 };
@@ -60,6 +61,17 @@ export function SettingsScreen() {
         }
         onPress={() => setPlayerSheet('sleep')}
         title="Temporizador"
+      />
+
+      <ListRow
+        leading={
+          <SquareIcon>
+            <Palette {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={() => setPlayerSheet('theme')}
+        subtitle={playerTheme.name}
+        title="Tema del reproductor"
       />
 
       <Text style={[type.label, styles.group]}>Biblioteca</Text>

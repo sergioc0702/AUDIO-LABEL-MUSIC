@@ -17,6 +17,7 @@ import {
   ListMusic,
   Moon,
   MoreVertical,
+  Palette,
   Repeat,
   Repeat1,
   Shuffle,
@@ -28,13 +29,15 @@ import { RepeatMode } from 'react-native-track-player';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useApp } from '../state/AppContext';
 import { motionDuration, motionEasing } from '../theme/motion';
-import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
+import type { PlayerPalette } from '../theme/playerThemes';
+import { radius, screenPadding, spacing, type } from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { Snackbar } from '../ui/Snackbar';
 import { Tap } from '../ui/Tap';
 import { formatTime } from '../utils/formatTime';
 import { PlayPauseIcon } from './PlayPauseIcon';
+import { PlayerScene } from './PlayerScene';
 import { useSleepTimer } from './Sheets';
 import { PlayerProgress } from './controls';
 
@@ -43,15 +46,17 @@ function Tool({
   caption,
   active = false,
   icon: Icon,
+  palette,
   onPress,
 }: {
+  palette: PlayerPalette;
   label: string;
   caption: string;
   active?: boolean;
   icon: typeof Gauge;
   onPress: () => void;
 }) {
-  const color = active ? colors.accent : colors.textSecondary;
+  const color = active ? palette.accent : palette.textSecondary;
   return (
     <Tap
       accessibilityRole="button"
@@ -69,7 +74,8 @@ function Tool({
 }
 
 export function NowPlaying() {
-  const { music, setPlayerSheet } = useApp();
+  const { music, setPlayerSheet, playerTheme } = useApp();
+  const { palette } = playerTheme;
   const {
     currentTrack,
     playerExpanded,
@@ -320,8 +326,19 @@ export function NowPlaying() {
       visible={mounted}
     >
       <Animated.View
-        style={[styles.player, { transform: [{ translateY: sheetY }] }]}
+        style={[
+          styles.player,
+          {
+            backgroundColor: palette.background,
+            transform: [{ translateY: sheetY }],
+          },
+        ]}
       >
+        <PlayerScene
+          active={isPlaying && playerExpanded}
+          artwork={currentTrack.artwork}
+          theme={playerTheme}
+        />
         <View
           {...gestures.header.panHandlers}
           style={[styles.header, { paddingTop: insets.top + spacing.xs }]}
@@ -331,10 +348,13 @@ export function NowPlaying() {
             label="Cerrar reproductor"
             onPress={() => setPlayerExpanded(false)}
           >
-            <ChevronDown color={colors.text} size={26} />
+            <ChevronDown color={palette.text} size={26} />
           </IconButton>
           <View style={styles.headerText}>
-            <Text numberOfLines={1} style={type.label}>
+            <Text
+              numberOfLines={1}
+              style={[type.label, { color: palette.text }]}
+            >
               Desde {playbackSourceLabel}
             </Text>
           </View>
@@ -344,7 +364,7 @@ export function NowPlaying() {
               setQueueTrackDialog({ track: currentTrack, fromLibrary: true })
             }
           >
-            <MoreVertical color={colors.text} size={24} />
+            <MoreVertical color={palette.text} size={24} />
           </IconButton>
         </View>
 
@@ -379,10 +399,16 @@ export function NowPlaying() {
 
           <View style={styles.info}>
             <View style={styles.infoText}>
-              <Text numberOfLines={1} style={type.headline}>
+              <Text
+                numberOfLines={1}
+                style={[type.headline, { color: palette.text }]}
+              >
                 {currentTrack.title}
               </Text>
-              <Text numberOfLines={1} style={[type.body, styles.artist]}>
+              <Text
+                numberOfLines={1}
+                style={[type.body, { color: palette.textSecondary }]}
+              >
                 {currentTrack.artist}
               </Text>
             </View>
@@ -391,8 +417,8 @@ export function NowPlaying() {
               onPress={() => toggleFavorite(currentTrack)}
             >
               <Heart
-                color={isFavorite ? colors.accent : colors.text}
-                fill={isFavorite ? colors.accent : 'none'}
+                color={isFavorite ? palette.accent : palette.text}
+                fill={isFavorite ? palette.accent : 'none'}
                 size={26}
               />
             </IconButton>
@@ -402,6 +428,7 @@ export function NowPlaying() {
             disabled={!playerReady}
             fallbackDuration={currentTrack.duration}
             onSeek={seekToPosition}
+            palette={palette}
           />
 
           <View style={styles.controls}>
@@ -412,7 +439,7 @@ export function NowPlaying() {
               onPress={toggleShuffle}
             >
               <Shuffle
-                color={shuffleEnabled ? colors.accent : colors.text}
+                color={shuffleEnabled ? palette.accent : palette.text}
                 size={24}
               />
             </IconButton>
@@ -420,17 +447,17 @@ export function NowPlaying() {
               label="Canción anterior"
               onPress={() => requestSkip('previous')}
             >
-              <SkipBack color={colors.text} fill={colors.text} size={30} />
+              <SkipBack color={palette.text} fill={palette.text} size={30} />
             </IconButton>
             <Tap
               accessibilityRole="button"
               accessibilityLabel={isPlaying ? 'Pausar' : 'Reproducir'}
               onPress={togglePlayback}
               pressedScale={0.92}
-              style={styles.play}
+              style={[styles.play, { backgroundColor: palette.control }]}
             >
               <PlayPauseIcon
-                color={colors.background}
+                color={palette.onControl}
                 isPlaying={isPlaying}
                 size={30}
               />
@@ -439,7 +466,7 @@ export function NowPlaying() {
               label="Siguiente canción"
               onPress={() => requestSkip('next')}
             >
-              <SkipForward color={colors.text} fill={colors.text} size={30} />
+              <SkipForward color={palette.text} fill={palette.text} size={30} />
             </IconButton>
             <IconButton
               accessibilityState={{
@@ -452,7 +479,7 @@ export function NowPlaying() {
             >
               <RepeatIcon
                 color={
-                  repeatMode !== RepeatMode.Off ? colors.accent : colors.text
+                  repeatMode !== RepeatMode.Off ? palette.accent : palette.text
                 }
                 size={24}
               />
@@ -461,12 +488,14 @@ export function NowPlaying() {
 
           <View style={styles.tools}>
             <Tool
+              palette={palette}
               caption={`Cola · ${playbackQueue.length}`}
               icon={ListMusic}
               label={`Abrir cola de reproducción con ${playbackQueue.length} canciones`}
               onPress={() => setQueueVisible(true)}
             />
             <Tool
+              palette={palette}
               active={timer.mode !== 'off'}
               caption={
                 timer.mode === 'time'
@@ -480,6 +509,7 @@ export function NowPlaying() {
               onPress={() => setPlayerSheet('sleep')}
             />
             <Tool
+              palette={palette}
               active={playbackRate !== 1}
               caption={`${playbackRate}×`}
               icon={Gauge}
@@ -487,11 +517,20 @@ export function NowPlaying() {
               onPress={() => setPlayerSheet('speed')}
             />
             <Tool
+              palette={palette}
               active={equalizerSettings.enabled}
               caption="Ecualizador"
               icon={SlidersHorizontal}
               label="Abrir ecualizador"
               onPress={() => setPlayerSheet('equalizer')}
+            />
+            <Tool
+              palette={palette}
+              active={playerTheme.scene !== 'none'}
+              caption="Tema"
+              icon={Palette}
+              label={`Cambiar tema del reproductor, ${playerTheme.name}`}
+              onPress={() => setPlayerSheet('theme')}
             />
           </View>
         </ScrollView>
@@ -503,7 +542,6 @@ export function NowPlaying() {
 
 const styles = StyleSheet.create({
   player: {
-    backgroundColor: colors.background,
     flex: 1,
     overflow: 'hidden',
   },
@@ -521,7 +559,6 @@ const styles = StyleSheet.create({
   stage: { alignItems: 'center', borderRadius: radius.md },
   info: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
   infoText: { flex: 1, gap: 2, minWidth: 0 },
-  artist: { color: colors.textSecondary },
   controls: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -529,7 +566,6 @@ const styles = StyleSheet.create({
   },
   play: {
     alignItems: 'center',
-    backgroundColor: colors.text,
     borderRadius: radius.full,
     height: 72,
     justifyContent: 'center',

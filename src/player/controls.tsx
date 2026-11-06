@@ -10,6 +10,7 @@ import {
 import { GripVertical, Minus, Music2 } from 'lucide-react-native';
 import { useProgress } from 'react-native-track-player';
 import { colors, radius, spacing, typeValues } from '../theme/theme';
+import type { PlayerPalette } from '../theme/playerThemes';
 import type { Track } from '../types/Track';
 import { Cover } from '../ui/Cover';
 import { formatTime } from '../utils/formatTime';
@@ -21,7 +22,9 @@ export function ProgressSlider({
   position,
   onSeek,
   disabled,
+  palette,
 }: {
+  palette: Pick<PlayerPalette, 'accent' | 'track' | 'textSecondary'>;
   duration: number;
   position: number;
   onSeek: (position: number) => Promise<void>;
@@ -131,14 +134,27 @@ export function ProgressSlider({
           disabled && styles.queueActionDisabled,
         ]}
       >
-        <View pointerEvents="none" style={styles.expandedProgressTrack}>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.expandedProgressTrack,
+            { backgroundColor: palette.track },
+          ]}
+        >
           <View
-            style={[styles.progressFill, { width: `${progressRatio * 100}%` }]}
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: palette.accent,
+                width: `${progressRatio * 100}%`,
+              },
+            ]}
           />
           <Animated.View
             style={[
               styles.progressThumb,
               {
+                backgroundColor: palette.accent,
                 left: `${progressRatio * 100}%`,
                 transform: [{ scale: thumbScale }],
               },
@@ -159,10 +175,10 @@ export function ProgressSlider({
         </View>
       </View>
       <View style={styles.expandedTimes}>
-        <Text style={styles.trackSubtitle}>
+        <Text style={[styles.trackSubtitle, { color: palette.textSecondary }]}>
           {formatTime(displayedPosition)}
         </Text>
-        <Text style={styles.trackSubtitle}>
+        <Text style={[styles.trackSubtitle, { color: palette.textSecondary }]}>
           -{formatTime(duration - displayedPosition)}
         </Text>
       </View>
@@ -597,10 +613,12 @@ export function PlayerProgress({
   fallbackDuration,
   onSeek,
   disabled,
+  palette,
 }: {
   fallbackDuration: number;
   onSeek: (position: number) => Promise<void>;
   disabled: boolean;
+  palette: Pick<PlayerPalette, 'accent' | 'track' | 'textSecondary'>;
 }) {
   const progress = useProgress(250);
 
@@ -610,6 +628,7 @@ export function PlayerProgress({
       position={progress.position}
       onSeek={onSeek}
       disabled={disabled}
+      palette={palette}
     />
   );
 }

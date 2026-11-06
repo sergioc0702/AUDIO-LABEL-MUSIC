@@ -302,6 +302,23 @@ class MusicLibraryModule(
   }
 
   @ReactMethod
+  fun savePlayerTheme(themeId: String, promise: Promise) {
+    context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+      .edit()
+      .putString("player_theme", themeId)
+      .apply()
+    promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun getPlayerTheme(promise: Promise) {
+    promise.resolve(
+      context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+        .getString("player_theme", null),
+    )
+  }
+
+  @ReactMethod
   fun getSession(promise: Promise) {
     promise.resolve(
       context.getSharedPreferences("music_library", Context.MODE_PRIVATE)

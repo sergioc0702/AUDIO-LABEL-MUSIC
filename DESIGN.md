@@ -344,3 +344,7 @@ La pieza más repetida de la app.
 - **No** uses rebote en toques, hojas o transiciones: solo lo admiten los objetos agarrados con el dedo, como el pulgar de progreso o la fila arrastrada.
 - **No** uses Riel (#3b3b43) para texto ni como único indicador de un valor.
 - **No** uses marcas ni copies diseños de otras apps de música.
+
+## Temas del reproductor
+
+Los temas solo cambian la pantalla del reproductor; el resto de la app conserva este sistema. Cada tema declara su paleta y su escena en `src/theme/playerThemes.ts`. Clásico es el aspecto base y no se anima. Las escenas usan solo transform y opacity en el hilo nativo, se detienen en pausa y con el reproductor cerrado, y quedan quietas con la opción de quitar animaciones. Un test exige contraste legible en toda paleta.

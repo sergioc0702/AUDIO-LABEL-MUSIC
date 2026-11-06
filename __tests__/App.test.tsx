@@ -20,6 +20,7 @@ import {
   getPlaybackRate,
   getPlaylists,
   getRecentPlayback,
+  getStoredPlayerTheme,
   getStoredSession,
   getTopPlayed,
   recordPlaybackHistory,
@@ -27,6 +28,7 @@ import {
   setEqualizerSettings,
   setPlaybackRate,
   setPlaylistTracks,
+  storePlayerTheme,
 } from '../src/native/musicLibrary';
 import type { Playlist, Track } from '../src/types/Track';
 
@@ -131,6 +133,8 @@ jest.mock('../src/native/musicLibrary', () => ({
   setEqualizerSettings: jest.fn().mockResolvedValue(undefined),
   storeSession: jest.fn().mockResolvedValue(undefined),
   getStoredSession: jest.fn().mockResolvedValue(null),
+  getStoredPlayerTheme: jest.fn().mockResolvedValue(null),
+  storePlayerTheme: jest.fn().mockResolvedValue(undefined),
   createPlaylist: jest.fn().mockResolvedValue({
     id: 'playlist-1',
     name: 'Para correr',
@@ -771,6 +775,31 @@ test('removes a song from the queue and can undo it', async () => {
     expect.objectContaining({ id: '2' }),
     1,
   );
+});
+
+test('picks a player theme and saves it', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  await press('Cambiar tema del reproductor, Clásico');
+  await press('Usar tema Aurora');
+
+  expect(storePlayerTheme).toHaveBeenCalledWith('aurora');
+  expect(hasLabel('Cambiar tema del reproductor, Aurora')).toBe(true);
+});
+
+test('opens with the saved player theme', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredPlayerTheme).mockResolvedValueOnce('brasas');
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(hasLabel('Cambiar tema del reproductor, Brasas')).toBe(true);
 });
 
 test('marks favorites from the player', async () => {

@@ -18,6 +18,9 @@ vuelve a abrir si cambia.
   2× y ecualizador de cinco bandas con perfiles. Se abre deslizando hacia arriba
   el mini-reproductor, se cierra deslizando hacia abajo y la carátula cambia de
   canción al deslizarla a los lados.
+- **Temas del reproductor:** Clásico, Portada, Aurora, Ondas, Brasas y Atardecer, cada
+  uno con su paleta y su animación. La animación se detiene al pausar o al cerrar el
+  reproductor y respeta el ajuste de Android para quitar animaciones.
 - **La sesión se recuerda:** al reabrir la app vuelven la cola, la canción, la
   posición, la mezcla y la repetición, sin que empiece a sonar sola.
 - **Temporizador:** 15 a 90 minutos o al terminar la canción. Funciona en segundo
@@ -62,6 +65,8 @@ desinstalar, y eso borra listas, favoritas e historial.
 - `src/screens/`: Inicio, Buscar, Biblioteca, detalle y Ajustes.
 - `src/player/`: reproductor, mini-reproductor, cola, ecualizador, temporizador y
   menús.
+- `src/theme/playerThemes.ts`: lista de temas. Un tema nuevo es una entrada ahí; una
+  animación nueva, además, un componente en `src/player/PlayerScene.tsx`.
 - `src/ui/`: componentes reutilizables. `src/theme/theme.ts`: colores y tipografía.
 - `src/services/`: reproductor, sesión guardada y temporizador.
 - `src/native/` y `android/app/`: acceso a MediaStore y base de datos Room.

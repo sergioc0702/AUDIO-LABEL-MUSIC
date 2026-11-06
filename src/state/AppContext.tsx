@@ -9,6 +9,12 @@ import {
   type ReactNode,
 } from 'react';
 import { BackHandler } from 'react-native';
+import { getStoredPlayerTheme, storePlayerTheme } from '../native/musicLibrary';
+import {
+  defaultPlayerThemeId,
+  getPlayerTheme,
+  type PlayerTheme,
+} from '../theme/playerThemes';
 import type { Playlist, Track } from '../types/Track';
 import type { CollectionRef } from '../utils/collections';
 import { useMusicController, type MusicController } from './useMusicController';
@@ -17,7 +23,7 @@ export type Tab = 'home' | 'search' | 'library';
 export type Route =
   | { name: 'collection'; ref: CollectionRef }
   | { name: 'settings' };
-export type PlayerSheet = 'sleep' | 'speed' | 'equalizer' | null;
+export type PlayerSheet = 'sleep' | 'speed' | 'equalizer' | 'theme' | null;
 export type LibraryFilter =
   | 'songs'
   | 'albums'
@@ -42,6 +48,8 @@ type AppContextValue = {
   setLibraryFilter: (filter: LibraryFilter) => void;
   playerSheet: PlayerSheet;
   setPlayerSheet: (sheet: PlayerSheet) => void;
+  playerTheme: PlayerTheme;
+  selectPlayerTheme: (themeId: string) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -70,6 +78,7 @@ export function AppProvider({
   const [playlistTarget, setPlaylistTarget] = useState<Track | null>(null);
   const [playerSheet, setPlayerSheet] = useState<PlayerSheet>(null);
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('songs');
+  const [playerThemeId, setPlayerThemeId] = useState(defaultPlayerThemeId);
   const tabRef = useRef(tab);
   tabRef.current = tab;
 
@@ -90,6 +99,21 @@ export function AppProvider({
       setStacks(current => ({ ...current, [next]: [] }));
     }
     setTab(next);
+  }, []);
+
+  useEffect(() => {
+    getStoredPlayerTheme()
+      .then(themeId => {
+        if (themeId) {
+          setPlayerThemeId(themeId);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const selectPlayerTheme = useCallback((themeId: string) => {
+    setPlayerThemeId(themeId);
+    storePlayerTheme(themeId).catch(() => undefined);
   }, []);
 
   const onPlaylistCreated = useCallback(
@@ -138,6 +162,8 @@ export function AppProvider({
         setLibraryFilter,
         playerSheet,
         setPlayerSheet,
+        playerTheme: getPlayerTheme(playerThemeId),
+        selectPlayerTheme,
       }}
     >
       {children}

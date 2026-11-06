@@ -22,6 +22,8 @@ type MusicLibraryModule = {
   clearPlaybackHistory(): Promise<void>;
   saveSession(session: string): Promise<void>;
   getSession(): Promise<string | null>;
+  savePlayerTheme(themeId: string): Promise<void>;
+  getPlayerTheme(): Promise<string | null>;
   getPlaybackRate(): Promise<number>;
   setPlaybackRate(rate: number): Promise<void>;
   getEqualizerSettings(): Promise<EqualizerSettings>;
@@ -155,6 +157,20 @@ export function getStoredSession(): Promise<string | null> {
     throw new Error('El módulo nativo de música no está disponible.');
   }
   return musicLibrary.getSession();
+}
+
+export function storePlayerTheme(themeId: string): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.savePlayerTheme(themeId);
+}
+
+export function getStoredPlayerTheme(): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.getPlayerTheme();
 }
 
 export function clearPlaybackHistory(): Promise<void> {
