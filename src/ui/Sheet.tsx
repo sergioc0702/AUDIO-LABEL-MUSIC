@@ -229,5 +229,5 @@ const styles = StyleSheet.create({
   },
   actionLabel: { flex: 1 },
   danger: { color: colors.danger },
-  selected: { color: colors.accent, fontWeight: '600' },
+  selected: { fontWeight: '700' },
 });

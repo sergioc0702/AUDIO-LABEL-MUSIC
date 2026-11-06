@@ -1,4 +1,5 @@
 import { useRef, type ComponentProps } from 'react';
+import { colors } from '../theme/theme';
 import {
   Animated,
   Pressable,
@@ -33,6 +34,7 @@ export function Tap({
 
   return (
     <AnimatedPressable
+      android_ripple={{ color: colors.ripple }}
       {...props}
       onPressIn={event => {
         animateTo(pressedScale);

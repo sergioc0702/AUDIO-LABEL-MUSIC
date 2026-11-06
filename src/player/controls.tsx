@@ -174,11 +174,13 @@ export function EqualizerBandControl({
   label,
   frequency,
   value,
+  enabled,
   onChange,
 }: {
   label: string;
   frequency: string;
   value: number;
+  enabled: boolean;
   onChange: (value: number) => void;
 }) {
   const sliderHeight = useRef(144);
@@ -213,7 +215,7 @@ export function EqualizerBandControl({
   const fillHeight = Math.abs(markerY - centerY);
 
   return (
-    <View style={styles.equalizerBand}>
+    <View style={[styles.equalizerBand, !enabled && styles.equalizerOff]}>
       <Text style={styles.equalizerBandFrequency}>{frequency}</Text>
       <View
         {...responder.panHandlers}
@@ -621,12 +623,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   progressFill: {
-    backgroundColor: colors.text,
+    backgroundColor: colors.accent,
     borderRadius: 2,
     height: 4,
   },
   progressThumb: {
-    backgroundColor: colors.text,
+    backgroundColor: colors.accent,
     borderRadius: 7,
     height: 14,
     marginLeft: -7,
@@ -655,6 +657,7 @@ const styles = StyleSheet.create({
   },
   queueActionDisabled: { opacity: 0.45 },
   equalizerBand: { alignItems: 'center', flex: 1, gap: spacing.xs },
+  equalizerOff: { opacity: 0.45 },
   equalizerBandFrequency: typeValues.caption,
   equalizerSliderTouchArea: {
     alignItems: 'center',
@@ -668,7 +671,7 @@ const styles = StyleSheet.create({
     width: 4,
   },
   equalizerSliderFill: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.text,
     position: 'absolute',
     width: 4,
   },

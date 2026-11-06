@@ -45,6 +45,7 @@ export function SearchScreen() {
   } = music;
   const hasQuery = query.trim().length > 0;
   const genres = useMemo(() => groupGenres(tracks), [tracks]);
+  const artists = useMemo(() => groupArtists(tracks), [tracks]);
 
   const { matchedTracks, sections } = useMemo(() => {
     if (!hasQuery) {
@@ -53,7 +54,7 @@ export function SearchScreen() {
     const songs = tracks.filter(track =>
       matchesQuery(`${track.title} ${track.artist} ${track.album}`, query),
     );
-    const artists = groupArtists(tracks).filter(group =>
+    const matchedArtists = artists.filter(group =>
       matchesQuery(group.name, query),
     );
     const albums = groupAlbums(tracks).filter(group =>
@@ -69,7 +70,7 @@ export function SearchScreen() {
       },
       {
         title: 'Artistas',
-        data: artists.map(group => ({
+        data: matchedArtists.map(group => ({
           type: 'artist',
           key: group.key,
           group,
@@ -92,7 +93,7 @@ export function SearchScreen() {
       matchedTracks: songs,
       sections: all.filter(section => section.data.length > 0),
     };
-  }, [hasQuery, playlists, query, tracks]);
+  }, [artists, hasQuery, playlists, query, tracks]);
 
   const renderResult = ({ item }: { item: Result }) => {
     if (item.type === 'track') {
@@ -154,7 +155,9 @@ export function SearchScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + spacing.md }]}>
-      <Text style={[type.display, styles.title]}>Buscar</Text>
+      <View style={styles.titleRow}>
+        <Text style={type.display}>Buscar</Text>
+      </View>
       <View style={styles.searchBox}>
         <Search color={colors.textSecondary} size={20} />
         <TextInput
@@ -196,12 +199,51 @@ export function SearchScreen() {
             </Text>
           </View>
         )
-      ) : genres.length > 0 ? (
+      ) : (
         <ScrollView
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <SectionHeader title="Explorar por género" />
+          {artists.length > 0 ? (
+            <>
+              <SectionHeader title="Artistas" />
+              <ScrollView
+                contentContainerStyle={styles.artists}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {artists.slice(0, 16).map(artist => (
+                  <Tap
+                    key={artist.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Abrir artista ${artist.name}`}
+                    onPress={() =>
+                      nav.push({
+                        name: 'collection',
+                        ref: {
+                          kind: 'group',
+                          key: artist.key,
+                          title: artist.name,
+                        },
+                      })
+                    }
+                    style={styles.artist}
+                  >
+                    <Cover round size={88} uri={artist.artwork} />
+                    <Text
+                      numberOfLines={1}
+                      style={[type.caption, styles.artistName]}
+                    >
+                      {artist.name}
+                    </Text>
+                  </Tap>
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+          {genres.length > 0 ? (
+            <SectionHeader title="Explorar por género" />
+          ) : null}
           <FlatList
             columnWrapperStyle={styles.genreRow}
             data={genres}
@@ -231,14 +273,19 @@ export function SearchScreen() {
             scrollEnabled={false}
           />
         </ScrollView>
-      ) : null}
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  title: { paddingBottom: spacing.md, paddingHorizontal: screenPadding },
+  titleRow: {
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    minHeight: 48,
+    paddingHorizontal: screenPadding,
+  },
   searchBox: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
@@ -255,6 +302,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingTop: spacing.xxl * 2,
   },
+  artists: { gap: spacing.md, paddingHorizontal: screenPadding },
+  artist: { alignItems: 'center', width: 88 },
+  artistName: { marginTop: spacing.xs, textAlign: 'center' },
   genreRow: {
     gap: spacing.sm,
     paddingBottom: spacing.sm,

@@ -115,6 +115,10 @@ export function useMusicController({
   const [pendingQueueRemoval, setPendingQueueRemoval] =
     useState<PendingQueueRemoval | null>(null);
   const [undoSecondsLeft, setUndoSecondsLeft] = useState(0);
+  const [playlistUndo, setPlaylistUndo] = useState<{
+    playlistId: string;
+    trackIds: string[];
+  } | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [recentPlayback, setRecentPlayback] = useState<RecentPlayback[]>([]);
   const [topPlayed, setTopPlayed] = useState<TopPlayed[]>([]);
@@ -150,9 +154,13 @@ export function useMusicController({
   const hasLibraryPermission = useRef(false);
   const originalQueueOrder = useRef<Track[]>([]);
   const sessionChecked = useRef(false);
+  const restoringSession = useRef(false);
   const undoTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undoInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const queueNoticeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playlistUndoTimeout = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const equalizerWriteChain = useRef<Promise<void>>(Promise.resolve());
   const lastRecordedTrackId = useRef<string | null>(null);
   const playbackPosition = useRef(0);
@@ -204,7 +212,12 @@ export function useMusicController({
       if (!session) {
         return;
       }
-      const restored = await restoreSession(session, tracks);
+      // A restored song is resumed, not played again: keep it out of the history.
+      restoringSession.current = true;
+      lastRecordedTrackId.current = session.trackIds[session.index] ?? null;
+      const restored = await restoreSession(session, tracks).finally(() => {
+        restoringSession.current = false;
+      });
       if (restored.length === 0) {
         return;
       }
@@ -436,6 +449,7 @@ export function useMusicController({
     if (
       !playerReady ||
       !trackId ||
+      restoringSession.current ||
       lastRecordedTrackId.current === trackId ||
       !tracks.some(track => track.id === trackId)
     ) {
@@ -943,6 +957,16 @@ export function useMusicController({
             : playlist,
         ),
       );
+      setPlaylistUndo({
+        playlistId,
+        trackIds: selectedPlaylist.trackIds,
+      });
+      if (playlistUndoTimeout.current) {
+        clearTimeout(playlistUndoTimeout.current);
+      }
+      playlistUndoTimeout.current = setTimeout(() => {
+        setPlaylistUndo(null);
+      }, 4000);
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
@@ -1485,6 +1509,28 @@ export function useMusicController({
     }
   }
 
+  async function undoPlaylistRemoval() {
+    if (!playlistUndo) {
+      return;
+    }
+    const { playlistId, trackIds } = playlistUndo;
+    setPlaylistUndo(null);
+    try {
+      await setPlaylistTracks(playlistId, trackIds);
+      setPlaylists(current =>
+        current.map(item =>
+          item.id === playlistId ? { ...item, trackIds } : item,
+        ),
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo deshacer: ${error.message}`
+          : 'No se pudo deshacer.',
+      );
+    }
+  }
+
   async function addTrackToPlaylist(playlist: Playlist, track: Track) {
     if (playlist.trackIds.includes(track.id)) {
       showQueueNotice(`${track.title} ya está en ${playlist.name}.`);
@@ -1540,6 +1586,8 @@ export function useMusicController({
     setErrorMessage,
     pendingQueueRemoval,
     undoSecondsLeft,
+    playlistUndo,
+    undoPlaylistRemoval,
     queueTrackDialog,
     setQueueTrackDialog,
     playlistNameDialog,

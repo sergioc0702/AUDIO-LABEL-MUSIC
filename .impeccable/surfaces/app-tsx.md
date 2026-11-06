@@ -17,6 +17,6 @@ STORY: Quien abre la app ve de inmediato sus accesos y lo último que escuchó, 
 
 FIRST VIEWPORT: Saludo a la izquierda y ajustes a la derecha; rejilla de seis accesos rápidos en dos columnas; fila horizontal de carátulas "Escuchado recientemente"; mini-reproductor sobre una barra inferior de tres pestañas: Inicio, Buscar, Biblioteca.
 
-FORM: Estándar de la categoría, elegido por el usuario. seed: none (unavailable)
+FORM: Estándar de la categoría, elegido por el usuario. seed:f64141599b0ea594
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

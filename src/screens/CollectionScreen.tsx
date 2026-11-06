@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
@@ -16,9 +16,15 @@ import { colors, screenPadding, spacing, type } from '../theme/theme';
 import { Button, IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { ReorderRow } from '../ui/ReorderRow';
-import { TrackRow } from '../ui/Rows';
+import { SectionHeader, TrackRow } from '../ui/Rows';
+import { Tap } from '../ui/Tap';
 import { Sheet, SheetAction } from '../ui/Sheet';
-import { resolveCollection, type CollectionRef } from '../utils/collections';
+import {
+  artistKey,
+  groupAlbums,
+  resolveCollection,
+  type CollectionRef,
+} from '../utils/collections';
 import { formatTrackCount } from '../utils/formatTrackCount';
 import { shuffleTracks } from '../utils/shuffleQueue';
 
@@ -92,6 +98,16 @@ export function CollectionScreen({
     Math.round(items.reduce((sum, track) => sum + track.duration, 0) / 60),
   );
   const hasMenu = playlist !== null || collection.kind === 'recent';
+  const isAlbum =
+    collection.kind === 'group' && collection.key.startsWith('album');
+  const artist = isAlbum ? items[0] : undefined;
+  const moreAlbums = artist
+    ? groupAlbums(
+        tracks.filter(track => artistKey(track) === artistKey(artist)),
+      ).filter(
+        album => collection.kind === 'group' && album.key !== collection.key,
+      )
+    : [];
   const playLabel =
     collection.kind === 'group'
       ? collection.key.startsWith('artist')
@@ -142,6 +158,25 @@ export function CollectionScreen({
               <Text numberOfLines={2} style={[type.headline, styles.heroTitle]}>
                 {title}
               </Text>
+              {artist ? (
+                <Tap
+                  accessibilityRole="button"
+                  accessibilityLabel={`Abrir artista ${artist.artist}`}
+                  hitSlop={12}
+                  onPress={() =>
+                    nav.push({
+                      name: 'collection',
+                      ref: {
+                        kind: 'group',
+                        key: artistKey(artist),
+                        title: artist.artist,
+                      },
+                    })
+                  }
+                >
+                  <Text style={type.bodyStrong}>{artist.artist}</Text>
+                </Tap>
+              ) : null}
               <Text style={type.secondary}>
                 {formatTrackCount(items.length)} · {totalMinutes} min
               </Text>
@@ -160,23 +195,64 @@ export function CollectionScreen({
                   onPress={() => playTracks(items, items[0], title)}
                   style={styles.action}
                 />
-                <Button
-                  accessibilityLabel={`Reproducir aleatoriamente ${title}`}
-                  disabled={items.length === 0 || !playerReady}
-                  icon={<Shuffle color={colors.text} size={18} />}
-                  label="Mezclar"
-                  onPress={() => {
-                    const shuffled = shuffleTracks(items);
-                    if (shuffled[0]) {
-                      playTracks(shuffled, shuffled[0], title);
-                    }
-                  }}
-                  style={styles.action}
-                  variant="tonal"
-                />
+                {items.length > 1 ? (
+                  <Button
+                    accessibilityLabel={`Reproducir aleatoriamente ${title}`}
+                    disabled={!playerReady}
+                    icon={<Shuffle color={colors.text} size={18} />}
+                    label="Mezclar"
+                    onPress={() => {
+                      const shuffled = shuffleTracks(items);
+                      if (shuffled[0]) {
+                        playTracks(shuffled, shuffled[0], title);
+                      }
+                    }}
+                    style={styles.action}
+                    variant="tonal"
+                  />
+                ) : null}
               </View>
             </View>
           </>
+        }
+        ListFooterComponent={
+          artist && moreAlbums.length > 0 ? (
+            <>
+              <SectionHeader title={`Más de ${artist.artist}`} />
+              <ScrollView
+                contentContainerStyle={styles.more}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {moreAlbums.map(album => (
+                  <Tap
+                    key={album.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Abrir álbum ${album.name}`}
+                    onPress={() =>
+                      nav.push({
+                        name: 'collection',
+                        ref: {
+                          kind: 'group',
+                          key: album.key,
+                          title: album.name,
+                        },
+                      })
+                    }
+                    style={styles.moreCard}
+                  >
+                    <Cover size={120} uri={album.artwork} />
+                    <Text
+                      numberOfLines={1}
+                      style={[type.label, styles.moreTitle]}
+                    >
+                      {album.name}
+                    </Text>
+                  </Tap>
+                ))}
+              </ScrollView>
+            </>
+          ) : undefined
         }
         renderItem={({ item, index }) => {
           const row = (
@@ -307,6 +383,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   action: { flex: 1 },
+  more: {
+    gap: spacing.md,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: screenPadding,
+  },
+  moreCard: { width: 120 },
+  moreTitle: { marginTop: spacing.sm },
   empty: {
     alignItems: 'center',
     gap: spacing.md,

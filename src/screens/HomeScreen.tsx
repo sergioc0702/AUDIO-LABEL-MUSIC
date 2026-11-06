@@ -168,12 +168,12 @@ export function HomeScreen() {
       ) : (
         <View style={styles.shortcuts}>
           <Shortcut
-            icon={<Heart color={colors.accent} size={iconSize} />}
+            icon={<Heart color={colors.text} size={iconSize} />}
             label="Favoritas"
             onPress={() => open('favorites')}
           />
           <Shortcut
-            icon={<Shuffle color={colors.accent} size={iconSize} />}
+            icon={<Shuffle color={colors.text} size={iconSize} />}
             label="Mezclar todo"
             onPress={() => {
               const shuffled = shuffleTracks(tracks);
@@ -183,22 +183,22 @@ export function HomeScreen() {
             }}
           />
           <Shortcut
-            icon={<TrendingUp color={colors.accent} size={iconSize} />}
+            icon={<TrendingUp color={colors.text} size={iconSize} />}
             label="Más escuchadas"
             onPress={() => open('top')}
           />
           <Shortcut
-            icon={<Clock3 color={colors.accent} size={iconSize} />}
+            icon={<Clock3 color={colors.text} size={iconSize} />}
             label="Recientes"
             onPress={() => open('recent')}
           />
           <Shortcut
-            icon={<Plus color={colors.accent} size={iconSize} />}
+            icon={<Plus color={colors.text} size={iconSize} />}
             label="Añadidas"
             onPress={() => open('added')}
           />
           <Shortcut
-            icon={<ListMusic color={colors.accent} size={iconSize} />}
+            icon={<ListMusic color={colors.text} size={iconSize} />}
             label="Tus listas"
             onPress={() => {
               setLibraryFilter('playlists');

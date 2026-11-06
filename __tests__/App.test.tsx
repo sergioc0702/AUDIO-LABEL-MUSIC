@@ -22,6 +22,7 @@ import {
   getRecentPlayback,
   getStoredSession,
   getTopPlayed,
+  recordPlaybackHistory,
   renamePlaylist,
   setEqualizerSettings,
   setPlaybackRate,
@@ -448,6 +449,27 @@ test('restores the saved queue and position without starting playback', async ()
   expect(TrackPlayer.setPlayWhenReady).toHaveBeenCalledWith(false);
   expect(TrackPlayer.setRepeatMode).toHaveBeenCalledWith(2);
   expect(TrackPlayer.play).not.toHaveBeenCalled();
+  expect(recordPlaybackHistory).not.toHaveBeenCalled();
+});
+
+test('undoes removing a song from a list', async () => {
+  jest
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([makeTrack('1'), makeTrack('2')]);
+  jest
+    .mocked(getPlaylists)
+    .mockResolvedValue([
+      { id: 'p1', name: 'Gym', createdAt: 1, trackIds: ['1', '2'] },
+    ]);
+  await renderApp('library');
+  await press('Listas');
+  await press('Abrir lista Gym, 2 canciones');
+
+  await press('Quitar Tema 2 de Gym');
+  expect(setPlaylistTracks).toHaveBeenLastCalledWith('p1', ['1']);
+
+  await press('Deshacer quitar de la lista');
+  expect(setPlaylistTracks).toHaveBeenLastCalledWith('p1', ['1', '2']);
 });
 
 test('keeps the live queue instead of a saved session', async () => {

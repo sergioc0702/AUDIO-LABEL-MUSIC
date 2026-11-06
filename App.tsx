@@ -34,8 +34,8 @@ import { SearchScreen } from './src/screens/SearchScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AppProvider, useApp, type Tab } from './src/state/AppContext';
 import { motionDuration, motionEasing } from './src/theme/motion';
-import { colors, radius, spacing, type } from './src/theme/theme';
-import { Tap } from './src/ui/Tap';
+import { colors, spacing, type } from './src/theme/theme';
+import { Snackbar } from './src/ui/Snackbar';
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Inicio', icon: Home },
@@ -63,7 +63,10 @@ function TabBar() {
             onPress={() => nav.selectTab(tab.id)}
             style={styles.tab}
           >
-            <View style={[styles.tabIcon, selected && styles.tabIconSelected]}>
+            <View
+              collapsable={false}
+              style={[styles.tabIcon, selected && styles.tabIconSelected]}
+            >
               <tab.icon
                 color={selected ? colors.text : colors.textSecondary}
                 size={22}
@@ -75,60 +78,6 @@ function TabBar() {
           </Pressable>
         );
       })}
-    </View>
-  );
-}
-
-function Snackbar() {
-  const { music } = useApp();
-  const {
-    errorMessage,
-    errorRetryAction,
-    setErrorMessage,
-    queueNotice,
-    pendingQueueRemoval,
-    undoQueueRemoval,
-    undoSecondsLeft,
-  } = music;
-  const message = pendingQueueRemoval
-    ? 'Canción quitada de la cola'
-    : errorMessage ?? queueNotice;
-  if (!message) {
-    return null;
-  }
-
-  return (
-    <View accessibilityLiveRegion="polite" style={styles.snackbar}>
-      <Text numberOfLines={3} style={[type.body, styles.snackbarText]}>
-        {message}
-      </Text>
-      {pendingQueueRemoval ? (
-        <Tap
-          accessibilityRole="button"
-          accessibilityLabel={`Deshacer eliminación, ${undoSecondsLeft} segundos`}
-          hitSlop={8}
-          onPress={undoQueueRemoval}
-        >
-          <Text style={styles.snackbarAction}>Deshacer</Text>
-        </Tap>
-      ) : errorRetryAction ? (
-        <Tap
-          accessibilityRole="button"
-          accessibilityLabel="Reintentar"
-          hitSlop={8}
-          onPress={errorRetryAction}
-        >
-          <Text style={styles.snackbarAction}>Reintentar</Text>
-        </Tap>
-      ) : errorMessage ? (
-        <Tap
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => setErrorMessage(null)}
-        >
-          <Text style={styles.snackbarAction}>Cerrar</Text>
-        </Tap>
-      ) : null}
     </View>
   );
 }
@@ -170,6 +119,7 @@ function Screens() {
 }
 
 function AppContent() {
+  const { music } = useApp();
   const insets = useSafeAreaInsets();
 
   return (
@@ -177,11 +127,12 @@ function AppContent() {
       <StatusBar barStyle="light-content" />
       <Screens />
       <View style={[styles.statusBar, { height: insets.top }]} />
-      <View>
-        <Snackbar />
-        <MiniPlayer />
-      </View>
+      <MiniPlayer />
       <TabBar />
+      <Snackbar
+        bottom={insets.bottom + (music.currentTrack ? 140 : 76)}
+        placement="app"
+      />
       <NowPlaying />
       <QueueSheet />
       <SleepTimerSheet />
@@ -220,7 +171,8 @@ const styles = StyleSheet.create({
     top: 0,
   },
   tabBar: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.navigation,
+    marginTop: spacing.sm,
     flexDirection: 'row',
     paddingTop: spacing.sm,
   },
@@ -232,7 +184,7 @@ const styles = StyleSheet.create({
   },
   tabIcon: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: colors.navigation,
     borderRadius: 16,
     height: 32,
     justifyContent: 'center',
@@ -240,19 +192,4 @@ const styles = StyleSheet.create({
   },
   tabIconSelected: { backgroundColor: colors.surfaceHigh },
   tabLabelSelected: { color: colors.text, fontWeight: '600' },
-  snackbar: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.md,
-    elevation: 4,
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-    marginHorizontal: spacing.sm,
-    minHeight: 48,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  snackbarText: { flex: 1 },
-  snackbarAction: { color: colors.accent, fontSize: 14, fontWeight: '600' },
 });

@@ -12,10 +12,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronDown,
-  Clock3,
   Gauge,
   Heart,
   ListMusic,
+  Moon,
   MoreVertical,
   Repeat,
   Repeat1,
@@ -31,9 +31,42 @@ import { motionDuration, motionEasing } from '../theme/motion';
 import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
+import { Snackbar } from '../ui/Snackbar';
 import { Tap } from '../ui/Tap';
+import { formatTime } from '../utils/formatTime';
 import { PlayPauseIcon } from './PlayPauseIcon';
+import { useSleepTimer } from './Sheets';
 import { PlayerProgress } from './controls';
+
+function Tool({
+  label,
+  caption,
+  active = false,
+  icon: Icon,
+  onPress,
+}: {
+  label: string;
+  caption: string;
+  active?: boolean;
+  icon: typeof Gauge;
+  onPress: () => void;
+}) {
+  const color = active ? colors.accent : colors.textSecondary;
+  return (
+    <Tap
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={4}
+      onPress={onPress}
+      style={styles.tool}
+    >
+      <Icon color={color} size={22} />
+      <Text numberOfLines={1} style={[type.caption, { color }]}>
+        {caption}
+      </Text>
+    </Tap>
+  );
+}
 
 export function NowPlaying() {
   const { music, setPlayerSheet } = useApp();
@@ -61,6 +94,7 @@ export function NowPlaying() {
     setQueueTrackDialog,
   } = music;
   const insets = useSafeAreaInsets();
+  const { timer, secondsLeft } = useSleepTimer();
   const reducedMotion = useReducedMotion();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const coverSize = Math.min(
@@ -300,9 +334,8 @@ export function NowPlaying() {
             <ChevronDown color={colors.text} size={26} />
           </IconButton>
           <View style={styles.headerText}>
-            <Text style={type.caption}>Reproduciendo desde</Text>
             <Text numberOfLines={1} style={type.label}>
-              {playbackSourceLabel}
+              Desde {playbackSourceLabel}
             </Text>
           </View>
           <IconButton
@@ -427,44 +460,42 @@ export function NowPlaying() {
           </View>
 
           <View style={styles.tools}>
-            <IconButton
+            <Tool
+              caption={`Cola · ${playbackQueue.length}`}
+              icon={ListMusic}
               label={`Abrir cola de reproducción con ${playbackQueue.length} canciones`}
               onPress={() => setQueueVisible(true)}
-            >
-              <ListMusic color={colors.textSecondary} size={22} />
-            </IconButton>
-            <IconButton
+            />
+            <Tool
+              active={timer.mode !== 'off'}
+              caption={
+                timer.mode === 'time'
+                  ? formatTime(secondsLeft)
+                  : timer.mode === 'endOfTrack'
+                  ? 'Al terminar'
+                  : 'Dormir'
+              }
+              icon={Moon}
               label="Configurar temporizador de apagado"
               onPress={() => setPlayerSheet('sleep')}
-            >
-              <Clock3 color={colors.textSecondary} size={22} />
-            </IconButton>
-            <IconButton
+            />
+            <Tool
+              active={playbackRate !== 1}
+              caption={`${playbackRate}×`}
+              icon={Gauge}
               label={`Velocidad de reproducción ${playbackRate}×`}
               onPress={() => setPlayerSheet('speed')}
-            >
-              <Gauge
-                color={
-                  playbackRate !== 1 ? colors.accent : colors.textSecondary
-                }
-                size={22}
-              />
-            </IconButton>
-            <IconButton
+            />
+            <Tool
+              active={equalizerSettings.enabled}
+              caption="Ecualizador"
+              icon={SlidersHorizontal}
               label="Abrir ecualizador"
               onPress={() => setPlayerSheet('equalizer')}
-            >
-              <SlidersHorizontal
-                color={
-                  equalizerSettings.enabled
-                    ? colors.accent
-                    : colors.textSecondary
-                }
-                size={22}
-              />
-            </IconButton>
+            />
           </View>
         </ScrollView>
+        <Snackbar bottom={insets.bottom + spacing.sm} placement="player" />
       </Animated.View>
     </Modal>
   );
@@ -505,4 +536,5 @@ const styles = StyleSheet.create({
     width: 72,
   },
   tools: { flexDirection: 'row', justifyContent: 'space-between' },
+  tool: { alignItems: 'center', flex: 1, gap: spacing.xs, minHeight: 48 },
 });

@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, type ReactNode } from 'react';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight, MoreVertical } from 'lucide-react-native';
 import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
@@ -8,17 +9,19 @@ import { Cover } from './Cover';
 import { Tap } from './Tap';
 
 export const trackRowHeight = 64;
+const restingBars = [0.45, 0.9, 0.6];
 
 export function NowPlayingBars({ isPlaying }: { isPlaying: boolean }) {
+  const reducedMotion = useReducedMotion();
   const bars = useRef([
-    new Animated.Value(0.4),
-    new Animated.Value(0.8),
-    new Animated.Value(0.55),
+    new Animated.Value(0.45),
+    new Animated.Value(0.9),
+    new Animated.Value(0.6),
   ]).current;
 
   useEffect(() => {
-    if (!isPlaying) {
-      bars.forEach(bar => bar.setValue(0.3));
+    if (!isPlaying || reducedMotion) {
+      bars.forEach((bar, index) => bar.setValue(restingBars[index]));
       return;
     }
     const loops = bars.map((bar, index) =>
@@ -39,14 +42,18 @@ export function NowPlayingBars({ isPlaying }: { isPlaying: boolean }) {
     );
     loops.forEach(loop => loop.start());
     return () => loops.forEach(loop => loop.stop());
-  }, [bars, isPlaying]);
+  }, [bars, isPlaying, reducedMotion]);
 
   return (
     <View accessibilityLabel="Reproduciendo" style={styles.bars}>
       {bars.map((bar, index) => (
         <Animated.View
           key={index}
-          style={[styles.bar, { transform: [{ scaleY: bar }] }]}
+          style={[
+            styles.bar,
+            !isPlaying && styles.barPaused,
+            { transform: [{ scaleY: bar }] },
+          ]}
         />
       ))}
     </View>
@@ -179,7 +186,7 @@ export function SectionHeader({
         <Tap
           accessibilityRole="button"
           accessibilityLabel={`${action}: ${title}`}
-          hitSlop={8}
+          hitSlop={14}
           onPress={onAction}
         >
           <Text style={type.secondary}>{action}</Text>
@@ -219,8 +226,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderRadius: 1,
     height: 16,
+    transformOrigin: 'bottom',
     width: 4,
   },
+  barPaused: { opacity: 0.55 },
   squareIcon: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,

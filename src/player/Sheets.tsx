@@ -15,6 +15,7 @@ import { colors, radius, spacing, type } from '../theme/theme';
 import type { Track } from '../types/Track';
 import { Button } from '../ui/Buttons';
 import { Sheet, SheetAction } from '../ui/Sheet';
+import { Snackbar } from '../ui/Snackbar';
 import { Tap } from '../ui/Tap';
 import { formatTime } from '../utils/formatTime';
 import { formatTrackCount } from '../utils/formatTrackCount';
@@ -134,7 +135,7 @@ export function SpeedSheet() {
           selected={rate === music.playbackRate}
           trailing={
             rate === music.playbackRate ? (
-              <Check color={colors.accent} size={20} />
+              <Check color={colors.text} size={20} />
             ) : undefined
           }
         />
@@ -203,6 +204,7 @@ export function EqualizerSheet() {
               key={band.frequency}
               frequency={band.frequency}
               label={band.label}
+              enabled={equalizerSettings.enabled}
               onChange={gain => changeEqualizerBand(index, gain)}
               value={equalizerSettings.bandGainsDb[index] ?? 0}
             />
@@ -347,6 +349,7 @@ export function QueueSheet() {
           windowSize={7}
         />
       </View>
+      <Snackbar bottom={spacing.lg} placement="queue" />
     </Sheet>
   );
 }
@@ -358,18 +361,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  presets: { flexDirection: 'row', gap: spacing.xs },
+  presets: { flexDirection: 'row', gap: spacing.sm },
   preset: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
     borderRadius: radius.full,
     flex: 1,
-    height: 40,
+    height: 48,
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
   },
-  presetSelected: { backgroundColor: colors.accent },
-  presetSelectedText: { color: colors.onAccent },
+  presetSelected: { backgroundColor: colors.text },
+  presetSelectedText: { color: colors.background },
   bands: { flexDirection: 'row', paddingBottom: spacing.md },
   queueSheet: { height: '80%' },
   queueActions: {

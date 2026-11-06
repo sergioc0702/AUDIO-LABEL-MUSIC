@@ -63,6 +63,9 @@ export function LibraryScreen() {
   const [sortVisible, setSortVisible] = useState(false);
   const {
     tracks,
+    loadingLibrary,
+    permissionDenied,
+    loadLibrary,
     playlists,
     playlistTracksById,
     favoriteIds,
@@ -135,7 +138,30 @@ export function LibraryScreen() {
         </ScrollView>
       </View>
 
-      {filter === 'songs' ? (
+      {tracks.length === 0 && filter !== 'playlists' ? (
+        <View style={styles.empty}>
+          <Text style={type.title}>
+            {permissionDenied
+              ? 'Permite el acceso a tu música'
+              : loadingLibrary
+              ? 'Buscando tu música…'
+              : 'No encontramos música'}
+          </Text>
+          {!loadingLibrary ? (
+            <>
+              <Text style={[type.secondary, styles.emptyText]}>
+                {permissionDenied
+                  ? 'Sin este permiso no podemos mostrar tus canciones.'
+                  : 'Copia archivos de audio al teléfono y actualiza.'}
+              </Text>
+              <Button
+                label={permissionDenied ? 'Dar permiso' : 'Actualizar'}
+                onPress={() => loadLibrary(permissionDenied)}
+              />
+            </>
+          ) : null}
+        </View>
+      ) : filter === 'songs' ? (
         <FlatList
           data={sortedTracks}
           getItemLayout={(_data, index) => ({
@@ -245,7 +271,7 @@ export function LibraryScreen() {
             <ListRow
               leading={
                 <SquareIcon>
-                  <Heart color={colors.accent} fill={colors.accent} size={22} />
+                  <Heart color={colors.text} fill={colors.text} size={22} />
                 </SquareIcon>
               }
               onPress={() =>
@@ -329,7 +355,7 @@ export function LibraryScreen() {
             selected={item.id === sort}
             trailing={
               item.id === sort ? (
-                <Check color={colors.accent} size={20} />
+                <Check color={colors.text} size={20} />
               ) : undefined
             }
           />
@@ -362,8 +388,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-  chipSelected: { backgroundColor: colors.accent },
-  chipSelectedText: { color: colors.onAccent },
+  chipSelected: { backgroundColor: colors.text },
+  chipSelectedText: { color: colors.background },
   toolbar: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -376,4 +402,11 @@ const styles = StyleSheet.create({
   albumList: { gap: spacing.lg, paddingHorizontal: screenPadding },
   albumRow: { gap: spacing.md },
   albumTitle: { marginTop: spacing.sm },
+  empty: {
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.xxl * 2,
+  },
+  emptyText: { textAlign: 'center' },
 });
