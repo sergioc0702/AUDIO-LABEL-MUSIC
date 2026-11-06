@@ -66,6 +66,10 @@ class MusicLibraryModule(
       resultCode: Int,
       data: Intent?,
     ) {
+      if (requestCode == BACKUP_EXPORT_REQUEST_CODE || requestCode == BACKUP_IMPORT_REQUEST_CODE) {
+        finishBackupRequest(requestCode, resultCode, data?.data)
+        return
+      }
       if (requestCode != DELETE_REQUEST_CODE) {
         return
       }
@@ -104,6 +108,8 @@ class MusicLibraryModule(
   }
   @Volatile
   private var pendingDeletion: PendingDeletion? = null
+  @Volatile
+  private var pendingBackup: PendingBackup? = null
 
   init {
     val preferences = context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
@@ -132,6 +138,11 @@ class MusicLibraryModule(
       "La eliminación se canceló porque la aplicación se reinició.",
     )
     pendingDeletion = null
+    pendingBackup?.promise?.reject(
+      "E_BACKUP",
+      "La copia se canceló porque la aplicación se reinició.",
+    )
+    pendingBackup = null
     playlistScope.cancel()
     super.invalidate()
   }
@@ -301,6 +312,117 @@ class MusicLibraryModule(
       .apply()
     promise.resolve(null)
   }
+
+  @ReactMethod
+  fun savePreference(key: String, value: String, promise: Promise) {
+    context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+      .edit()
+      .putString("preference_$key", value)
+      .apply()
+    promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun getPreference(key: String, promise: Promise) {
+    promise.resolve(
+      context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+        .getString("preference_$key", null),
+    )
+  }
+
+  @ReactMethod
+  fun shareTrack(trackId: String, title: String, promise: Promise) {
+    val mediaId = trackId.toLongOrNull()?.takeIf { it > 0 }
+    if (mediaId == null) {
+      promise.reject("E_TRACK_INVALID", "La canción seleccionada no es válida.")
+      return
+    }
+    val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mediaId)
+    val share = Intent(Intent.ACTION_SEND).apply {
+      type = context.contentResolver.getType(uri) ?: "audio/*"
+      putExtra(Intent.EXTRA_STREAM, uri)
+      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.runOnUiQueueThread {
+      try {
+        val activity = context.currentActivity
+          ?: throw IllegalStateException("No hay una pantalla activa para compartir.")
+        activity.startActivity(Intent.createChooser(share, "Compartir $title"))
+        promise.resolve(null)
+      } catch (error: Exception) {
+        promise.reject("E_TRACK_SHARE", "No se pudo compartir la canción.", error)
+      }
+    }
+  }
+
+  @ReactMethod
+  fun exportBackup(fileName: String, contents: String, promise: Promise) {
+    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "application/json"
+      putExtra(Intent.EXTRA_TITLE, fileName)
+    }
+    startBackupRequest(intent, BACKUP_EXPORT_REQUEST_CODE, PendingBackup(promise, contents))
+  }
+
+  @ReactMethod
+  fun importBackup(promise: Promise) {
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "*/*"
+      putExtra(
+        Intent.EXTRA_MIME_TYPES,
+        arrayOf("application/json", "text/plain", "application/octet-stream"),
+      )
+    }
+    startBackupRequest(intent, BACKUP_IMPORT_REQUEST_CODE, PendingBackup(promise, null))
+  }
+
+  private fun startBackupRequest(intent: Intent, requestCode: Int, backup: PendingBackup) {
+    if (pendingBackup != null) {
+      backup.promise.reject("E_BACKUP", "Ya hay una copia en curso.")
+      return
+    }
+    pendingBackup = backup
+    context.runOnUiQueueThread {
+      try {
+        val activity = context.currentActivity
+          ?: throw IllegalStateException("No hay una pantalla activa para elegir el archivo.")
+        activity.startActivityForResult(intent, requestCode)
+      } catch (error: Exception) {
+        pendingBackup = null
+        backup.promise.reject("E_BACKUP", "No se pudo abrir el selector de archivos.", error)
+      }
+    }
+  }
+
+  private fun finishBackupRequest(requestCode: Int, resultCode: Int, uri: Uri?) {
+    val backup = pendingBackup ?: return
+    pendingBackup = null
+    val exporting = requestCode == BACKUP_EXPORT_REQUEST_CODE
+    if (resultCode != Activity.RESULT_OK || uri == null) {
+      backup.promise.resolve(if (exporting) false else null)
+      return
+    }
+    playlistScope.launch {
+      try {
+        if (exporting) {
+          val output = context.contentResolver.openOutputStream(uri)
+            ?: throw IOException("Android no pudo abrir el archivo.")
+          output.use { it.write(backup.contents.orEmpty().toByteArray()) }
+          backup.promise.resolve(true)
+        } else {
+          val input = context.contentResolver.openInputStream(uri)
+            ?: throw IOException("Android no pudo abrir el archivo.")
+          backup.promise.resolve(input.bufferedReader().use { it.readText() })
+        }
+      } catch (error: Exception) {
+        backup.promise.reject("E_BACKUP", "No se pudo leer o escribir el archivo.", error)
+      }
+    }
+  }
+
+  private class PendingBackup(val promise: Promise, val contents: String?)
 
   @ReactMethod
   fun saveAppearance(appearance: String, promise: Promise) {
@@ -695,10 +817,16 @@ class MusicLibraryModule(
     val artworkEmittedAlbums = mutableSetOf<Long>()
     val tracks = Arguments.createArray()
 
+    val selection = buildString {
+      append("${MediaStore.Audio.Media.IS_MUSIC} != 0")
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        append(" AND ${MediaStore.Audio.Media.IS_RECORDING} = 0")
+      }
+    }
     val cursor = context.contentResolver.query(
       MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
       projection,
-      null,
+      selection,
       null,
       "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC",
     ) ?: throw IllegalStateException("Android no pudo consultar la biblioteca de audio.")
@@ -794,12 +922,56 @@ class MusicLibraryModule(
     if (updatedMetadata.isNotEmpty()) {
       dao.insertTrackMetadata(updatedMetadata)
     }
+    remapTrackIds(
+      matchMovedTracks(
+        cachedMetadata.filterKeys { it !in scannedTrackIds }.values,
+        updatedMetadata.filter { it.trackId !in cachedMetadata },
+      ),
+    )
     (cachedMetadata.keys - scannedTrackIds).chunked(METADATA_DELETE_BATCH_SIZE).forEach { trackIds ->
       dao.deleteTrackMetadata(trackIds)
     }
     deleteOrphanedArtwork(artworkByAlbum.keys)
 
     return tracks
+  }
+
+  // Android gives a file a new id when it is moved, so one that vanished and one
+  // that appeared with the same size and tags are the same song.
+  private fun matchMovedTracks(
+    vanished: Collection<TrackMetadataEntity>,
+    appeared: List<TrackMetadataEntity>,
+  ): Map<String, String> {
+    fun fingerprint(track: TrackMetadataEntity) = "${track.size}|${track.title}|${track.artist}"
+    val appearedByFingerprint = appeared.groupBy(::fingerprint).filterValues { it.size == 1 }
+    return vanished.groupBy(::fingerprint)
+      .filterValues { it.size == 1 }
+      .mapNotNull { (key, tracks) ->
+        appearedByFingerprint[key]?.let { tracks.first().trackId to it.first().trackId }
+      }
+      .toMap()
+  }
+
+  private suspend fun remapTrackIds(moved: Map<String, String>) {
+    if (moved.isEmpty()) {
+      return
+    }
+    val dao = playlistDatabase.playlistDao()
+    playlistDatabase.withTransaction {
+      moved.forEach { (oldId, newId) ->
+        dao.remapPlaylistTrack(oldId, newId)
+        dao.remapPlaybackHistory(oldId, newId)
+      }
+    }
+    val preferences = context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+    val favorites = preferences.getStringSet("favorite_track_ids", emptySet())
+      .orEmpty()
+      .map { moved[it] ?: it }
+      .toSet()
+    preferences.edit().putStringSet("favorite_track_ids", favorites).apply()
+    if (context.hasActiveReactInstance()) {
+      context.emitDeviceEvent("musicTracksRemapped")
+    }
   }
 
   // RELATIVE_PATH exists from Android 10; older versions only expose the absolute path.
@@ -939,6 +1111,8 @@ class MusicLibraryModule(
 
   private companion object {
     const val DELETE_REQUEST_CODE = 7412
+    const val BACKUP_EXPORT_REQUEST_CODE = 7413
+    const val BACKUP_IMPORT_REQUEST_CODE = 7414
     const val LIBRARY_CHANGE_DEBOUNCE_MS = 700L
     const val METADATA_DELETE_BATCH_SIZE = 500
   }

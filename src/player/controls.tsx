@@ -3,6 +3,7 @@ import { Animated, PanResponder, Pressable, Text, View } from 'react-native';
 import { GripVertical, Minus, Music2 } from 'lucide-react-native';
 import { useProgress } from 'react-native-track-player';
 import { radius, spacing, createStyles, useColors } from '../theme/theme';
+import { queueAutoScrollStep } from '../utils/queueDrag';
 import type { Track } from '../types/Track';
 import { Cover } from '../ui/Cover';
 import { formatTime } from '../utils/formatTime';
@@ -292,8 +293,10 @@ export function QueueTrackRow({
   disabled,
   dropTarget,
   getScrollOffset,
+  getViewportHeight,
   onPress,
   onMove,
+  onAutoScroll,
   onDragStateChange,
   onRemove,
 }: {
@@ -304,12 +307,13 @@ export function QueueTrackRow({
   disabled: boolean;
   dropTarget: boolean;
   getScrollOffset: () => number;
+  getViewportHeight: () => number;
   onPress: () => void;
   onMove: (fromIndex: number, toIndex: number) => Promise<void>;
+  onAutoScroll: (delta: number) => void;
   onDragStateChange: (
     trackId: string | null,
     targetIndex: number | null,
-    pointerY?: number,
   ) => void;
   onRemove: () => Promise<boolean>;
 }) {
@@ -320,6 +324,11 @@ export function QueueTrackRow({
   const dragTargetIndex = useRef(index);
   const dragStartIndex = useRef(index);
   const dragStartScrollOffset = useRef(0);
+  const dragStartPointerY = useRef(0);
+  const dragDy = useRef(0);
+  const dragDirectionAnchor = useRef(0);
+  const dragDirection = useRef<-1 | 0 | 1>(0);
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const dragReleaseInProgress = useRef(false);
   const suppressTrackPress = useRef(false);
   const suppressTrackPressTimeout = useRef<ReturnType<
@@ -331,13 +340,18 @@ export function QueueTrackRow({
       if (suppressTrackPressTimeout.current) {
         clearTimeout(suppressTrackPressTimeout.current);
       }
+      if (autoScrollTimer.current) {
+        clearInterval(autoScrollTimer.current);
+      }
     },
     [],
   );
   const propsRef = useRef({
     disabled,
     getScrollOffset,
+    getViewportHeight,
     index,
+    onAutoScroll,
     onDragStateChange,
     onMove,
     onRemove,
@@ -347,7 +361,9 @@ export function QueueTrackRow({
   propsRef.current = {
     disabled,
     getScrollOffset,
+    getViewportHeight,
     index,
+    onAutoScroll,
     onDragStateChange,
     onMove,
     onRemove,
@@ -355,133 +371,170 @@ export function QueueTrackRow({
     trackId: track.id,
   };
 
-  const dragResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () =>
-          !propsRef.current.disabled && !dragReleaseInProgress.current,
-        onPanResponderTerminationRequest: () => false,
-        onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          !propsRef.current.disabled &&
-          !dragReleaseInProgress.current &&
-          Math.abs(gesture.dy) > 12 &&
-          Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2,
-        onPanResponderGrant: (_, gesture) => {
-          if (suppressTrackPressTimeout.current) {
-            clearTimeout(suppressTrackPressTimeout.current);
-            suppressTrackPressTimeout.current = null;
-          }
-          suppressTrackPress.current = true;
-          setIsDragging(true);
-          dragStartIndex.current = propsRef.current.index;
-          dragTargetIndex.current = dragStartIndex.current;
-          dragStartScrollOffset.current = propsRef.current.getScrollOffset();
-          propsRef.current.onDragStateChange(
-            propsRef.current.trackId,
-            dragStartIndex.current,
-            gesture.moveY,
-          );
-          translateY.stopAnimation();
-          translateY.setValue(0);
-          Animated.spring(dragScale, {
-            toValue: 1.1,
-            speed: 22,
-            bounciness: 7,
-            useNativeDriver: true,
-          }).start();
-        },
-        onPanResponderMove: (_, gesture) => {
-          const dragDistance =
-            gesture.dy +
-            propsRef.current.getScrollOffset() -
-            dragStartScrollOffset.current;
-          translateY.setValue(dragDistance);
-          const offset = Math.round(dragDistance / queueRowHeight);
-          const targetIndex = Math.max(
-            0,
-            Math.min(
-              dragStartIndex.current + offset,
-              propsRef.current.queueLength - 1,
-            ),
-          );
-          if (dragTargetIndex.current !== targetIndex) {
-            dragTargetIndex.current = targetIndex;
-          }
-          propsRef.current.onDragStateChange(
-            propsRef.current.trackId,
-            targetIndex,
-            gesture.moveY,
-          );
-        },
-        onPanResponderRelease: (_, gesture) => {
-          dragReleaseInProgress.current = true;
-          const dragDistance =
-            gesture.dy +
-            propsRef.current.getScrollOffset() -
-            dragStartScrollOffset.current;
-          const offset = Math.round(dragDistance / queueRowHeight);
-          const fromIndex = dragStartIndex.current;
-          const toIndex = Math.max(
-            0,
-            Math.min(fromIndex + offset, propsRef.current.queueLength - 1),
-          );
-          const snappedOffset = (toIndex - fromIndex) * queueRowHeight;
-          Animated.parallel([
-            Animated.spring(translateY, {
-              toValue: snappedOffset,
-              useNativeDriver: true,
-              speed: 24,
-              bounciness: 0,
-            }),
-            Animated.spring(dragScale, {
-              toValue: 1,
-              speed: 20,
-              bounciness: 0,
-              useNativeDriver: true,
-            }),
-          ]).start(({ finished }) => {
-            if (!finished) {
-              dragReleaseInProgress.current = false;
-              setIsDragging(false);
-              propsRef.current.onDragStateChange(null, null);
-              return;
-            }
+  const dragResponder = useMemo(() => {
+    function dragDistance() {
+      return (
+        dragDy.current +
+        propsRef.current.getScrollOffset() -
+        dragStartScrollOffset.current
+      );
+    }
 
-            translateY.setValue(0);
-            setIsDragging(false);
+    function followDrag() {
+      const distance = dragDistance();
+      translateY.setValue(distance);
+      dragTargetIndex.current = Math.max(
+        0,
+        Math.min(
+          dragStartIndex.current + Math.round(distance / queueRowHeight),
+          propsRef.current.queueLength - 1,
+        ),
+      );
+      propsRef.current.onDragStateChange(
+        propsRef.current.trackId,
+        dragTargetIndex.current,
+      );
+    }
+
+    function stopAutoScroll() {
+      if (autoScrollTimer.current) {
+        clearInterval(autoScrollTimer.current);
+        autoScrollTimer.current = null;
+      }
+    }
+
+    function startAutoScroll() {
+      stopAutoScroll();
+      autoScrollTimer.current = setInterval(() => {
+        const step = queueAutoScrollStep(
+          dragStartPointerY.current + dragDy.current,
+          propsRef.current.getViewportHeight(),
+          dragDirection.current,
+        );
+        if (step !== 0) {
+          propsRef.current.onAutoScroll(step);
+          followDrag();
+        }
+      }, 16);
+    }
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () =>
+        !propsRef.current.disabled && !dragReleaseInProgress.current,
+      onPanResponderTerminationRequest: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gesture) =>
+        !propsRef.current.disabled &&
+        !dragReleaseInProgress.current &&
+        Math.abs(gesture.dy) > 12 &&
+        Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2,
+      onPanResponderGrant: (_, gesture) => {
+        if (suppressTrackPressTimeout.current) {
+          clearTimeout(suppressTrackPressTimeout.current);
+          suppressTrackPressTimeout.current = null;
+        }
+        suppressTrackPress.current = true;
+        setIsDragging(true);
+        dragStartIndex.current = propsRef.current.index;
+        dragTargetIndex.current = dragStartIndex.current;
+        dragStartScrollOffset.current = propsRef.current.getScrollOffset();
+        // Where the finger is inside the list, without measuring the window:
+        // the sheet may still be moving, and that would give a wrong position.
+        dragStartPointerY.current =
+          (dragStartIndex.current + 0.5) * queueRowHeight -
+          dragStartScrollOffset.current;
+        dragDy.current = gesture.dy;
+        dragDirectionAnchor.current = gesture.dy;
+        dragDirection.current = 0;
+        propsRef.current.onDragStateChange(
+          propsRef.current.trackId,
+          dragStartIndex.current,
+        );
+        startAutoScroll();
+        translateY.stopAnimation();
+        translateY.setValue(0);
+        Animated.spring(dragScale, {
+          toValue: 1.1,
+          speed: 22,
+          bounciness: 7,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderMove: (_, gesture) => {
+        dragDy.current = gesture.dy;
+        const moved = gesture.dy - dragDirectionAnchor.current;
+        if (Math.abs(moved) >= 6) {
+          dragDirection.current = moved < 0 ? -1 : 1;
+          dragDirectionAnchor.current = gesture.dy;
+        }
+        followDrag();
+      },
+      onPanResponderRelease: (_, gesture) => {
+        stopAutoScroll();
+        dragReleaseInProgress.current = true;
+        dragDy.current = gesture.dy;
+        const offset = Math.round(dragDistance() / queueRowHeight);
+        const fromIndex = dragStartIndex.current;
+        const toIndex = Math.max(
+          0,
+          Math.min(fromIndex + offset, propsRef.current.queueLength - 1),
+        );
+        const snappedOffset = (toIndex - fromIndex) * queueRowHeight;
+        Animated.parallel([
+          Animated.spring(translateY, {
+            toValue: snappedOffset,
+            useNativeDriver: true,
+            speed: 24,
+            bounciness: 0,
+          }),
+          Animated.spring(dragScale, {
+            toValue: 1,
+            speed: 20,
+            bounciness: 0,
+            useNativeDriver: true,
+          }),
+        ]).start(({ finished }) => {
+          if (!finished) {
             dragReleaseInProgress.current = false;
+            setIsDragging(false);
             propsRef.current.onDragStateChange(null, null);
-            if (fromIndex !== toIndex) {
-              propsRef.current.onMove(fromIndex, toIndex);
-            }
-            suppressTrackPressTimeout.current = setTimeout(() => {
-              suppressTrackPress.current = false;
-              suppressTrackPressTimeout.current = null;
-            }, 300);
-          });
-        },
-        onPanResponderTerminate: () => {
+            return;
+          }
+
+          translateY.setValue(0);
           setIsDragging(false);
           dragReleaseInProgress.current = false;
           propsRef.current.onDragStateChange(null, null);
+          if (fromIndex !== toIndex) {
+            propsRef.current.onMove(fromIndex, toIndex);
+          }
           suppressTrackPressTimeout.current = setTimeout(() => {
             suppressTrackPress.current = false;
             suppressTrackPressTimeout.current = null;
           }, 300);
-          Animated.parallel([
-            Animated.spring(translateY, {
-              toValue: 0,
-              useNativeDriver: true,
-            }),
-            Animated.spring(dragScale, {
-              toValue: 1,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        },
-      }),
-    [dragScale, translateY],
-  );
+        });
+      },
+      onPanResponderTerminate: () => {
+        stopAutoScroll();
+        setIsDragging(false);
+        dragReleaseInProgress.current = false;
+        propsRef.current.onDragStateChange(null, null);
+        suppressTrackPressTimeout.current = setTimeout(() => {
+          suppressTrackPress.current = false;
+          suppressTrackPressTimeout.current = null;
+        }, 300);
+        Animated.parallel([
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.spring(dragScale, {
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      },
+    });
+  }, [dragScale, translateY]);
 
   return (
     <View

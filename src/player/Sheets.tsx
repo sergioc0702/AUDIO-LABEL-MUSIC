@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ElementRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FlatList, ScrollView, Switch, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import {
@@ -334,44 +334,29 @@ export function QueueSheet() {
   const [draggingTrackId, setDraggingTrackId] = useState<string | null>(null);
   const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
   const listRef = useRef<FlatList<Track>>(null);
-  const viewportRef = useRef<ElementRef<typeof View>>(null);
   const scrollOffset = useRef(0);
   const contentHeight = useRef(0);
-  const viewport = useRef({ top: 0, height: 0 });
-  const lastAutoScrollAt = useRef(0);
+  const viewportHeight = useRef(0);
 
-  function updateDrag(
-    trackId: string | null,
-    targetIndex: number | null,
-    pointerY?: number,
-  ) {
+  function updateDrag(trackId: string | null, targetIndex: number | null) {
     setDraggingTrackId(current => (current === trackId ? current : trackId));
     setDragTargetIndex(current =>
       current === targetIndex ? current : targetIndex,
     );
-    if (trackId === null || pointerY === undefined) {
-      return;
-    }
-    const now = Date.now();
-    if (now - lastAutoScrollAt.current < 40) {
-      return;
-    }
-    const { top, height } = viewport.current;
-    if (height <= 0) {
-      return;
-    }
-    const edgeSize = 56;
-    const maxOffset = Math.max(0, contentHeight.current - height);
-    let nextOffset = scrollOffset.current;
-    if (pointerY < top + edgeSize) {
-      nextOffset = Math.max(0, nextOffset - 12);
-    } else if (pointerY > top + height - edgeSize) {
-      nextOffset = Math.min(maxOffset, nextOffset + 12);
-    }
-    if (nextOffset !== scrollOffset.current) {
-      lastAutoScrollAt.current = now;
-      scrollOffset.current = nextOffset;
-      listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
+  }
+
+  function scrollQueueBy(delta: number) {
+    const maxOffset = Math.max(
+      0,
+      contentHeight.current - viewportHeight.current,
+    );
+    const offset = Math.max(
+      0,
+      Math.min(scrollOffset.current + delta, maxOffset),
+    );
+    if (offset !== scrollOffset.current) {
+      scrollOffset.current = offset;
+      listRef.current?.scrollToOffset({ offset, animated: false });
     }
   }
 
@@ -403,11 +388,8 @@ export function QueueSheet() {
         />
       </View>
       <View
-        ref={viewportRef}
-        onLayout={() => {
-          viewportRef.current?.measureInWindow((_x, top, _width, height) => {
-            viewport.current = { top, height };
-          });
+        onLayout={event => {
+          viewportHeight.current = event.nativeEvent.layout.height;
         }}
         style={styles.queueList}
       >
@@ -415,6 +397,8 @@ export function QueueSheet() {
           ref={listRef}
           data={playbackQueue}
           initialNumToRender={12}
+          // Android detaches rows scrolled out of view, and the dragged row must stay.
+          removeClippedSubviews={false}
           keyExtractor={track => track.id}
           ListEmptyComponent={
             <Text style={[type.secondary, styles.queueEmpty]}>
@@ -426,7 +410,10 @@ export function QueueSheet() {
             contentHeight.current = height;
           }}
           onScroll={event => {
-            scrollOffset.current = event.nativeEvent.contentOffset.y;
+            // While dragging, the drag owns the offset: these events arrive late.
+            if (draggingTrackId === null) {
+              scrollOffset.current = event.nativeEvent.contentOffset.y;
+            }
           }}
           renderItem={({ item: track, index }) => (
             <QueueTrackRow
@@ -435,8 +422,10 @@ export function QueueSheet() {
                 dragTargetIndex === index && draggingTrackId !== track.id
               }
               getScrollOffset={() => scrollOffset.current}
+              getViewportHeight={() => viewportHeight.current}
               index={index}
               isCurrent={track.id === currentTrack?.id}
+              onAutoScroll={scrollQueueBy}
               onDragStateChange={updateDrag}
               onMove={moveQueueTrack}
               onPress={() => playQueueTrack(index)}

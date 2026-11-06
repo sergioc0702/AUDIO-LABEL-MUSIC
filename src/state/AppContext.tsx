@@ -90,6 +90,7 @@ export function AppProvider({
   const [playerSheet, setPlayerSheet] = useState<PlayerSheet>(null);
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('songs');
   const [appearance, setAppearance] = useState<Appearance>(defaultAppearance);
+  const [appearanceReady, setAppearanceReady] = useState(false);
   const tabRef = useRef(tab);
   tabRef.current = tab;
 
@@ -120,7 +121,8 @@ export function AppProvider({
           setAppearance({ themeId: theme.id, paletteId: palette.id });
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setAppearanceReady(true));
   }, []);
 
   const saveAppearance = useCallback((next: Partial<Appearance>) => {
@@ -195,7 +197,7 @@ export function AppProvider({
       }}
     >
       <ColorsContext.Provider value={palette}>
-        {children}
+        {appearanceReady ? children : null}
       </ColorsContext.Provider>
     </AppContext.Provider>
   );

@@ -1,4 +1,6 @@
 import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { handlePlaybackFailure, resetPlaybackFailures } from './playbackErrors';
+import { skipToPreviousPlayerTrack } from './player';
 import { saveSession } from './session';
 import { checkSleepTimerDeadline, handleTrackFinished } from './sleepTimer';
 
@@ -12,7 +14,7 @@ export default async function PlaybackService() {
     TrackPlayer.skipToNext(),
   );
   TrackPlayer.addEventListener(Event.RemotePrevious, () =>
-    TrackPlayer.skipToPrevious(),
+    skipToPreviousPlayerTrack(),
   );
   TrackPlayer.addEventListener(Event.RemoteSeek, event =>
     TrackPlayer.seekTo(event.position),
@@ -39,5 +41,11 @@ export default async function PlaybackService() {
     if (event.state === State.Paused) {
       saveSession().catch(ignoreFailure);
     }
+    if (event.state === State.Playing) {
+      resetPlaybackFailures();
+    }
+  });
+  TrackPlayer.addEventListener(Event.PlaybackError, () => {
+    handlePlaybackFailure().catch(ignoreFailure);
   });
 }

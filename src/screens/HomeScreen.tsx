@@ -115,6 +115,8 @@ export function HomeScreen() {
     recentTracks,
     loadingLibrary,
     permissionDenied,
+    permissionBlocked,
+    requestLibraryAccess,
     loadLibrary,
     playTracks,
     setPlaylistNameDialog,
@@ -158,7 +160,10 @@ export function HomeScreen() {
           <Text style={type.secondary}>
             Sin este permiso no podemos mostrar las canciones del teléfono.
           </Text>
-          <Button label="Dar permiso" onPress={() => loadLibrary()} />
+          <Button
+            label={permissionBlocked ? 'Abrir ajustes' : 'Dar permiso'}
+            onPress={requestLibraryAccess}
+          />
         </View>
       ) : !loadingLibrary && tracks.length === 0 ? (
         <View style={styles.notice}>

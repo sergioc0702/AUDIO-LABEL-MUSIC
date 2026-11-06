@@ -15,6 +15,7 @@ import {
   ListPlus,
   ListStart,
   Plus,
+  Share2,
   Trash2,
   User,
   X,
@@ -114,6 +115,12 @@ export function TrackMenu() {
             icon={<User {...iconProps} />}
             label="Ir al artista"
             onPress={() => goTo(artistKey(track), track.artist)}
+          />
+          <SheetAction
+            accessibilityLabel={`Compartir ${track.title}`}
+            icon={<Share2 {...iconProps} />}
+            label="Compartir"
+            onPress={() => music.shareTrack(track)}
           />
           {queueTrackDialog?.fromLibrary ? (
             <SheetAction

@@ -1,5 +1,11 @@
-import TrackPlayer, { Capability, RepeatMode } from 'react-native-track-player';
+import TrackPlayer, {
+  Capability,
+  Event,
+  RepeatMode,
+} from 'react-native-track-player';
 import type { Track } from '../types/Track';
+
+const restartThreshold = 3;
 
 export async function setupPlayer(): Promise<void> {
   const serviceRunning = await TrackPlayer.isServiceRunning();
@@ -103,7 +109,13 @@ export async function skipToNextPlayerTrack(): Promise<void> {
   await TrackPlayer.skipToNext();
 }
 
+/** Past the first seconds of a song, "previous" means start it again. */
 export async function skipToPreviousPlayerTrack(): Promise<void> {
+  const { position } = await TrackPlayer.getProgress();
+  if (position > restartThreshold) {
+    await TrackPlayer.seekTo(0);
+    return;
+  }
   await TrackPlayer.skipToPrevious();
 }
 
@@ -124,4 +136,8 @@ export async function movePlayerTrack(
 
 export async function removePlayerTrack(index: number): Promise<void> {
   await TrackPlayer.remove(index);
+}
+
+export function onPlayerError(listener: () => void) {
+  return TrackPlayer.addEventListener(Event.PlaybackError, listener);
 }

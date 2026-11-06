@@ -3,14 +3,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Clock3,
+  Download,
   Gauge,
   History,
   LayoutTemplate,
   Palette,
   RefreshCw,
   SlidersHorizontal,
+  Timer,
+  Upload,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
+import { shortAudioSeconds } from '../state/useMusicController';
 import {
   screenPadding,
   spacing,
@@ -120,6 +124,46 @@ export function SettingsScreen() {
         onPress={music.clearRecentPlayback}
         showChevron={false}
         title="Borrar historial"
+      />
+      <ListRow
+        accessibilityLabel={`Ocultar audios cortos, ${
+          music.hideShortAudio ? 'activado' : 'desactivado'
+        }`}
+        leading={
+          <SquareIcon>
+            <Timer {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={music.toggleHideShortAudio}
+        showChevron={false}
+        subtitle={`Menos de ${shortAudioSeconds} segundos · ${
+          music.hideShortAudio ? 'Activado' : 'Desactivado'
+        }`}
+        title="Ocultar audios cortos"
+      />
+
+      <Text style={[type.label, styles.group]}>Copia de seguridad</Text>
+      <ListRow
+        leading={
+          <SquareIcon>
+            <Upload {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={music.exportLibraryBackup}
+        showChevron={false}
+        subtitle="Favoritas y listas en un archivo"
+        title="Guardar copia"
+      />
+      <ListRow
+        leading={
+          <SquareIcon>
+            <Download {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={music.restoreLibraryBackup}
+        showChevron={false}
+        subtitle="Añade lo guardado, sin borrar nada"
+        title="Restaurar copia"
       />
     </ScrollView>
   );

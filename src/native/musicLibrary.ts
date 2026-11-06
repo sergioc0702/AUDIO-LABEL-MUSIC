@@ -23,6 +23,11 @@ type MusicLibraryModule = {
   clearPlaybackHistory(): Promise<void>;
   saveSession(session: string): Promise<void>;
   getSession(): Promise<string | null>;
+  savePreference(key: string, value: string): Promise<void>;
+  getPreference(key: string): Promise<string | null>;
+  shareTrack(trackId: string, title: string): Promise<void>;
+  exportBackup(fileName: string, contents: string): Promise<boolean>;
+  importBackup(): Promise<string | null>;
   saveAppearance(appearance: string): Promise<void>;
   getAppearance(): Promise<string | null>;
   getPlaybackRate(): Promise<number>;
@@ -158,6 +163,43 @@ export function getStoredSession(): Promise<string | null> {
     throw new Error('El módulo nativo de música no está disponible.');
   }
   return musicLibrary.getSession();
+}
+
+export function storePreference(key: string, value: string): Promise<void> {
+  if (!musicLibrary) {
+    return Promise.resolve();
+  }
+  return musicLibrary.savePreference(key, value);
+}
+
+export async function getStoredPreference(key: string): Promise<string | null> {
+  return (await musicLibrary?.getPreference(key)) ?? null;
+}
+
+export function shareTrackFile(trackId: string, title: string): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.shareTrack(trackId, title);
+}
+
+/** Resolves false if the person cancels the file picker. */
+export function exportBackupFile(
+  fileName: string,
+  contents: string,
+): Promise<boolean> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.exportBackup(fileName, contents);
+}
+
+/** Resolves null if the person cancels the file picker. */
+export function importBackupFile(): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.importBackup();
 }
 
 export function storeAppearance(appearance: Appearance): Promise<void> {

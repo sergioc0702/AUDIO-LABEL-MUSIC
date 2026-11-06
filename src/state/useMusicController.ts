@@ -3,6 +3,7 @@ import {
   Alert,
   AppState,
   DeviceEventEmitter,
+  Linking,
   PermissionsAndroid,
   Platform,
 } from 'react-native';
@@ -18,6 +19,7 @@ import {
   getPlayerQueue,
   getPlayerRepeatMode,
   movePlayerTrack,
+  onPlayerError,
   pausePlayer,
   playPlayer,
   removePlayerTrack,
@@ -43,19 +45,25 @@ import {
   createPlaylist,
   deletePlaylist,
   deleteTrackFromDevice,
+  exportBackupFile,
   getDeviceTracks,
   getEqualizerSettings,
   getFavoriteTrackIds,
   getPlaybackRate,
   getPlaylists,
   getRecentPlayback,
+  getStoredPreference,
   getTopPlayed,
+  importBackupFile,
   recordPlaybackHistory,
   renamePlaylist,
   setEqualizerSettings as persistEqualizerSettings,
   setPlaybackRate as persistPlaybackRate,
   setPlaylistTracks,
   setTrackFavorite,
+  shareTrackFile,
+  storePreference,
+  storeSession,
 } from '../native/musicLibrary';
 import type { EqualizerSettings } from '../native/musicLibrary';
 import type {
@@ -64,6 +72,8 @@ import type {
   TopPlayed,
   Track,
 } from '../types/Track';
+import { buildBackup, matchBackup, readBackup } from '../utils/backup';
+import { formatTrackCount } from '../utils/formatTrackCount';
 import {
   restoreUpcomingTrackOrder,
   shuffleTracks,
@@ -72,6 +82,15 @@ import {
 
 export const playbackRates = [0.75, 1, 1.25, 1.5, 2];
 export const equalizerBandCount = 5;
+export const shortAudioSeconds = 30;
+
+const hideShortAudioKey = 'hideShortAudio';
+
+function libraryPermission() {
+  return Number(Platform.Version) >= 33
+    ? ('android.permission.READ_MEDIA_AUDIO' as const)
+    : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+}
 
 type PendingQueueRemoval = {
   track: Track;
@@ -140,6 +159,8 @@ export function useMusicController({
   );
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [permissionBlocked, setPermissionBlocked] = useState(false);
+  const [hideShortAudio, setHideShortAudio] = useState(false);
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [errorMessage, setErrorMessageState] = useState<string | null>(null);
@@ -152,6 +173,7 @@ export function useMusicController({
   const libraryLoadInProgress = useRef(false);
   const libraryRefreshPending = useRef(false);
   const hasLibraryPermission = useRef(false);
+  const libraryAccessDenied = useRef(false);
   const originalQueueOrder = useRef<Track[]>([]);
   const sessionChecked = useRef(false);
   const restoringSession = useRef(false);
@@ -270,30 +292,38 @@ export function useMusicController({
 
       try {
         if (requestPermission) {
-          const permission =
-            Number(Platform.Version) >= 33
-              ? 'android.permission.READ_MEDIA_AUDIO'
-              : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-          const granted = await PermissionsAndroid.request(permission, {
-            title: 'Acceso a tu música',
-            message:
-              'Mi Música necesita permiso para encontrar canciones y leer sus metadatos en este dispositivo.',
-            buttonPositive: 'Permitir',
-            buttonNegative: 'Ahora no',
-          });
+          const granted = await PermissionsAndroid.request(
+            libraryPermission(),
+            {
+              title: 'Acceso a tu música',
+              message:
+                'Mi Música necesita permiso para encontrar canciones y leer sus metadatos en este dispositivo.',
+              buttonPositive: 'Permitir',
+              buttonNegative: 'Ahora no',
+            },
+          );
 
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            // After "don't ask again" Android no longer shows the dialog.
+            const blocked =
+              granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN;
             hasLibraryPermission.current = false;
+            libraryAccessDenied.current = true;
             setPermissionDenied(true);
+            setPermissionBlocked(blocked);
             setTracks([]);
             setRetryableError(
-              'Sin permiso no podemos mostrar la música del dispositivo. Puedes volver a intentarlo cuando quieras.',
-              () => loadLibrary(),
+              blocked
+                ? 'Activa el permiso de música en los ajustes del teléfono para ver tus canciones.'
+                : 'Sin permiso no podemos mostrar la música del dispositivo. Puedes volver a intentarlo cuando quieras.',
+              blocked ? () => Linking.openSettings() : () => loadLibrary(),
             );
             return;
           }
           hasLibraryPermission.current = true;
+          libraryAccessDenied.current = false;
           setPermissionDenied(false);
+          setPermissionBlocked(false);
 
           if (Number(Platform.Version) >= 33) {
             await PermissionsAndroid.request(
@@ -302,11 +332,22 @@ export function useMusicController({
           }
         }
 
-        const [deviceTracks, favoriteTrackIds] = await Promise.all([
-          getDeviceTracks(),
+        // In this order: reading the tracks may update the saved favorites.
+        const deviceTracks = await getDeviceTracks();
+        const [favoriteTrackIds, shortAudioHidden] = await Promise.all([
           getFavoriteTrackIds(),
+          getStoredPreference(hideShortAudioKey),
         ]);
-        setTracks(deviceTracks);
+        const hideShort = shortAudioHidden === 'true';
+        setHideShortAudio(hideShort);
+        setTracks(
+          hideShort
+            ? deviceTracks.filter(
+                track =>
+                  track.duration <= 0 || track.duration >= shortAudioSeconds,
+              )
+            : deviceTracks,
+        );
         setFavoriteIds(new Set(favoriteTrackIds));
       } catch (error) {
         setRetryableError(
@@ -426,6 +467,15 @@ export function useMusicController({
         previousState = nextState;
         if (returnedToForeground && hasLibraryPermission.current) {
           loadLibrary(false);
+        } else if (returnedToForeground && libraryAccessDenied.current) {
+          // The person may be back from granting it in the phone settings.
+          PermissionsAndroid.check(libraryPermission())
+            .then(granted => {
+              if (granted) {
+                loadLibrary();
+              }
+            })
+            .catch(() => undefined);
         }
       },
     );
@@ -438,11 +488,24 @@ export function useMusicController({
       },
     );
 
+    const remapSubscription = DeviceEventEmitter.addListener(
+      'musicTracksRemapped',
+      () => {
+        loadPlaylists();
+        loadPlaybackHistory();
+      },
+    );
+    const errorSubscription = onPlayerError(() => {
+      setErrorMessage('Una canción no se pudo reproducir y se saltó.');
+    });
+
     return () => {
       appStateSubscription.remove();
       librarySubscription.remove();
+      remapSubscription.remove();
+      errorSubscription?.remove();
     };
-  }, [loadLibrary]);
+  }, [loadLibrary, loadPlaybackHistory, loadPlaylists, setErrorMessage]);
 
   useEffect(() => {
     const trackId = activeTrack?.id;
@@ -480,7 +543,20 @@ export function useMusicController({
     }
 
     getPlayerQueue()
-      .then(queue => {
+      .then(async queue => {
+        // A song that left the library must leave the player too, or the
+        // positions shown in the queue stop matching the real ones.
+        if (!queueOperationInProgress.current) {
+          const missing = queue
+            .map((item, index) =>
+              tracksById.has(String(item.id)) ? -1 : index,
+            )
+            .filter(index => index >= 0)
+            .reverse();
+          for (const index of missing) {
+            await removePlayerTrack(index);
+          }
+        }
         const liveQueue = queue
           .map(item => tracksById.get(String(item.id)))
           .filter((track): track is Track => track !== undefined);
@@ -988,17 +1064,28 @@ export function useMusicController({
     if (!selectedPlaylist || savingPlaylist) {
       return;
     }
+    // The positions are those on screen, which skip songs not on this phone.
+    const visibleTrackIds = selectedPlaylist.trackIds.filter(id =>
+      tracksById.has(id),
+    );
     if (
       fromIndex < 0 ||
       toIndex < 0 ||
-      fromIndex >= selectedPlaylist.trackIds.length ||
-      toIndex >= selectedPlaylist.trackIds.length
+      fromIndex >= visibleTrackIds.length ||
+      toIndex >= visibleTrackIds.length
     ) {
       return;
     }
     const updatedTrackIds = [...selectedPlaylist.trackIds];
-    const [movedTrackId] = updatedTrackIds.splice(fromIndex, 1);
-    updatedTrackIds.splice(toIndex, 0, movedTrackId);
+    const [movedTrackId] = updatedTrackIds.splice(
+      updatedTrackIds.indexOf(visibleTrackIds[fromIndex]),
+      1,
+    );
+    updatedTrackIds.splice(
+      selectedPlaylist.trackIds.indexOf(visibleTrackIds[toIndex]),
+      0,
+      movedTrackId,
+    );
     setSavingPlaylist(true);
     try {
       await setPlaylistTracks(selectedPlaylist.id, updatedTrackIds);
@@ -1338,7 +1425,10 @@ export function useMusicController({
         .map(item => tracksById.get(String(item.id)))
         .filter((track): track is Track => track !== undefined),
     );
-    saveSession().catch(() => undefined);
+    // An empty queue is not saved, so the old one must not come back.
+    (queue.length === 0 ? storeSession('') : saveSession()).catch(
+      () => undefined,
+    );
   }
 
   function clearQueueUndoTimers() {
@@ -1554,6 +1644,104 @@ export function useMusicController({
     }
   }
 
+  function requestLibraryAccess() {
+    if (permissionBlocked) {
+      Linking.openSettings().catch(() => undefined);
+    } else {
+      loadLibrary();
+    }
+  }
+
+  async function toggleHideShortAudio() {
+    try {
+      await storePreference(hideShortAudioKey, String(!hideShortAudio));
+      await loadLibrary(false);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo guardar el ajuste: ${error.message}`
+          : 'No se pudo guardar el ajuste.',
+      );
+    }
+  }
+
+  async function shareTrack(track: Track) {
+    setQueueTrackDialog(null);
+    try {
+      await shareTrackFile(track.id, track.title);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo compartir la canción: ${error.message}`
+          : 'No se pudo compartir la canción.',
+      );
+    }
+  }
+
+  async function exportLibraryBackup() {
+    try {
+      const backup = buildBackup(tracks, favoriteIds, playlists);
+      const date = new Date().toISOString().slice(0, 10);
+      const saved = await exportBackupFile(
+        `mi-musica-copia-${date}.json`,
+        JSON.stringify(backup),
+      );
+      if (saved) {
+        showQueueNotice('Copia de seguridad guardada.');
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo guardar la copia: ${error.message}`
+          : 'No se pudo guardar la copia de seguridad.',
+      );
+    }
+  }
+
+  /** Adds to what is already here: restoring never deletes favorites or lists. */
+  async function restoreLibraryBackup() {
+    try {
+      const text = await importBackupFile();
+      if (text === null) {
+        return;
+      }
+      const backup = readBackup(text);
+      if (!backup) {
+        setErrorMessage('Ese archivo no es una copia de Mi Música.');
+        return;
+      }
+      const restored = matchBackup(backup, tracks);
+      for (const trackId of restored.favoriteIds) {
+        await setTrackFavorite(trackId, true);
+      }
+      const current = await getPlaylists();
+      for (const saved of restored.playlists) {
+        const existing = current.find(
+          item => item.name.toLowerCase() === saved.name.toLowerCase(),
+        );
+        const playlist = existing ?? (await createPlaylist(saved.name));
+        await setPlaylistTracks(playlist.id, [
+          ...new Set([...playlist.trackIds, ...saved.trackIds]),
+        ]);
+      }
+      setFavoriteIds(ids => new Set([...ids, ...restored.favoriteIds]));
+      setPlaylists(await getPlaylists());
+      showQueueNotice(
+        restored.missingCount > 0
+          ? `Copia restaurada. Faltan en este teléfono: ${formatTrackCount(
+              restored.missingCount,
+            )}.`
+          : 'Copia restaurada.',
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo restaurar la copia: ${error.message}`
+          : 'No se pudo restaurar la copia de seguridad.',
+      );
+    }
+  }
+
   return {
     tracks,
     tracksById,
@@ -1577,6 +1765,13 @@ export function useMusicController({
     equalizerSettings,
     loadingLibrary,
     permissionDenied,
+    permissionBlocked,
+    requestLibraryAccess,
+    hideShortAudio,
+    toggleHideShortAudio,
+    shareTrack,
+    exportLibraryBackup,
+    restoreLibraryBackup,
     loadingPlaylists,
     savingPlaylist,
     queueUpdating,

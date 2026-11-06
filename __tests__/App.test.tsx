@@ -21,6 +21,7 @@ import {
   getPlaylists,
   getRecentPlayback,
   getStoredAppearance,
+  getStoredPreference,
   getStoredSession,
   getTopPlayed,
   recordPlaybackHistory,
@@ -107,6 +108,7 @@ jest.mock('react-native-track-player', () => ({
     PlaybackActiveTrackChanged: 'playback-active-track-changed',
     PlaybackProgressUpdated: 'playback-progress-updated',
     PlaybackState: 'playback-state',
+    PlaybackError: 'playback-error',
   },
   RepeatMode: { Off: 0, Track: 1, Queue: 2 },
   useActiveTrack: jest.fn().mockReturnValue(undefined),
@@ -135,6 +137,8 @@ jest.mock('../src/native/musicLibrary', () => ({
   getStoredSession: jest.fn().mockResolvedValue(null),
   getStoredAppearance: jest.fn().mockResolvedValue(null),
   storeAppearance: jest.fn().mockResolvedValue(undefined),
+  storePreference: jest.fn().mockResolvedValue(undefined),
+  getStoredPreference: jest.fn().mockResolvedValue(null),
   createPlaylist: jest.fn().mockResolvedValue({
     id: 'playlist-1',
     name: 'Para correr',
@@ -822,6 +826,38 @@ test('keeps the appearance settings out of the player', async () => {
 
   expect(hasLabel('Abrir ecualizador')).toBe(true);
   expect(hasLabel('Paleta de colores, Clásico')).toBe(false);
+});
+
+test('previous restarts a song that is already under way', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(TrackPlayer.getProgress).mockResolvedValueOnce({
+    position: 40,
+    duration: 180,
+    buffered: 180,
+  });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  await press('Canción anterior');
+
+  expect(TrackPlayer.seekTo).toHaveBeenCalledWith(0);
+  expect(TrackPlayer.skipToPrevious).not.toHaveBeenCalled();
+});
+
+test('hides short audio when the setting is on', async () => {
+  jest
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([{ ...makeTrack('1'), duration: 12 }, makeTrack('2')]);
+  jest.mocked(getStoredPreference).mockResolvedValue('true');
+  await renderApp();
+  await press('Ajustes');
+
+  expect(hasLabel('Ocultar audios cortos, activado')).toBe(true);
+  await press('Biblioteca');
+  expect(hasLabel('Reproducir 1 canciones')).toBe(true);
+  jest.mocked(getStoredPreference).mockResolvedValue(null);
 });
 
 test('marks favorites from the player', async () => {

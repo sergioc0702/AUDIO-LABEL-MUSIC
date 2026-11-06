@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   ScrollView,
@@ -40,6 +40,7 @@ import {
 import { formatTrackCount } from '../utils/formatTrackCount';
 import { shuffleTracks } from '../utils/shuffleQueue';
 import { sortTracks, type TrackSort } from '../utils/sortTracks';
+import { getStoredPreference, storePreference } from '../native/musicLibrary';
 
 const filters: { id: LibraryFilter; label: string }[] = [
   { id: 'songs', label: 'Canciones' },
@@ -48,6 +49,8 @@ const filters: { id: LibraryFilter; label: string }[] = [
   { id: 'playlists', label: 'Listas' },
   { id: 'folders', label: 'Carpetas' },
 ];
+
+const sortKey = 'librarySort';
 
 const sorts: { id: TrackSort; label: string }[] = [
   { id: 'titleAsc', label: 'Nombre A–Z' },
@@ -68,10 +71,29 @@ export function LibraryScreen() {
   const { width } = useWindowDimensions();
   const [sort, setSort] = useState<TrackSort>('titleAsc');
   const [sortVisible, setSortVisible] = useState(false);
+
+  useEffect(() => {
+    getStoredPreference(sortKey)
+      .then(saved => {
+        const match = sorts.find(item => item.id === saved);
+        if (match) {
+          setSort(match.id);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  function chooseSort(next: TrackSort) {
+    setSort(next);
+    storePreference(sortKey, next).catch(() => undefined);
+  }
+
   const {
     tracks,
     loadingLibrary,
     permissionDenied,
+    permissionBlocked,
+    requestLibraryAccess,
     loadLibrary,
     playlists,
     playlistTracksById,
@@ -162,8 +184,16 @@ export function LibraryScreen() {
                   : 'Copia archivos de audio al teléfono y actualiza.'}
               </Text>
               <Button
-                label={permissionDenied ? 'Dar permiso' : 'Actualizar'}
-                onPress={() => loadLibrary(permissionDenied)}
+                label={
+                  permissionBlocked
+                    ? 'Abrir ajustes'
+                    : permissionDenied
+                    ? 'Dar permiso'
+                    : 'Actualizar'
+                }
+                onPress={() =>
+                  permissionDenied ? requestLibraryAccess() : loadLibrary(false)
+                }
               />
             </>
           ) : null}
@@ -356,7 +386,7 @@ export function LibraryScreen() {
             key={item.id}
             label={item.label}
             onPress={() => {
-              setSort(item.id);
+              chooseSort(item.id);
               setSortVisible(false);
             }}
             selected={item.id === sort}

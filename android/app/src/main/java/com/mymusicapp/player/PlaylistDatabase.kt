@@ -89,6 +89,12 @@ interface PlaylistDao {
   @Query("DELETE FROM playlist_tracks WHERE playlistId = :playlistId")
   suspend fun deletePlaylistTracks(playlistId: String)
 
+  @Query("UPDATE OR IGNORE playlist_tracks SET trackId = :newId WHERE trackId = :oldId")
+  suspend fun remapPlaylistTrack(oldId: String, newId: String)
+
+  @Query("UPDATE playback_history SET trackId = :newId WHERE trackId = :oldId")
+  suspend fun remapPlaybackHistory(oldId: String, newId: String)
+
   @Query("DELETE FROM playlist_tracks WHERE trackId = :trackId")
   suspend fun deletePlaylistTrackReferences(trackId: String)
 

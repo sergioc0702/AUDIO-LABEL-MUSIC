@@ -27,7 +27,12 @@ vuelve a abrir si cambia.
 - **Temporizador:** 15 a 90 minutos o al terminar la canción. Funciona en segundo
   plano porque vive en el servicio de reproducción.
 - **Menú de cada canción:** reproducir a continuación, añadir a la cola o a una
-  lista, favoritas, ir al álbum o al artista, y eliminar del dispositivo.
+  lista, favoritas, ir al álbum o al artista, compartir y eliminar del dispositivo.
+- **Copia de seguridad:** guarda favoritas y listas en un archivo y las restaura en
+  este u otro teléfono, buscando las canciones por título y artista. Restaurar
+  añade lo guardado, sin borrar nada.
+- **Biblioteca limpia:** solo muestra lo que Android marca como música, y en Ajustes
+  se pueden ocultar los audios de menos de 30 segundos.
 - **Listas:** crear, renombrar, eliminar, reordenar y guardar la cola como lista.
 - Reproducción en segundo plano, notificación, botones de audífonos y paso sin
   silencios entre canciones.
