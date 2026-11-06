@@ -168,7 +168,10 @@ export function EqualizerSheet() {
             value={equalizerSettings.enabled}
           />
         </View>
-        <View style={styles.presets}>
+        <View
+          needsOffscreenAlphaCompositing
+          style={[styles.presets, !equalizerSettings.enabled && styles.off]}
+        >
           {equalizerPresets.map(preset => {
             const selected = preset.gains.every(
               (gain, index) => gain === equalizerSettings.bandGainsDb[index],
@@ -362,6 +365,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   presets: { flexDirection: 'row', gap: spacing.sm },
+  off: { opacity: 0.45 },
   preset: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,

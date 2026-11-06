@@ -60,6 +60,11 @@ function TabBar() {
             accessibilityRole="tab"
             accessibilityLabel={tab.label}
             accessibilityState={{ selected }}
+            android_ripple={{
+              color: colors.ripple,
+              borderless: true,
+              radius: 48,
+            }}
             onPress={() => nav.selectTab(tab.id)}
             style={styles.tab}
           >

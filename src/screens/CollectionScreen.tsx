@@ -101,13 +101,19 @@ export function CollectionScreen({
   const isAlbum =
     collection.kind === 'group' && collection.key.startsWith('album');
   const artist = isAlbum ? items[0] : undefined;
-  const moreAlbums = artist
-    ? groupAlbums(
-        tracks.filter(track => artistKey(track) === artistKey(artist)),
-      ).filter(
+  const otherAlbums = isAlbum
+    ? groupAlbums(tracks).filter(
         album => collection.kind === 'group' && album.key !== collection.key,
       )
     : [];
+  const artistAlbums = artist
+    ? otherAlbums.filter(
+        album => artistKey(album.tracks[0]) === artistKey(artist),
+      )
+    : [];
+  const moreAlbums = (
+    artistAlbums.length > 0 ? artistAlbums : otherAlbums
+  ).slice(0, 12);
   const playLabel =
     collection.kind === 'group'
       ? collection.key.startsWith('artist')
@@ -218,7 +224,13 @@ export function CollectionScreen({
         ListFooterComponent={
           artist && moreAlbums.length > 0 ? (
             <>
-              <SectionHeader title={`Más de ${artist.artist}`} />
+              <SectionHeader
+                title={
+                  artistAlbums.length > 0
+                    ? `Más de ${artist.artist}`
+                    : 'Más en tu biblioteca'
+                }
+              />
               <ScrollView
                 contentContainerStyle={styles.more}
                 horizontal

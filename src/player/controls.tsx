@@ -215,7 +215,10 @@ export function EqualizerBandControl({
   const fillHeight = Math.abs(markerY - centerY);
 
   return (
-    <View style={[styles.equalizerBand, !enabled && styles.equalizerOff]}>
+    <View
+      needsOffscreenAlphaCompositing
+      style={[styles.equalizerBand, !enabled && styles.equalizerOff]}
+    >
       <Text style={styles.equalizerBandFrequency}>{frequency}</Text>
       <View
         {...responder.panHandlers}
