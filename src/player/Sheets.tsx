@@ -233,6 +233,7 @@ export function ThemeSheet() {
   return (
     <Sheet
       closeLabel="Cerrar temas"
+      lightScrim
       onClose={() => setPlayerSheet(null)}
       subtitle="Se aplica al reproductor"
       title="Tema"

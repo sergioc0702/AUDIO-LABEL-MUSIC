@@ -329,10 +329,10 @@ function Ember({
 function EmbersScene({ colors, active }: SceneProps) {
   const embers = useMemo(
     () =>
-      Array.from({ length: 18 }, (_, index) => ({
+      Array.from({ length: 22 }, (_, index) => ({
         color: colors[index % colors.length],
         left: ((index * 37) % 100) / 100,
-        size: 3 + ((index * 5) % 5),
+        size: 5 + ((index * 5) % 6),
         duration: 7000 + ((index * 1300) % 6000),
         delay: (index * 700) % 7000,
       })),
@@ -351,7 +351,7 @@ function EmbersScene({ colors, active }: SceneProps) {
 function SunsetScene({ colors, background, active }: SceneProps) {
   const { width, height } = useWindowDimensions();
   const breath = useLoop(active, 8000, { reverse: true });
-  const sun = width * 1.15;
+  const sun = width * 0.95;
 
   return (
     <>
@@ -359,7 +359,8 @@ function SunsetScene({ colors, background, active }: SceneProps) {
         <Defs>
           <LinearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
             <Stop offset="0.35" stopColor={background} stopOpacity={1} />
-            <Stop offset="1" stopColor={colors[0]} stopOpacity={0.5} />
+            <Stop offset="0.72" stopColor={colors[0]} stopOpacity={0.5} />
+            <Stop offset="0.96" stopColor={background} stopOpacity={1} />
           </LinearGradient>
         </Defs>
         <Rect fill="url(#sky)" height="100%" width="100%" />
@@ -371,13 +372,13 @@ function SunsetScene({ colors, background, active }: SceneProps) {
           {
             height: sun,
             left: (width - sun) / 2,
-            top: height - sun * 0.62,
+            top: height * 0.76 - sun / 2,
             width: sun,
             transform: [
               {
                 scale: breath.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0.92, 1.1],
+                  outputRange: [0.92, 1.04],
                 }),
               },
             ],
@@ -438,12 +439,38 @@ export function PlayerScene({
         background={theme.palette.background}
         colors={theme.sceneColors}
       />
+      <View style={styles.bottomFade}>
+        <Svg height="100%" width="100%">
+          <Defs>
+            <LinearGradient id="bottom-fade" x1="0" x2="0" y1="0" y2="1">
+              <Stop
+                offset="0"
+                stopColor={theme.palette.background}
+                stopOpacity={0}
+              />
+              <Stop
+                offset="0.6"
+                stopColor={theme.palette.background}
+                stopOpacity={1}
+              />
+            </LinearGradient>
+          </Defs>
+          <Rect fill="url(#bottom-fade)" height="100%" width="100%" />
+        </Svg>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   absolute: { position: 'absolute' },
+  bottomFade: {
+    bottom: 0,
+    height: '26%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
   sun: { opacity: 0.45, position: 'absolute' },
   coverScrim: { opacity: 0.55 },
   ring: { borderWidth: 2, position: 'absolute' },

@@ -25,6 +25,7 @@ export function Sheet({
   title,
   subtitle,
   sheetStyle,
+  lightScrim = false,
   children,
 }: {
   visible: boolean;
@@ -33,6 +34,8 @@ export function Sheet({
   title?: string;
   subtitle?: string;
   sheetStyle?: StyleProp<ViewStyle>;
+  /** Keeps what is behind visible, for a live preview. */
+  lightScrim?: boolean;
   children: ReactNode;
 }) {
   const { height } = useWindowDimensions();
@@ -117,7 +120,13 @@ export function Sheet({
       visible={mounted}
     >
       <View style={styles.overlay}>
-        <Animated.View style={[styles.scrim, { opacity: scrim }]}>
+        <Animated.View
+          style={[
+            styles.scrim,
+            lightScrim && styles.scrimLight,
+            { opacity: scrim },
+          ]}
+        >
           <Pressable
             accessibilityLabel={closeLabel}
             onPress={onClose}
@@ -201,6 +210,7 @@ export function SheetAction({
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
+  scrimLight: { backgroundColor: 'transparent' },
   fill: { flex: 1 },
   sheet: {
     backgroundColor: colors.surface,
