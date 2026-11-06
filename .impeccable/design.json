@@ -1,0 +1,432 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-06T05:24:09Z",
+  "title": "Design System: Mi Música",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Fondo Noche",
+        "canonical": "#121214",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242425",
+          "#3f3f41",
+          "#5d5d60",
+          "#7d7d80",
+          "#9e9ea1",
+          "#c4c4c6",
+          "#eeeeef"
+        ]
+      },
+      "navigation": {
+        "role": "neutral",
+        "displayName": "Navegación",
+        "canonical": "#19191c",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242426",
+          "#3f3f42",
+          "#5d5d61",
+          "#7d7d81",
+          "#9e9ea2",
+          "#c4c4c7",
+          "#eeeef0"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superficie",
+        "canonical": "#1d1d21",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242426",
+          "#3f3f43",
+          "#5d5d62",
+          "#7d7d82",
+          "#9e9ea3",
+          "#c3c4c7",
+          "#eeeef0"
+        ]
+      },
+      "surface-high": {
+        "role": "neutral",
+        "displayName": "Superficie Alta",
+        "canonical": "#2b2b31",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#242427",
+          "#3f3f45",
+          "#5d5d64",
+          "#7c7c84",
+          "#9e9ea4",
+          "#c3c3c9",
+          "#eeeef1"
+        ]
+      },
+      "outline": {
+        "role": "neutral",
+        "displayName": "Riel",
+        "canonical": "#3b3b43",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#232328",
+          "#3f3f46",
+          "#5d5d65",
+          "#7c7c85",
+          "#9d9da6",
+          "#c3c3ca",
+          "#eeeef2"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Blanco",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#7d7d7d",
+          "#9e9e9e",
+          "#c4c4c4",
+          "#eeeeee"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Gris Texto",
+        "canonical": "#b6b6be",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#242428",
+          "#3f3f45",
+          "#5d5d64",
+          "#7c7c84",
+          "#9e9ea5",
+          "#c3c3c9",
+          "#eeeef1"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Coral Sonando",
+        "canonical": "#ff7a59",
+        "tonalRamp": [
+          "#1d0200",
+          "#460b00",
+          "#741b01",
+          "#a62a02",
+          "#cd4e2e",
+          "#ee7659",
+          "#ffac97",
+          "#fee9e4"
+        ]
+      },
+      "on-accent": {
+        "role": "primary",
+        "displayName": "Tinta sobre Coral",
+        "canonical": "#2a0a03",
+        "tonalRamp": [
+          "#130806",
+          "#341d17",
+          "#56362d",
+          "#795348",
+          "#9b7266",
+          "#bc9488",
+          "#dcbcb2",
+          "#fceae5"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Rosa Aviso",
+        "canonical": "#ff9c9c",
+        "tonalRamp": [
+          "#1a0304",
+          "#430f13",
+          "#6c2328",
+          "#943e41",
+          "#b95e60",
+          "#d98282",
+          "#f6afad",
+          "#fee9e8"
+        ]
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Velo",
+        "canonical": "#000000b3",
+        "tonalRamp": [
+          "#0b0b0bb3",
+          "#242424b3",
+          "#404040b3",
+          "#5d5d5db3",
+          "#7d7d7db3",
+          "#9e9e9eb3",
+          "#c4c4c4b3",
+          "#eeeeeeb3"
+        ]
+      },
+      "ripple": {
+        "role": "neutral",
+        "displayName": "Onda",
+        "canonical": "#ffffff1f",
+        "tonalRamp": [
+          "#0b0b0b1f",
+          "#2424241f",
+          "#4040401f",
+          "#5d5d5d1f",
+          "#7d7d7d1f",
+          "#9e9e9e1f",
+          "#c4c4c41f",
+          "#eeeeee1f"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Título de cada pestaña principal."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Encabezados de sección, título en el reproductor y título de colección."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Títulos de hojas y diálogos."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Título de canción en listas, opciones de hojas y campos."
+      },
+      "body-strong": {
+        "displayName": "Body Strong",
+        "purpose": "Etiquetas de botones y título en el mini-reproductor."
+      },
+      "secondary": {
+        "displayName": "Secondary",
+        "purpose": "Artista en listas y descripciones."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Chips, títulos bajo carátulas, accesos rápidos y grupos de ajustes."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Artista bajo carátulas, pestañas, tiempos y frecuencias. Con cifras tabulares en los tiempos."
+      }
+    },
+    "shadows": [
+      {
+        "name": "flotante",
+        "value": "elevation: 6",
+        "purpose": "Sombra nativa de Android para el aviso flotante y la fila que se arrastra."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-enter",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Entradas y cambios de estado."
+      },
+      {
+        "name": "ease-exit",
+        "value": "cubic-bezier(0.4, 0, 1, 1)",
+        "purpose": "Salidas de hojas y del reproductor."
+      },
+      {
+        "name": "duration-enter",
+        "value": "320ms",
+        "purpose": "Entrada de hojas y del reproductor completo."
+      },
+      {
+        "name": "duration-state",
+        "value": "200ms",
+        "purpose": "Cambio de vista, reproducir/pausar y velo."
+      },
+      {
+        "name": "duration-exit",
+        "value": "200ms",
+        "purpose": "Salida de hojas y del reproductor completo."
+      },
+      {
+        "name": "spring-tap",
+        "value": "spring speed 50, bounciness 0",
+        "purpose": "Respuesta al toque: escala 0.97 por defecto, 0.985 en filas, 0.92 en reproducir y 0.9 en botones de icono."
+      },
+      {
+        "name": "spring-grab",
+        "value": "spring speed 22-30, bounciness 6-7",
+        "purpose": "Único rebote del sistema: objetos agarrados con el dedo, como el pulgar de progreso y la fila arrastrada."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Botón relleno",
+      "kind": "button",
+      "refersTo": "button-filled",
+      "description": "Acción principal de la vista, con icono opcional.",
+      "html": "<button class=\"ds-btn-filled\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"#2a0a03\" stroke=\"#2a0a03\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\"/></svg><span>Reproducir</span></button>",
+      "css": ".ds-btn-filled { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 24px; border: none; border-radius: 999px; background: #ff7a59; color: #2a0a03; font-family: Roboto, sans-serif; font-size: 15px; font-weight: 600; transition: transform 120ms; } .ds-btn-filled:hover, .ds-btn-filled:focus-visible { box-shadow: inset 0 0 0 999px #ffffff1f; outline: none; } .ds-btn-filled:active { transform: scale(0.97); }"
+    },
+    {
+      "name": "Botón tonal",
+      "kind": "button",
+      "refersTo": "button-tonal",
+      "description": "Acción de apoyo junto a la principal.",
+      "html": "<button class=\"ds-btn-tonal\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m18 14 4 4-4 4\"/><path d=\"m18 2 4 4-4 4\"/><path d=\"M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22\"/><path d=\"M2 6h1.972a4 4 0 0 1 3.6 2.2\"/><path d=\"M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45\"/></svg><span>Mezclar</span></button>",
+      "css": ".ds-btn-tonal { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 24px; border: none; border-radius: 999px; background: #2b2b31; color: #ffffff; font-family: Roboto, sans-serif; font-size: 15px; font-weight: 600; transition: transform 120ms; } .ds-btn-tonal:hover, .ds-btn-tonal:focus-visible { box-shadow: inset 0 0 0 999px #ffffff1f; outline: none; } .ds-btn-tonal:active { transform: scale(0.97); }"
+    },
+    {
+      "name": "Botón de reproducir",
+      "kind": "button",
+      "refersTo": "play-button",
+      "description": "Control central del reproductor completo: blanco, nunca coral.",
+      "html": "<button class=\"ds-play\" aria-label=\"Reproducir\"><svg width=\"30\" height=\"30\" viewBox=\"0 0 24 24\" fill=\"#121214\" stroke=\"#121214\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\"/></svg></button>",
+      "css": ".ds-play { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; border: none; border-radius: 999px; background: #ffffff; transition: transform 120ms; } .ds-play:hover, .ds-play:focus-visible { box-shadow: inset 0 0 0 999px #1212141f; outline: none; } .ds-play:active { transform: scale(0.92); }"
+    },
+    {
+      "name": "Chips de filtro",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Filtros de Biblioteca: el elegido se invierte a blanco.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-chip-selected\">Canciones</button><button class=\"ds-chip\">Álbumes</button><button class=\"ds-chip\">Artistas</button></div>",
+      "css": ".ds-chips { display: flex; gap: 8px; } .ds-chip { height: 36px; padding: 0 16px; border: none; border-radius: 999px; background: #2b2b31; color: #ffffff; font-family: Roboto, sans-serif; font-size: 13px; font-weight: 600; transition: transform 120ms; } .ds-chip-selected { background: #ffffff; color: #121214; } .ds-chip:hover, .ds-chip:focus-visible { box-shadow: inset 0 0 0 999px #ffffff1f; outline: none; } .ds-chip:active { transform: scale(0.97); }"
+    },
+    {
+      "name": "Campo de búsqueda",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "Campo tonal sin borde, con cursor coral.",
+      "html": "<label class=\"ds-search\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#b6b6be\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg><input class=\"ds-search-input\" placeholder=\"Canciones, artistas, álbumes\" aria-label=\"Buscar\" /></label>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 8px; height: 48px; padding-left: 12px; border-radius: 10px; background: #2b2b31; } .ds-search-input { flex: 1; min-width: 0; height: 48px; border: none; outline: none; background: transparent; color: #ffffff; caret-color: #ff7a59; font-family: Roboto, sans-serif; font-size: 15px; } .ds-search-input::placeholder { color: #b6b6be; } .ds-search-input::selection { background: #ff7a59; color: #2a0a03; }"
+    },
+    {
+      "name": "Barra de pestañas",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Tres pestañas fijas; la elegida lleva píldora tonal, sin coral.",
+      "html": "<nav class=\"ds-tabs\"><button class=\"ds-tab ds-tab-selected\"><span class=\"ds-tab-icon\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg></span><span>Inicio</span></button><button class=\"ds-tab\"><span class=\"ds-tab-icon\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#b6b6be\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg></span><span>Buscar</span></button><button class=\"ds-tab\"><span class=\"ds-tab-icon\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#b6b6be\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m16 6 4 14\"/><path d=\"M12 6v14\"/><path d=\"M8 8v12\"/><path d=\"M4 4v16\"/></svg></span><span>Biblioteca</span></button></nav>",
+      "css": ".ds-tabs { display: flex; padding-top: 8px; background: #19191c; } .ds-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 56px; border: none; background: transparent; color: #b6b6be; font-family: Roboto, sans-serif; font-size: 12px; } .ds-tab-icon { display: flex; align-items: center; justify-content: center; width: 64px; height: 32px; border-radius: 16px; } .ds-tab-selected { color: #ffffff; font-weight: 600; } .ds-tab-selected .ds-tab-icon { background: #2b2b31; } .ds-tab:hover .ds-tab-icon, .ds-tab:focus-visible .ds-tab-icon { box-shadow: inset 0 0 0 999px #ffffff1f; } .ds-tab:focus-visible { outline: none; }"
+    },
+    {
+      "name": "Fila de canción",
+      "kind": "custom",
+      "refersTo": "track-row",
+      "description": "Fila sin contenedor. La canción actual va en coral con barras.",
+      "html": "<div class=\"ds-row\"><button class=\"ds-row-main\"><span class=\"ds-cover\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#b6b6be\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m19 6-5.2-3.9a.5.5 0 0 0-.8.4V18\"/><circle cx=\"9\" cy=\"18\" r=\"4\"/></svg></span><span class=\"ds-row-text\"><span class=\"ds-row-title\">Título de la canción</span><span class=\"ds-row-sub\">Artista</span></span><span class=\"ds-bars\"><i></i><i></i><i></i></span></button><button class=\"ds-row-more\" aria-label=\"Más acciones\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#b6b6be\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"12\" cy=\"5\" r=\"1\"/><circle cx=\"12\" cy=\"19\" r=\"1\"/></svg></button></div>",
+      "css": ".ds-row { display: flex; align-items: center; min-height: 64px; padding-right: 4px; background: #121214; } .ds-row-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 8px 0 16px; border: none; background: transparent; text-align: left; transition: transform 120ms; } .ds-row-main:hover, .ds-row-main:focus-visible { box-shadow: inset 0 0 0 999px #ffffff1f; outline: none; } .ds-row-main:active { transform: scale(0.985); } .ds-cover { width: 48px; height: 48px; border-radius: 6px; background: #2b2b31; display: flex; align-items: center; justify-content: center; flex: none; } .ds-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .ds-row-title { color: #ff7a59; font-family: Roboto, sans-serif; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row-sub { color: #b6b6be; font-family: Roboto, sans-serif; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-bars { display: flex; align-items: flex-end; gap: 2px; width: 16px; height: 16px; } .ds-bars i { width: 4px; border-radius: 1px; background: #ff7a59; } .ds-bars i:nth-child(1) { height: 7px; } .ds-bars i:nth-child(2) { height: 14px; } .ds-bars i:nth-child(3) { height: 10px; } .ds-row-more { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: none; border-radius: 999px; background: transparent; } .ds-row-more:hover, .ds-row-more:focus-visible { box-shadow: inset 0 0 0 999px #ffffff1f; outline: none; } "
+    },
+    {
+      "name": "Acceso rápido",
+      "kind": "card",
+      "refersTo": "shortcut",
+      "description": "Mosaico de Inicio con bloque de icono tonal a la izquierda.",
+      "html": "<button class=\"ds-shortcut\"><span class=\"ds-shortcut-icon\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5\"/></svg></span><span class=\"ds-shortcut-label\">Favoritas</span></button>",
+      "css": ".ds-shortcut { display: flex; align-items: center; gap: 12px; width: 180px; height: 56px; padding: 0; border: none; border-radius: 6px; overflow: hidden; background: #1d1d21; color: #ffffff; text-align: left; font-family: Roboto, sans-serif; font-size: 13px; font-weight: 600; transition: transform 120ms; } .ds-shortcut-icon { display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; background: #2b2b31; } .ds-shortcut:hover, .ds-shortcut:focus-visible { box-shadow: inset 0 0 0 999px #ffffff1f; outline: none; } .ds-shortcut:active { transform: scale(0.97); }"
+    },
+    {
+      "name": "Mini-reproductor",
+      "kind": "custom",
+      "refersTo": "mini-player",
+      "description": "Barra persistente sobre las pestañas, con línea de progreso blanca.",
+      "html": "<div class=\"ds-mini\"><div class=\"ds-mini-row\"><span class=\"ds-mini-cover\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#b6b6be\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m19 6-5.2-3.9a.5.5 0 0 0-.8.4V18\"/><circle cx=\"9\" cy=\"18\" r=\"4\"/></svg></span><span class=\"ds-mini-text\"><span class=\"ds-mini-title\">Título de la canción</span><span class=\"ds-mini-sub\">Artista</span></span><button class=\"ds-mini-btn\" aria-label=\"Reproducir\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"#ffffff\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\"/></svg></button><button class=\"ds-mini-btn\" aria-label=\"Siguiente canción\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"#ffffff\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 4v16\"/><path d=\"M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z\"/></svg></button></div><div class=\"ds-mini-track\"><div class=\"ds-mini-fill\"></div></div></div>",
+      "css": ".ds-mini { border-radius: 10px; overflow: hidden; background: #2b2b31; } .ds-mini-row { display: flex; align-items: center; height: 60px; padding-left: 8px; } .ds-mini-cover { width: 44px; height: 44px; border-radius: 6px; background: #2b2b31; display: flex; align-items: center; justify-content: center; flex: none; margin-right: 12px; } .ds-mini-text { flex: 1; min-width: 0; display: flex; flex-direction: column; } .ds-mini-title { color: #ffffff; font-family: Roboto, sans-serif; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-mini-sub { color: #b6b6be; font-family: Roboto, sans-serif; font-size: 12px; } .ds-mini-btn { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: none; border-radius: 999px; background: transparent; transition: transform 120ms; } .ds-mini-btn:hover, .ds-mini-btn:focus-visible { box-shadow: inset 0 0 0 999px #ffffff1f; outline: none; } .ds-mini-btn:active { transform: scale(0.9); } .ds-mini-track { height: 2px; background: #3b3b43; } .ds-mini-fill { width: 30%; height: 2px; background: #ffffff; }"
+    },
+    {
+      "name": "Aviso flotante",
+      "kind": "custom",
+      "refersTo": "snackbar",
+      "description": "Mensaje invertido en blanco con una acción opcional.",
+      "html": "<div class=\"ds-snackbar\"><span class=\"ds-snackbar-text\">Canción quitada de la cola</span><button class=\"ds-snackbar-action\">Deshacer</button></div>",
+      "css": ".ds-snackbar { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 4px 0 16px; border-radius: 10px; background: #ffffff; box-shadow: 0 3px 6px #00000066; } .ds-snackbar-text { flex: 1; padding: 8px 0; color: #121214; font-family: Roboto, sans-serif; font-size: 15px; } .ds-snackbar-action { height: 48px; padding: 0 12px; border: none; border-radius: 10px; background: transparent; color: #121214; font-family: Roboto, sans-serif; font-size: 14px; font-weight: 700; } .ds-snackbar-action:hover, .ds-snackbar-action:focus-visible { box-shadow: inset 0 0 0 999px #1212141f; outline: none; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La convención bien hecha",
+    "overview": "Mi Música se ve y se usa como una app de música estándar, y su identidad está en la calidad de la ejecución, no en un disfraz. Nada en el sistema pide que se aprenda: tres pestañas abajo, mini-reproductor encima, filas limpias y una carátula grande cuando algo suena.\n\nLa interfaz es un fondo casi negro y silencioso para que el color lo pongan las carátulas de la propia persona. La densidad es la de una lista de música: filas de 64 px, márgenes de 16 px y objetivos táctiles de 48 px, pensados para usarse con una mano. El único color de la interfaz es un coral, y solo aparece cuando algo suena, cuando algo está activado o en la acción principal de la pantalla.\n\nSe rechaza cualquier rareza añadida. El sistema toma el nivel de acabado y la forma de uso de las grandes apps de música, sin usar sus marcas ni copiar sus diseños.",
+    "keyCharacteristics": [
+      "Oscuro, plano y tonal: la profundidad nace del gris, no de líneas.",
+      "Un solo acento coral, con reglas estrictas de uso.",
+      "Tipografía del sistema, con jerarquía por tamaño y peso, sin mayúsculas forzadas.",
+      "Una sola familia de iconos (Lucide), de trazo, rellenos solo en los controles de transporte y en favoritos activos.",
+      "Movimiento breve y sin rebote, que respeta la opción de quitar animaciones de Android."
+    ],
+    "rules": [
+      {
+        "name": "La Regla del Coral",
+        "body": "El coral significa \"sonando\", \"activado\" o \"acción principal\". Si un elemento no cumple una de las tres, va en blanco o gris.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Blanco Elegido",
+        "body": "Lo elegido en filtros y preajustes se invierte: fondo blanco y texto Fondo Noche. La elección de vista no es lo que suena, así que no usa coral.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla de la Carátula",
+        "body": "El reproductor completo no lleva relleno de color: el botón de reproducir es blanco y el fondo es Fondo Noche, para que la carátula sea lo único vivo en pantalla.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla de la Caja Natural",
+        "body": "El texto se muestra como se escribió: sin mayúsculas forzadas ni tracking. Los títulos en mayúsculas de las etiquetas de la persona se respetan tal cual.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla del Tiempo Quieto",
+        "body": "Tiempos y posiciones usan cifras tabulares para que nada tiemble mientras avanza la canción.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla de la Línea Única",
+        "body": "Títulos y artistas de fila se cortan a una línea con puntos suspensivos. Las etiquetas reales son largas e incompletas, y la fila no cambia de altura por ellas.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla del Margen Óptico",
+        "body": "Las columnas de iconos usan 4 px de margen más un objetivo de 48 px, de forma que un icono de 24 px queda alineado con el margen de 16 px del texto.",
+        "section": "layout"
+      },
+      {
+        "name": "La Regla de los 48",
+        "body": "Ningún objetivo táctil baja de 48 px. Si la forma visible es menor, como los chips de 36 px, la zona de toque se amplía hasta alcanzarlos.",
+        "section": "layout"
+      },
+      {
+        "name": "La Regla de la Sombra Ganada",
+        "body": "Solo lleva sombra lo que flota de forma temporal sobre el contenido. Hojas, diálogos y mini-reproductor se separan por tono y por el velo.",
+        "section": "elevation"
+      },
+      {
+        "name": "La Regla Sin Líneas",
+        "body": "Las filas y superficies se separan con espacio y tono, nunca con bordes ni divisores.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Haz que todo color de interfaz distinto de gris o blanco cumpla la Regla del Coral.",
+      "Haz que cada acción destructiva use Rosa Aviso (#ff9c9c) en su opción de menú.",
+      "Haz que las transiciones usen 200 ms para cambios de estado y salidas, y 320 ms para entradas, con las curvas de entrada y salida del sistema.",
+      "Haz que toda animación de posición o bucle se detenga si Android tiene las animaciones quitadas.",
+      "Haz que el estado desactivado use opacidad de 0.45.",
+      "Haz que toda carátula ausente muestre el icono de nota sobre Superficie Alta, sin imágenes de relleno.",
+      "Haz que los iconos sean de Lucide, de trazo en reposo, y rellenos solo en transporte y favorito activo."
+    ],
+    "donts": [
+      "No envuelvas filas de canciones en tarjetas ni pongas divisores entre ellas.",
+      "No uses bordes para separar superficies: sube un nivel de tono.",
+      "No uses coral para pestañas, chips o preajustes elegidos.",
+      "No añadas una segunda familia de iconos ni uses caracteres de texto como iconos.",
+      "No añadas degradados ni desenfoques.",
+      "No uses rebote en toques, hojas o transiciones: solo lo admiten los objetos agarrados con el dedo, como el pulgar de progreso o la fila arrastrada.",
+      "No uses Riel (#3b3b43) para texto ni como único indicador de un valor.",
+      "No uses marcas ni copies diseños de otras apps de música."
+    ]
+  }
+}
