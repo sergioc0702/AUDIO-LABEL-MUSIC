@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { StyleSheet, Text } from 'react-native';
-import { colors, radius, spacing, type } from '../theme/theme';
+import { Text } from 'react-native';
+import { radius, spacing, createStyles, useColors } from '../theme/theme';
 import { Tap } from './Tap';
 
 type TapProps = ComponentProps<typeof Tap>;
@@ -14,6 +14,8 @@ export function IconButton({
   children: ReactNode;
   label: string;
 }) {
+  const { colors } = useColors();
+  const styles = useStyles();
   return (
     <Tap
       accessibilityRole="button"
@@ -40,6 +42,8 @@ export function Button({
   icon?: ReactNode;
   variant?: 'filled' | 'tonal';
 }) {
+  const { type } = useColors();
+  const styles = useStyles();
   return (
     <Tap
       accessibilityRole="button"
@@ -63,7 +67,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   icon: {
     alignItems: 'center',
     height: 48,
@@ -83,4 +87,4 @@ const styles = StyleSheet.create({
   tonal: { backgroundColor: colors.surfaceHigh },
   filledText: { color: colors.onAccent },
   disabled: { opacity: 0.45 },
-});
+}));

@@ -1,11 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Clock3,
@@ -17,7 +11,13 @@ import {
   TrendingUp,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
+import {
+  radius,
+  screenPadding,
+  spacing,
+  createStyles,
+  useColors,
+} from '../theme/theme';
 import { Button, IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { SectionHeader } from '../ui/Rows';
@@ -43,6 +43,8 @@ function Shortcut({
   icon: ReactNode;
   onPress: () => void;
 }) {
+  const { type } = useColors();
+  const styles = useStyles();
   return (
     <Tap
       accessibilityRole="button"
@@ -73,6 +75,8 @@ function CoverCard({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
+  const { type } = useColors();
+  const styles = useStyles();
   return (
     <Tap
       accessibilityRole="button"
@@ -100,6 +104,8 @@ function CoverCard({
 }
 
 export function HomeScreen() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { music, nav, setLibraryFilter } = useApp();
   const insets = useSafeAreaInsets();
   const {
@@ -334,7 +340,7 @@ export function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   content: { paddingBottom: spacing.xl },
   header: {
     alignItems: 'center',
@@ -384,4 +390,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding,
     paddingTop: spacing.xl,
   },
-});
+}));

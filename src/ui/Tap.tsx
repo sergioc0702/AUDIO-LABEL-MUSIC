@@ -1,5 +1,5 @@
 import { useRef, type ComponentProps } from 'react';
-import { colors } from '../theme/theme';
+import { useColors } from '../theme/theme';
 import {
   Animated,
   Pressable,
@@ -22,6 +22,7 @@ export function Tap({
   style,
   ...props
 }: TapProps) {
+  const { colors } = useColors();
   const scale = useRef(new Animated.Value(1)).current;
   const animateTo = (toValue: number) => {
     Animated.spring(scale, {

@@ -1,6 +1,5 @@
 import {
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -21,7 +20,13 @@ import {
   X,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
+import {
+  radius,
+  screenPadding,
+  spacing,
+  createStyles,
+  useColors,
+} from '../theme/theme';
 import { Button, IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { ListRow, SquareIcon } from '../ui/Rows';
@@ -32,6 +37,7 @@ import { formatTime } from '../utils/formatTime';
 import { formatTrackCount } from '../utils/formatTrackCount';
 
 export function TrackMenu() {
+  const { colors } = useColors();
   const { music, nav, setPlaylistTarget } = useApp();
   const {
     queueTrackDialog,
@@ -125,6 +131,8 @@ export function TrackMenu() {
 }
 
 export function AddToPlaylistSheet() {
+  const { colors } = useColors();
+  const styles = useStyles();
   const { music, playlistTarget, setPlaylistTarget } = useApp();
   const {
     playlists,
@@ -207,6 +215,8 @@ function Dialog({
   title: string;
   children: React.ReactNode;
 }) {
+  const { type } = useColors();
+  const styles = useStyles();
   return (
     <Modal
       animationType="fade"
@@ -226,6 +236,8 @@ function Dialog({
 }
 
 export function PlaylistDialogs() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { music } = useApp();
   const {
     playlistNameDialog,
@@ -312,6 +324,8 @@ export function PlaylistDialogs() {
 }
 
 export function PlaylistTrackPicker() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { music } = useApp();
   const insets = useSafeAreaInsets();
   const {
@@ -402,7 +416,7 @@ export function PlaylistTrackPicker() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   included: { paddingRight: spacing.lg },
   dialogOverlay: {
     alignItems: 'center',
@@ -451,4 +465,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding,
   },
   pickerText: { flex: 1, gap: 2, minWidth: 0 },
-});
+}));

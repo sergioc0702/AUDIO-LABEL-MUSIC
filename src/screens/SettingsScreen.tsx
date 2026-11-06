@@ -1,21 +1,29 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Clock3,
   Gauge,
   History,
+  LayoutTemplate,
   Palette,
   RefreshCw,
   SlidersHorizontal,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { colors, screenPadding, spacing, type } from '../theme/theme';
+import {
+  screenPadding,
+  spacing,
+  createStyles,
+  useColors,
+} from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { ListRow, SquareIcon } from '../ui/Rows';
 
 export function SettingsScreen() {
-  const { music, nav, setPlayerSheet, playerTheme } = useApp();
+  const { colors, type } = useColors();
+  const styles = useStyles();
+  const { music, nav, setPlayerSheet, theme, palette } = useApp();
   const insets = useSafeAreaInsets();
   const { tracks, playbackRate, equalizerSettings, loadLibrary } = music;
   const iconProps = { color: colors.textSecondary, size: 22 };
@@ -63,15 +71,28 @@ export function SettingsScreen() {
         title="Temporizador"
       />
 
+      <Text style={[type.label, styles.group]}>Apariencia</Text>
       <ListRow
+        accessibilityLabel={`Tema, ${theme.name}`}
+        leading={
+          <SquareIcon>
+            <LayoutTemplate {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={() => setPlayerSheet('theme')}
+        subtitle={theme.name}
+        title="Tema"
+      />
+      <ListRow
+        accessibilityLabel={`Paleta de colores, ${palette.name}`}
         leading={
           <SquareIcon>
             <Palette {...iconProps} />
           </SquareIcon>
         }
-        onPress={() => setPlayerSheet('theme')}
-        subtitle={playerTheme.name}
-        title="Tema del reproductor"
+        onPress={() => setPlayerSheet('palette')}
+        subtitle={palette.name}
+        title="Paleta de colores"
       />
 
       <Text style={[type.label, styles.group]}>Biblioteca</Text>
@@ -104,7 +125,7 @@ export function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -117,4 +138,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding,
     paddingTop: spacing.xl,
   },
-});
+}));

@@ -1,12 +1,5 @@
 import { useEffect, useRef, useState, type ElementRef } from 'react';
-import {
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, ScrollView, Switch, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import {
   getSleepTimer,
@@ -18,8 +11,8 @@ import {
 } from '../services/sleepTimer';
 import { useApp } from '../state/AppContext';
 import { playbackRates } from '../state/useMusicController';
-import { playerThemes } from '../theme/playerThemes';
-import { colors, radius, spacing, type } from '../theme/theme';
+import { appThemes } from '../theme/themes';
+import { radius, spacing, createStyles, useColors } from '../theme/theme';
 import type { Track } from '../types/Track';
 import { Button } from '../ui/Buttons';
 import { Sheet, SheetAction } from '../ui/Sheet';
@@ -124,6 +117,7 @@ export function SleepTimerSheet() {
 }
 
 export function SpeedSheet() {
+  const { colors } = useColors();
   const { playerSheet, setPlayerSheet, music } = useApp();
 
   return (
@@ -153,6 +147,8 @@ export function SpeedSheet() {
 }
 
 export function EqualizerSheet() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { playerSheet, setPlayerSheet, music } = useApp();
   const { equalizerSettings, updateEqualizerSettings, changeEqualizerBand } =
     music;
@@ -227,57 +223,88 @@ export function EqualizerSheet() {
 }
 
 export function ThemeSheet() {
-  const { playerSheet, setPlayerSheet, playerTheme, selectPlayerTheme } =
-    useApp();
+  const { colors } = useColors();
+  const { playerSheet, setPlayerSheet, theme, selectTheme } = useApp();
 
   return (
     <Sheet
       closeLabel="Cerrar temas"
-      lightScrim
       onClose={() => setPlayerSheet(null)}
-      subtitle="Se aplica al reproductor"
+      subtitle="El diseño de toda la app"
       title="Tema"
       visible={playerSheet === 'theme'}
     >
+      {appThemes.map(item => (
+        <SheetAction
+          key={item.id}
+          label={item.name}
+          onPress={() => selectTheme(item.id)}
+          selected={item.id === theme.id}
+          trailing={
+            item.id === theme.id ? (
+              <Check color={colors.accent} size={22} />
+            ) : null
+          }
+        />
+      ))}
+    </Sheet>
+  );
+}
+
+export function PaletteSheet() {
+  const { type } = useColors();
+  const styles = useStyles();
+  const { playerSheet, setPlayerSheet, theme, palette, selectPalette } =
+    useApp();
+
+  return (
+    <Sheet
+      closeLabel="Cerrar paletas de colores"
+      lightScrim
+      onClose={() => setPlayerSheet(null)}
+      subtitle={`Colores del tema ${theme.name}`}
+      title="Paleta de colores"
+      visible={playerSheet === 'palette'}
+    >
       <ScrollView
-        contentContainerStyle={styles.themes}
+        contentContainerStyle={styles.palettes}
         horizontal
         showsHorizontalScrollIndicator={false}
       >
-        {playerThemes.map(theme => {
-          const selected = theme.id === playerTheme.id;
+        {theme.palettes.map(item => {
+          const selected = item.id === palette.id;
           return (
             <Tap
-              key={theme.id}
+              key={item.id}
               accessibilityRole="button"
-              accessibilityLabel={`Usar tema ${theme.name}`}
+              accessibilityLabel={`Usar paleta ${item.name}`}
               accessibilityState={{ selected }}
-              onPress={() => selectPlayerTheme(theme.id)}
+              onPress={() => selectPalette(item.id)}
               style={[
-                styles.theme,
-                { backgroundColor: theme.palette.background },
-                selected && styles.themeSelected,
+                styles.palette,
+                { backgroundColor: item.background },
+                selected && styles.paletteSelected,
               ]}
             >
-              <View style={styles.themeColors}>
-                {[theme.palette.accent, theme.palette.control]
-                  .concat(theme.sceneColors.slice(1, 2))
+              <View style={styles.paletteColors}>
+                {[item.accent, item.control]
+                  .concat(item.sceneColors.slice(1, 2))
                   .map((color, index) => (
                     <View
                       key={index}
-                      style={[styles.themeColor, { backgroundColor: color }]}
+                      style={[styles.paletteColor, { backgroundColor: color }]}
                     />
                   ))}
               </View>
               <Text
                 numberOfLines={1}
-                style={[type.label, { color: theme.palette.text }]}
+                style={[type.label, { color: item.text }]}
               >
-                {theme.name}
+                {item.name}
               </Text>
               {selected ? (
-                <View style={styles.themeCheck}>
-                  <Check color={theme.palette.text} size={18} />
+                <View style={styles.paletteCheck}>
+                  <Check color={item.text} size={18} />
                 </View>
               ) : null}
             </Tap>
@@ -289,6 +316,8 @@ export function ThemeSheet() {
 }
 
 export function QueueSheet() {
+  const { type } = useColors();
+  const styles = useStyles();
   const { music } = useApp();
   const {
     queueVisible,
@@ -427,13 +456,13 @@ export function QueueSheet() {
   );
 }
 
-const styles = StyleSheet.create({
-  themes: {
+const useStyles = createStyles(colors => ({
+  palettes: {
     gap: spacing.md,
     paddingBottom: spacing.lg,
     paddingHorizontal: spacing.xl,
   },
-  theme: {
+  palette: {
     borderColor: colors.outline,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -443,10 +472,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     width: 112,
   },
-  themeSelected: { borderColor: colors.text, borderWidth: 2 },
-  themeColors: { flexDirection: 'row', gap: spacing.xs },
-  themeColor: { borderRadius: 7, height: 14, width: 14 },
-  themeCheck: { position: 'absolute', right: spacing.sm, top: spacing.sm },
+  paletteSelected: { borderColor: colors.text, borderWidth: 2 },
+  paletteColors: { flexDirection: 'row', gap: spacing.xs },
+  paletteColor: { borderRadius: 7, height: 14, width: 14 },
+  paletteCheck: { position: 'absolute', right: spacing.sm, top: spacing.sm },
   equalizer: { gap: spacing.lg, paddingHorizontal: spacing.lg },
   equalizerHeader: {
     alignItems: 'center',
@@ -477,4 +506,4 @@ const styles = StyleSheet.create({
   queueAction: { flex: 1, paddingHorizontal: spacing.sm },
   queueList: { flex: 1 },
   queueEmpty: { padding: spacing.xl, textAlign: 'center' },
-});
+}));

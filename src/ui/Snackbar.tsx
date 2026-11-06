@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useApp } from '../state/AppContext';
-import { colors, radius, spacing, type } from '../theme/theme';
+import { radius, spacing, createStyles, useColors } from '../theme/theme';
 import { Tap } from './Tap';
 
 type Placement = 'app' | 'player' | 'queue';
@@ -16,6 +16,8 @@ export function Snackbar({
   placement: Placement;
   bottom: number;
 }) {
+  const { type } = useColors();
+  const styles = useStyles();
   const { music } = useApp();
   const {
     queueVisible,
@@ -92,7 +94,7 @@ export function Snackbar({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   snackbar: {
     alignItems: 'center',
     backgroundColor: colors.text,
@@ -115,4 +117,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   actionText: { color: colors.background, fontSize: 14, fontWeight: '700' },
-});
+}));

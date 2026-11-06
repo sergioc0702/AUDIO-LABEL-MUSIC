@@ -9,12 +9,15 @@ import {
   type ReactNode,
 } from 'react';
 import { BackHandler } from 'react-native';
-import { getStoredPlayerTheme, storePlayerTheme } from '../native/musicLibrary';
+import { getStoredAppearance, storeAppearance } from '../native/musicLibrary';
+import { ColorsContext } from '../theme/theme';
 import {
-  defaultPlayerThemeId,
-  getPlayerTheme,
-  type PlayerTheme,
-} from '../theme/playerThemes';
+  defaultAppearance,
+  resolveAppearance,
+  type AppTheme,
+  type Appearance,
+  type Palette,
+} from '../theme/themes';
 import type { Playlist, Track } from '../types/Track';
 import type { CollectionRef } from '../utils/collections';
 import { useMusicController, type MusicController } from './useMusicController';
@@ -23,7 +26,13 @@ export type Tab = 'home' | 'search' | 'library';
 export type Route =
   | { name: 'collection'; ref: CollectionRef }
   | { name: 'settings' };
-export type PlayerSheet = 'sleep' | 'speed' | 'equalizer' | 'theme' | null;
+export type PlayerSheet =
+  | 'sleep'
+  | 'speed'
+  | 'equalizer'
+  | 'theme'
+  | 'palette'
+  | null;
 export type LibraryFilter =
   | 'songs'
   | 'albums'
@@ -48,8 +57,10 @@ type AppContextValue = {
   setLibraryFilter: (filter: LibraryFilter) => void;
   playerSheet: PlayerSheet;
   setPlayerSheet: (sheet: PlayerSheet) => void;
-  playerTheme: PlayerTheme;
-  selectPlayerTheme: (themeId: string) => void;
+  theme: AppTheme;
+  palette: Palette;
+  selectTheme: (themeId: string) => void;
+  selectPalette: (paletteId: string) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -78,7 +89,7 @@ export function AppProvider({
   const [playlistTarget, setPlaylistTarget] = useState<Track | null>(null);
   const [playerSheet, setPlayerSheet] = useState<PlayerSheet>(null);
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('songs');
-  const [playerThemeId, setPlayerThemeId] = useState(defaultPlayerThemeId);
+  const [appearance, setAppearance] = useState<Appearance>(defaultAppearance);
   const tabRef = useRef(tab);
   tabRef.current = tab;
 
@@ -102,19 +113,32 @@ export function AppProvider({
   }, []);
 
   useEffect(() => {
-    getStoredPlayerTheme()
-      .then(themeId => {
-        if (themeId) {
-          setPlayerThemeId(themeId);
+    getStoredAppearance()
+      .then(stored => {
+        if (stored) {
+          const { theme, palette } = resolveAppearance(stored);
+          setAppearance({ themeId: theme.id, paletteId: palette.id });
         }
       })
       .catch(() => undefined);
   }, []);
 
-  const selectPlayerTheme = useCallback((themeId: string) => {
-    setPlayerThemeId(themeId);
-    storePlayerTheme(themeId).catch(() => undefined);
+  const saveAppearance = useCallback((next: Partial<Appearance>) => {
+    const { theme, palette } = resolveAppearance(next);
+    const resolved = { themeId: theme.id, paletteId: palette.id };
+    setAppearance(resolved);
+    storeAppearance(resolved).catch(() => undefined);
   }, []);
+  // Each theme has its own palettes, so a new theme starts on its first one.
+  const selectTheme = useCallback(
+    (themeId: string) => saveAppearance({ themeId }),
+    [saveAppearance],
+  );
+  const selectPalette = useCallback(
+    (paletteId: string) =>
+      saveAppearance({ themeId: appearance.themeId, paletteId }),
+    [appearance.themeId, saveAppearance],
+  );
 
   const onPlaylistCreated = useCallback(
     (playlist: Playlist) => {
@@ -151,6 +175,8 @@ export function AppProvider({
     [pop, push, route, selectTab, tab],
   );
 
+  const { theme, palette } = resolveAppearance(appearance);
+
   return (
     <AppContext.Provider
       value={{
@@ -162,11 +188,15 @@ export function AppProvider({
         setLibraryFilter,
         playerSheet,
         setPlayerSheet,
-        playerTheme: getPlayerTheme(playerThemeId),
-        selectPlayerTheme,
+        theme,
+        palette,
+        selectTheme,
+        selectPalette,
       }}
     >
-      {children}
+      <ColorsContext.Provider value={palette}>
+        {children}
+      </ColorsContext.Provider>
     </AppContext.Provider>
   );
 }

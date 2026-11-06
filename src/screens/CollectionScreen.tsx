@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
@@ -12,7 +12,12 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { colors, screenPadding, spacing, type } from '../theme/theme';
+import {
+  screenPadding,
+  spacing,
+  createStyles,
+  useColors,
+} from '../theme/theme';
 import { Button, IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { ReorderRow } from '../ui/ReorderRow';
@@ -33,6 +38,8 @@ export function CollectionScreen({
 }: {
   collection: CollectionRef;
 }) {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { music, nav } = useApp();
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -373,7 +380,7 @@ export function CollectionScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(() => ({
   screen: { flex: 1 },
   missing: { flex: 1, paddingLeft: spacing.xs },
   missingText: { padding: screenPadding },
@@ -407,4 +414,4 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingTop: spacing.xxl,
   },
-});
+}));

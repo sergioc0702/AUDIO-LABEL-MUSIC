@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, PanResponder, StyleSheet, View } from 'react-native';
+import { Animated, PanResponder, View } from 'react-native';
 import { GripVertical } from 'lucide-react-native';
-import { colors, radius } from '../theme/theme';
+import { radius, createStyles, useColors } from '../theme/theme';
 import { trackRowHeight } from './Rows';
 
 export function ReorderRow({
@@ -19,6 +19,8 @@ export function ReorderRow({
   title: string;
   trackCount: number;
 }) {
+  const { colors } = useColors();
+  const styles = useStyles();
   const translateY = useRef(new Animated.Value(0)).current;
   const startIndex = useRef(index);
   const [isDragging, setIsDragging] = useState(false);
@@ -98,7 +100,7 @@ export function ReorderRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   row: { alignItems: 'center', flexDirection: 'row' },
   dragging: {
     backgroundColor: colors.surfaceHigh,
@@ -113,4 +115,4 @@ const styles = StyleSheet.create({
     width: 40,
   },
   content: { flex: 1, minWidth: 0 },
-});
+}));

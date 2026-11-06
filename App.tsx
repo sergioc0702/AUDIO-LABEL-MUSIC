@@ -1,12 +1,5 @@
 import { useEffect, useRef } from 'react';
-import {
-  Animated,
-  Pressable,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, Pressable, StatusBar, Text, View } from 'react-native';
 import { Home, Library, Search } from 'lucide-react-native';
 import {
   SafeAreaProvider,
@@ -20,6 +13,7 @@ import {
   QueueSheet,
   SleepTimerSheet,
   SpeedSheet,
+  PaletteSheet,
   ThemeSheet,
 } from './src/player/Sheets';
 import {
@@ -35,7 +29,7 @@ import { SearchScreen } from './src/screens/SearchScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AppProvider, useApp, type Tab } from './src/state/AppContext';
 import { motionDuration, motionEasing } from './src/theme/motion';
-import { colors, spacing, type } from './src/theme/theme';
+import { spacing, createStyles, useColors } from './src/theme/theme';
 import { Snackbar } from './src/ui/Snackbar';
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -45,6 +39,8 @@ const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
 ];
 
 function TabBar() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { nav } = useApp();
   const insets = useSafeAreaInsets();
 
@@ -89,6 +85,7 @@ function TabBar() {
 }
 
 function Screens() {
+  const styles = useStyles();
   const { nav } = useApp();
   const reducedMotion = useReducedMotion();
   const reveal = useRef(new Animated.Value(1)).current;
@@ -125,6 +122,7 @@ function Screens() {
 }
 
 function AppContent() {
+  const styles = useStyles();
   const { music } = useApp();
   const insets = useSafeAreaInsets();
 
@@ -145,6 +143,7 @@ function AppContent() {
       <SpeedSheet />
       <EqualizerSheet />
       <ThemeSheet />
+      <PaletteSheet />
       <TrackMenu />
       <AddToPlaylistSheet />
       <PlaylistTrackPicker />
@@ -167,7 +166,7 @@ export default function App({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   app: { backgroundColor: colors.background, flex: 1 },
   screens: { flex: 1 },
   statusBar: {
@@ -199,4 +198,4 @@ const styles = StyleSheet.create({
   },
   tabIconSelected: { backgroundColor: colors.surfaceHigh },
   tabLabelSelected: { color: colors.text, fontWeight: '600' },
-});
+}));

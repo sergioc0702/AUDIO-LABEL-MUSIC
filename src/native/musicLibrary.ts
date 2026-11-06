@@ -1,4 +1,5 @@
 import { NativeModules } from 'react-native';
+import type { Appearance } from '../theme/themes';
 import type {
   Playlist,
   RecentPlayback,
@@ -22,8 +23,8 @@ type MusicLibraryModule = {
   clearPlaybackHistory(): Promise<void>;
   saveSession(session: string): Promise<void>;
   getSession(): Promise<string | null>;
-  savePlayerTheme(themeId: string): Promise<void>;
-  getPlayerTheme(): Promise<string | null>;
+  saveAppearance(appearance: string): Promise<void>;
+  getAppearance(): Promise<string | null>;
   getPlaybackRate(): Promise<number>;
   setPlaybackRate(rate: number): Promise<void>;
   getEqualizerSettings(): Promise<EqualizerSettings>;
@@ -159,18 +160,16 @@ export function getStoredSession(): Promise<string | null> {
   return musicLibrary.getSession();
 }
 
-export function storePlayerTheme(themeId: string): Promise<void> {
+export function storeAppearance(appearance: Appearance): Promise<void> {
   if (!musicLibrary) {
-    throw new Error('El módulo nativo de música no está disponible.');
+    return Promise.resolve();
   }
-  return musicLibrary.savePlayerTheme(themeId);
+  return musicLibrary.saveAppearance(JSON.stringify(appearance));
 }
 
-export function getStoredPlayerTheme(): Promise<string | null> {
-  if (!musicLibrary) {
-    throw new Error('El módulo nativo de música no está disponible.');
-  }
-  return musicLibrary.getPlayerTheme();
+export async function getStoredAppearance(): Promise<Partial<Appearance> | null> {
+  const stored = await musicLibrary?.getAppearance();
+  return stored ? JSON.parse(stored) : null;
 }
 
 export function clearPlaybackHistory(): Promise<void> {

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import {
   FlatList,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   useWindowDimensions,
@@ -19,7 +18,13 @@ import {
   Shuffle,
 } from 'lucide-react-native';
 import { useApp, type LibraryFilter } from '../state/AppContext';
-import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
+import {
+  radius,
+  screenPadding,
+  spacing,
+  createStyles,
+  useColors,
+} from '../theme/theme';
 import type { Track } from '../types/Track';
 import { Button, IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
@@ -51,6 +56,8 @@ const sorts: { id: TrackSort; label: string }[] = [
 ];
 
 export function LibraryScreen() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const {
     music,
     nav,
@@ -365,7 +372,7 @@ export function LibraryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   screen: { flex: 1 },
   header: {
     alignItems: 'center',
@@ -409,4 +416,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl * 2,
   },
   emptyText: { textAlign: 'center' },
-});
+}));

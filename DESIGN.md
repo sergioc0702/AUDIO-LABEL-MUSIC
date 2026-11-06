@@ -345,6 +345,10 @@ La pieza más repetida de la app.
 - **No** uses Riel (#3b3b43) para texto ni como único indicador de un valor.
 - **No** uses marcas ni copies diseños de otras apps de música.
 
-## Temas del reproductor
+## Temas y paletas de colores
 
-Los temas solo cambian la pantalla del reproductor; el resto de la app conserva este sistema. Cada tema declara su paleta y su escena en `src/theme/playerThemes.ts`. Clásico es el aspecto base y no se anima. Las escenas usan solo transform y opacity en el hilo nativo, se detienen en pausa y con el reproductor cerrado, y quedan quietas con la opción de quitar animaciones. Un test exige contraste legible en toda paleta.
+Un tema es el diseño de toda la app y trae su propio conjunto de paletas; una paleta solo cambia colores. Ambos se eligen únicamente en Ajustes, en el grupo Apariencia, y se declaran en `src/theme/themes.ts`. Hoy existe el tema Estándar, que es este sistema, con seis paletas: Clásico, Portada, Aurora, Ondas, Brasas y Atardecer.
+
+Los colores nombrados en este documento son los de la paleta Clásico. Cada paleta define los mismos papeles (fondo, navegación, superficies, contorno, textos, acento, control y peligro), y toda la interfaz los lee de la paleta activa con `useColors` y `createStyles`: ningún componente fija un color propio. Un test exige contraste legible de texto y acento sobre todas las superficies de cada paleta.
+
+Cada paleta declara además la escena del reproductor. Clásico no se anima. Las escenas usan solo transform y opacity en el hilo nativo, se detienen en pausa y con el reproductor cerrado, y quedan quietas con la opción de quitar animaciones.

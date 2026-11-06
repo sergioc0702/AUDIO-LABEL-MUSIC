@@ -3,7 +3,6 @@ import {
   FlatList,
   ScrollView,
   SectionList,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -11,7 +10,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListMusic, Search, X } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
+import {
+  radius,
+  screenPadding,
+  spacing,
+  createStyles,
+  useColors,
+} from '../theme/theme';
 import type { Playlist, Track } from '../types/Track';
 import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
@@ -31,6 +36,8 @@ type Result =
   | { type: 'playlist'; key: string; playlist: Playlist };
 
 export function SearchScreen() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { music, nav } = useApp();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
@@ -278,7 +285,7 @@ export function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   screen: { flex: 1 },
   titleRow: {
     justifyContent: 'center',
@@ -319,4 +326,4 @@ const styles = StyleSheet.create({
     minHeight: 88,
     padding: spacing.md,
   },
-});
+}));

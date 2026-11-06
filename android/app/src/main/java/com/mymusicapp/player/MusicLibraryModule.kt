@@ -35,6 +35,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.UUID
+import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -302,19 +303,23 @@ class MusicLibraryModule(
   }
 
   @ReactMethod
-  fun savePlayerTheme(themeId: String, promise: Promise) {
+  fun saveAppearance(appearance: String, promise: Promise) {
     context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
       .edit()
-      .putString("player_theme", themeId)
+      .putString("appearance", appearance)
       .apply()
     promise.resolve(null)
   }
 
   @ReactMethod
-  fun getPlayerTheme(promise: Promise) {
-    promise.resolve(
+  fun getAppearance(promise: Promise) {
+    val preferences =
       context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
-        .getString("player_theme", null),
+    // Older versions only saved the player theme, which is now a palette.
+    val legacyPalette = preferences.getString("player_theme", null)
+    promise.resolve(
+      preferences.getString("appearance", null)
+        ?: legacyPalette?.let { JSONObject().put("paletteId", it).toString() },
     )
   }
 

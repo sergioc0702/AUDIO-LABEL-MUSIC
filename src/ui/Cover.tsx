@@ -1,6 +1,6 @@
 import { Image, StyleSheet, View } from 'react-native';
 import { Music2 } from 'lucide-react-native';
-import { colors, radius } from '../theme/theme';
+import { radius, createStyles, useColors } from '../theme/theme';
 
 export function Cover({
   uri,
@@ -11,6 +11,8 @@ export function Cover({
   size: number;
   round?: boolean;
 }) {
+  const { colors } = useColors();
+  const styles = useStyles();
   const shape = {
     borderRadius: round ? size / 2 : size >= 120 ? radius.md : radius.sm,
     height: size,
@@ -28,11 +30,11 @@ export function Cover({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   cover: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
     justifyContent: 'center',
     overflow: 'hidden',
   },
-});
+}));

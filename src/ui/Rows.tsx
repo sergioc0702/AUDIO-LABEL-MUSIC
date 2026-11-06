@@ -1,8 +1,14 @@
 import { memo, useEffect, useRef, type ReactNode } from 'react';
 import { useReducedMotion } from '../hooks/useReducedMotion';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import { ChevronRight, MoreVertical } from 'lucide-react-native';
-import { colors, radius, screenPadding, spacing, type } from '../theme/theme';
+import {
+  radius,
+  screenPadding,
+  spacing,
+  createStyles,
+  useColors,
+} from '../theme/theme';
 import type { Track } from '../types/Track';
 import { IconButton } from './Buttons';
 import { Cover } from './Cover';
@@ -12,6 +18,7 @@ export const trackRowHeight = 64;
 const restingBars = [0.45, 0.9, 0.6];
 
 export function NowPlayingBars({ isPlaying }: { isPlaying: boolean }) {
+  const styles = useStyles();
   const reducedMotion = useReducedMotion();
   const bars = useRef([
     new Animated.Value(0.45),
@@ -81,6 +88,8 @@ export const TrackRow = memo(function TrackRowContent({
   leading?: ReactNode;
   trailing?: ReactNode;
 }) {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       {leading}
@@ -136,6 +145,8 @@ export function ListRow({
   showChevron?: boolean;
   trailing?: ReactNode;
 }) {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <Tap
@@ -167,6 +178,7 @@ export function ListRow({
 }
 
 export function SquareIcon({ children }: { children: ReactNode }) {
+  const styles = useStyles();
   return <View style={styles.squareIcon}>{children}</View>;
 }
 
@@ -179,6 +191,8 @@ export function SectionHeader({
   action?: string;
   onAction?: () => void;
 }) {
+  const { type } = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.section}>
       <Text style={type.headline}>{title}</Text>
@@ -196,7 +210,7 @@ export function SectionHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -246,4 +260,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding,
     paddingTop: spacing.xl,
   },
-});
+}));

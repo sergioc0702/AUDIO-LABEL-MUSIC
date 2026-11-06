@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { motionDuration, motionEasing } from '../theme/motion';
-import { colors, radius, spacing, type } from '../theme/theme';
+import { radius, spacing, createStyles, useColors } from '../theme/theme';
 import { Tap } from './Tap';
 
 /** Bottom sheet. Android Back, the scrim and dragging the handle all close it. */
@@ -38,6 +38,8 @@ export function Sheet({
   lightScrim?: boolean;
   children: ReactNode;
 }) {
+  const { type } = useColors();
+  const styles = useStyles();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
@@ -180,6 +182,8 @@ export function SheetAction({
   trailing?: ReactNode;
   onPress: () => void;
 }) {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   return (
     <Tap
       accessibilityRole="button"
@@ -207,7 +211,7 @@ export function SheetAction({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
   scrimLight: { backgroundColor: 'transparent' },
@@ -240,4 +244,4 @@ const styles = StyleSheet.create({
   actionLabel: { flex: 1 },
   danger: { color: colors.danger },
   selected: { fontWeight: '700' },
-});
+}));

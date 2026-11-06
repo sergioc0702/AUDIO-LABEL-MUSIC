@@ -1,16 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  PanResponder,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, PanResponder, Pressable, Text, View } from 'react-native';
 import { GripVertical, Minus, Music2 } from 'lucide-react-native';
 import { useProgress } from 'react-native-track-player';
-import { colors, radius, spacing, typeValues } from '../theme/theme';
-import type { PlayerPalette } from '../theme/playerThemes';
+import { radius, spacing, createStyles, useColors } from '../theme/theme';
 import type { Track } from '../types/Track';
 import { Cover } from '../ui/Cover';
 import { formatTime } from '../utils/formatTime';
@@ -22,14 +14,14 @@ export function ProgressSlider({
   position,
   onSeek,
   disabled,
-  palette,
 }: {
-  palette: Pick<PlayerPalette, 'accent' | 'track' | 'textSecondary'>;
   duration: number;
   position: number;
   onSeek: (position: number) => Promise<void>;
   disabled: boolean;
 }) {
+  const { colors } = useColors();
+  const styles = useStyles();
   const [width, setWidth] = useState(0);
   const [previewPosition, setPreviewPosition] = useState<number | null>(null);
   const dragStartX = useRef(0);
@@ -138,14 +130,14 @@ export function ProgressSlider({
           pointerEvents="none"
           style={[
             styles.expandedProgressTrack,
-            { backgroundColor: palette.track },
+            { backgroundColor: colors.outline },
           ]}
         >
           <View
             style={[
               styles.progressFill,
               {
-                backgroundColor: palette.accent,
+                backgroundColor: colors.accent,
                 width: `${progressRatio * 100}%`,
               },
             ]}
@@ -154,7 +146,7 @@ export function ProgressSlider({
             style={[
               styles.progressThumb,
               {
-                backgroundColor: palette.accent,
+                backgroundColor: colors.accent,
                 left: `${progressRatio * 100}%`,
                 transform: [{ scale: thumbScale }],
               },
@@ -175,10 +167,10 @@ export function ProgressSlider({
         </View>
       </View>
       <View style={styles.expandedTimes}>
-        <Text style={[styles.trackSubtitle, { color: palette.textSecondary }]}>
+        <Text style={[styles.trackSubtitle, { color: colors.textSecondary }]}>
           {formatTime(displayedPosition)}
         </Text>
-        <Text style={[styles.trackSubtitle, { color: palette.textSecondary }]}>
+        <Text style={[styles.trackSubtitle, { color: colors.textSecondary }]}>
           -{formatTime(duration - displayedPosition)}
         </Text>
       </View>
@@ -199,6 +191,7 @@ export function EqualizerBandControl({
   enabled: boolean;
   onChange: (value: number) => void;
 }) {
+  const styles = useStyles();
   const sliderHeight = useRef(144);
   const startY = useRef(0);
   const propsRef = useRef({ onChange, value });
@@ -320,6 +313,8 @@ export function QueueTrackRow({
   ) => void;
   onRemove: () => Promise<boolean>;
 }) {
+  const { colors } = useColors();
+  const styles = useStyles();
   const translateY = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current;
   const dragTargetIndex = useRef(index);
@@ -593,6 +588,7 @@ export function MiniProgress({
   duration: number;
   onPositionChange: (position: number) => void;
 }) {
+  const styles = useStyles();
   const { position } = useProgress(1000);
 
   useEffect(() => {
@@ -613,12 +609,10 @@ export function PlayerProgress({
   fallbackDuration,
   onSeek,
   disabled,
-  palette,
 }: {
   fallbackDuration: number;
   onSeek: (position: number) => Promise<void>;
   disabled: boolean;
-  palette: Pick<PlayerPalette, 'accent' | 'track' | 'textSecondary'>;
 }) {
   const progress = useProgress(250);
 
@@ -628,12 +622,11 @@ export function PlayerProgress({
       position={progress.position}
       onSeek={onSeek}
       disabled={disabled}
-      palette={palette}
     />
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors, typeValues) => ({
   miniTrack: { backgroundColor: colors.outline, height: 2 },
   miniFill: { backgroundColor: colors.text, height: 2 },
   expandedProgressContainer: { width: '100%' },
@@ -759,4 +752,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
-});
+}));

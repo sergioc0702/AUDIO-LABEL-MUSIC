@@ -1,8 +1,8 @@
 import { useMemo, useRef } from 'react';
-import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, Text, View } from 'react-native';
 import { SkipForward } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { colors, radius, spacing, type } from '../theme/theme';
+import { radius, spacing, createStyles, useColors } from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { Tap } from '../ui/Tap';
@@ -12,6 +12,8 @@ import { MiniProgress } from './controls';
 const swipeDistance = 72;
 
 export function MiniPlayer() {
+  const { colors, type } = useColors();
+  const styles = useStyles();
   const { music } = useApp();
   const {
     currentTrack,
@@ -102,7 +104,7 @@ export function MiniPlayer() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles(colors => ({
   player: {
     backgroundColor: colors.surfaceHigh,
     borderRadius: radius.md,
@@ -122,4 +124,4 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   text: { flex: 1, minWidth: 0 },
-});
+}));

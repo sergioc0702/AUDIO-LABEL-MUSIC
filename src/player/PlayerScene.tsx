@@ -17,7 +17,7 @@ import Svg, {
 } from 'react-native-svg';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { motionDuration, motionEasing } from '../theme/motion';
-import type { PlayerSceneId, PlayerTheme } from '../theme/playerThemes';
+import type { Palette, PlayerSceneId } from '../theme/themes';
 
 type SceneProps = {
   colors: string[];
@@ -403,11 +403,11 @@ const scenes: Record<
 };
 
 export function PlayerScene({
-  theme,
+  palette,
   artwork,
   active,
 }: {
-  theme: PlayerTheme;
+  palette: Palette;
   artwork: string | null;
   active: boolean;
 }) {
@@ -423,10 +423,10 @@ export function PlayerScene({
     }).start();
   }, [active, energy, reducedMotion]);
 
-  if (theme.scene === 'none') {
+  if (palette.scene === 'none') {
     return null;
   }
-  const Scene = scenes[theme.scene];
+  const Scene = scenes[palette.scene];
 
   return (
     <Animated.View
@@ -436,21 +436,17 @@ export function PlayerScene({
       <Scene
         active={active && !reducedMotion}
         artwork={artwork}
-        background={theme.palette.background}
-        colors={theme.sceneColors}
+        background={palette.background}
+        colors={palette.sceneColors}
       />
       <View style={styles.bottomFade}>
         <Svg height="100%" width="100%">
           <Defs>
             <LinearGradient id="bottom-fade" x1="0" x2="0" y1="0" y2="1">
-              <Stop
-                offset="0"
-                stopColor={theme.palette.background}
-                stopOpacity={0}
-              />
+              <Stop offset="0" stopColor={palette.background} stopOpacity={0} />
               <Stop
                 offset="0.6"
-                stopColor={theme.palette.background}
+                stopColor={palette.background}
                 stopOpacity={1}
               />
             </LinearGradient>
