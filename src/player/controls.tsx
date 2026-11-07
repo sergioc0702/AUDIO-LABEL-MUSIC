@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { createStyles, radius, spacing, useColors } from '../theme/theme';
+import { createStyles, spacing, useColors } from '../theme/theme';
 import { clamp } from './playerMotion';
 
 const rangeHeight = 112;
@@ -135,7 +135,7 @@ const useStyles = createStyles(colors => ({
   rail: {
     width: 4,
     height: rangeHeight,
-    borderRadius: radius.full,
+    borderRadius: colors.design.radius.full,
     backgroundColor: colors.outline,
   },
   gain: {

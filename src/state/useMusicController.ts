@@ -1356,7 +1356,9 @@ export function useMusicController({
         );
         const latestActiveId = latestQueue[latestSafeIndex]?.id ?? null;
         if (latestSafeIndex < 0 || !latestActiveId) {
-          throw new Error('No se pudo identificar la canción activa para recuperar la cola.');
+          throw new Error(
+            'No se pudo identificar la canción activa para recuperar la cola.',
+          );
         }
         const rollbackTarget = restoreUpcomingTrackOrder(
           latestQueue,
@@ -1723,15 +1725,24 @@ export function useMusicController({
       const existingIds = new Set(playlist.trackIds);
       const newIds = imported.trackIds.filter(id => !existingIds.has(id));
       const trackIds = [...playlist.trackIds, ...newIds];
-      if (trackIds.length === playlist.trackIds.length && imported.missing.length === 0) {
-        Alert.alert('Lista vacía', 'El archivo no contiene canciones nuevas para esta lista.');
+      if (
+        trackIds.length === playlist.trackIds.length &&
+        imported.missing.length === 0
+      ) {
+        Alert.alert(
+          'Lista vacía',
+          'El archivo no contiene canciones nuevas para esta lista.',
+        );
         return;
       }
       await setPlaylistTracks(playlist.id, trackIds);
       setPlaylists(current =>
-        current.map(item => (item.id === playlist.id ? { ...item, trackIds } : item)),
+        current.map(item =>
+          item.id === playlist.id ? { ...item, trackIds } : item,
+        ),
       );
-      const skipped = imported.duplicates.length + imported.trackIds.length - newIds.length;
+      const skipped =
+        imported.duplicates.length + imported.trackIds.length - newIds.length;
       Alert.alert(
         'Importación completada',
         `Añadidas: ${newIds.length}. No encontradas: ${imported.missing.length}. ` +
@@ -1751,13 +1762,17 @@ export function useMusicController({
       const playlistTracks = playlist.trackIds
         .map(id => tracksById.get(id))
         .filter((track): track is Track => track !== undefined);
-      const safeName = playlist.name
-        .replace(/[<>:"/\\|?*]/g, '-')
-        .split('')
-        .map(character => (character.charCodeAt(0) < 32 ? '-' : character))
-        .join('')
-        .trim() || 'lista';
-      const saved = await exportM3uFile(`${safeName}.m3u8`, buildM3u(playlistTracks));
+      const safeName =
+        playlist.name
+          .replace(/[<>:"/\\|?*]/g, '-')
+          .split('')
+          .map(character => (character.charCodeAt(0) < 32 ? '-' : character))
+          .join('')
+          .trim() || 'lista';
+      const saved = await exportM3uFile(
+        `${safeName}.m3u8`,
+        buildM3u(playlistTracks),
+      );
       if (saved) {
         showQueueNotice('Lista M3U guardada.');
       }
@@ -1777,7 +1792,10 @@ export function useMusicController({
         return false;
       }
       if (parseLrc(contents).length === 0) {
-        Alert.alert('Archivo LRC no válido', 'El archivo no contiene líneas con marcas de tiempo reconocibles.');
+        Alert.alert(
+          'Archivo LRC no válido',
+          'El archivo no contiene líneas con marcas de tiempo reconocibles.',
+        );
         return false;
       }
       await storeLyrics(track.id, contents);
@@ -1841,8 +1859,8 @@ export function useMusicController({
     } catch (error) {
       setErrorMessage(
         error instanceof Error
-          ? `No se pudieron eliminar las letras: ${error.message}`
-          : 'No se pudieron eliminar las letras.',
+          ? `No se pudo compartir la canción: ${error.message}`
+          : 'No se pudo compartir la canción.',
       );
     }
   }

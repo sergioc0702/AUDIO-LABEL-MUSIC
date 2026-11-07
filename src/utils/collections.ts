@@ -10,10 +10,18 @@ export type TrackGroup = {
 };
 
 type GroupKind = 'albums' | 'artists' | 'folders' | 'genres';
-const groupCache = new WeakMap<Track[], Partial<Record<GroupKind, TrackGroup[]>>>();
-const compareGroupNames = new Intl.Collator('es', { sensitivity: 'base' }).compare;
+const groupCache = new WeakMap<
+  Track[],
+  Partial<Record<GroupKind, TrackGroup[]>>
+>();
+const compareGroupNames = new Intl.Collator('es', { sensitivity: 'base' })
+  .compare;
 
-function cachedGroups(tracks: Track[], kind: GroupKind, build: () => TrackGroup[]) {
+function cachedGroups(
+  tracks: Track[],
+  kind: GroupKind,
+  build: () => TrackGroup[],
+) {
   // Library updates replace the track array, invalidating all derived groups.
   const cached = groupCache.get(tracks) ?? {};
   const groups = (cached[kind] ??= build());

@@ -41,7 +41,10 @@ export function parseLrc(contents: string): LyricLine[] {
   return parsed.sort((left, right) => left.timeMs - right.timeMs);
 }
 
-export function currentLyricIndex(lines: LyricLine[], positionSeconds: number): number {
+export function currentLyricIndex(
+  lines: LyricLine[],
+  positionSeconds: number,
+): number {
   const targetMs = Math.max(0, positionSeconds * 1000);
   let low = 0;
   let high = lines.length - 1;

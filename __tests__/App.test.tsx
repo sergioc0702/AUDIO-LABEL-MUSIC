@@ -7,6 +7,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import { Alert, BackHandler, DeviceEventEmitter, Modal } from 'react-native';
 import TrackPlayer, {
   useActiveTrack,
+  usePlaybackState,
   type Track as PlayerTrack,
 } from 'react-native-track-player';
 import App from '../App';
@@ -29,6 +30,7 @@ import {
   setEqualizerSettings,
   setPlaybackRate,
   setPlaylistTracks,
+  setMediaVolume,
   storeAppearance,
 } from '../src/native/musicLibrary';
 import type { Playlist, Track } from '../src/types/Track';
@@ -113,7 +115,7 @@ jest.mock('react-native-track-player', () => ({
   },
   RepeatMode: { Off: 0, Track: 1, Queue: 2 },
   useActiveTrack: jest.fn().mockReturnValue(undefined),
-  usePlaybackState: () => ({ state: 'none' }),
+  usePlaybackState: jest.fn().mockReturnValue({ state: 'none' }),
   useProgress: () => ({ position: 0, duration: 0, buffered: 0 }),
 }));
 
@@ -138,6 +140,10 @@ jest.mock('../src/native/musicLibrary', () => ({
   getStoredSession: jest.fn().mockResolvedValue(null),
   getStoredAppearance: jest.fn().mockResolvedValue(null),
   storeAppearance: jest.fn().mockResolvedValue(undefined),
+  getMediaVolume: jest.fn().mockResolvedValue({ level: 0.2, fixed: false }),
+  setMediaVolume: jest.fn().mockResolvedValue({ level: 0.9, fixed: false }),
+  startVolumeUpdates: jest.fn(),
+  stopVolumeUpdates: jest.fn(),
   storePreference: jest.fn().mockResolvedValue(undefined),
   getStoredPreference: jest.fn().mockResolvedValue(null),
   createPlaylist: jest.fn().mockResolvedValue({
@@ -881,7 +887,8 @@ test('closes the queue before the player in the same playback window', async () 
   await press('Abrir reproductor: Tema 1 de Artista');
   await press('Abrir cola de reproducción con 2 canciones');
 
-  const windows = () => renderer.root.findAllByType(Modal).filter(node => node.props.visible);
+  const windows = () =>
+    renderer.root.findAllByType(Modal).filter(node => node.props.visible);
   expect(windows()).toHaveLength(1);
   expect(hasLabel('Cerrar cola')).toBe(true);
 
@@ -971,6 +978,46 @@ test('hides short audio when the setting is on', async () => {
   await press('Biblioteca');
   expect(hasLabel('Reproducir 1 canciones')).toBe(true);
   jest.mocked(getStoredPreference).mockResolvedValue(null);
+});
+
+test.each([
+  ['Kawaii', 'Volumen'],
+  ['Brutalista', 'Cambiar la posición de la canción'],
+  ['Terminal', 'Forma de la canción. Toca para cambiar la posición'],
+  ['Tornamesa', 'Cambiar la posición de la canción'],
+  ['Mixtape', 'Contador de cinta 0:00'],
+  ['Taquilla', 'Código de barras. Toca para cambiar la posición'],
+])('the %s theme brings its own player', async (theme, part) => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Ajustes');
+  await press('Tema, Estándar');
+  await press(theme);
+
+  expect(storeAppearance).toHaveBeenLastCalledWith(
+    expect.objectContaining({ themeId: theme.toLowerCase() }),
+  );
+  await press('Abrir reproductor: Tema 1 de Artista');
+  expect(hasLabel(part)).toBe(true);
+  expect(hasLabel('Pausar') || hasLabel('Reproducir')).toBe(true);
+});
+
+test('the Kawaii dog asks for more volume when it is low', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'kawaii' });
+  setActive(tracks[0]);
+  jest.mocked(usePlaybackState).mockReturnValue({ state: 'playing' } as never);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  await settle();
+  expect(hasLabel('El perrito pide que subas el volumen')).toBe(true);
+  await press('Subir volumen');
+  expect(setMediaVolume).toHaveBeenCalledWith(expect.closeTo(0.3, 5));
+  jest.mocked(usePlaybackState).mockReturnValue({ state: 'none' } as never);
 });
 
 test('marks favorites from the player', async () => {

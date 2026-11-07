@@ -3,14 +3,17 @@ package com.mymusicapp.player
 import android.Manifest
 import android.app.Activity
 import android.app.RecoverableSecurityException
+import android.content.BroadcastReceiver
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.IntentSender
 import android.database.ContentObserver
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -18,12 +21,14 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.BaseActivityEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.WritableArray
+import com.facebook.react.bridge.WritableMap
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -135,7 +140,94 @@ class MusicLibraryModule(
 
   override fun getName(): String = "MusicLibrary"
 
+  private val audioManager by lazy {
+    context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+  }
+  private var volumeReceiver: BroadcastReceiver? = null
+
+  /** Media volume from 0 to 1, read from the system every time. */
+  private fun mediaVolume(): WritableMap {
+    val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+    val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      audioManager.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+    } else {
+      0
+    }
+    val now = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+    return Arguments.createMap().apply {
+      putDouble("level", if (max > min) (now - min).toDouble() / (max - min) else 0.0)
+      putBoolean("fixed", audioManager.isVolumeFixed)
+    }
+  }
+
+  @ReactMethod
+  fun getMediaVolume(promise: Promise) {
+    try {
+      promise.resolve(mediaVolume())
+    } catch (error: RuntimeException) {
+      promise.reject("E_VOLUME", "No se pudo leer el volumen.", error)
+    }
+  }
+
+  @ReactMethod
+  fun setMediaVolume(level: Double, promise: Promise) {
+    try {
+      if (!audioManager.isVolumeFixed && level.isFinite()) {
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          audioManager.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        } else {
+          0
+        }
+        val index = min + Math.round(level.coerceIn(0.0, 1.0) * (max - min)).toInt()
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
+      }
+      promise.resolve(mediaVolume())
+    } catch (error: RuntimeException) {
+      promise.reject("E_VOLUME", "No se pudo cambiar el volumen.", error)
+    }
+  }
+
+  /**
+   * Android has no public listener for volume changes. This undocumented
+   * broadcast only tells the app to read the volume again; JavaScript also
+   * polls while the screen that needs it is open, in case it stops arriving.
+   */
+  @ReactMethod
+  fun startVolumeUpdates() {
+    if (volumeReceiver != null) {
+      return
+    }
+    val receiver = object : BroadcastReceiver() {
+      override fun onReceive(receiverContext: Context?, intent: Intent?) {
+        if (context.hasActiveReactInstance()) {
+          context.emitDeviceEvent("mediaVolumeChanged", mediaVolume())
+        }
+      }
+    }
+    ContextCompat.registerReceiver(
+      context,
+      receiver,
+      IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
+      ContextCompat.RECEIVER_NOT_EXPORTED,
+    )
+    volumeReceiver = receiver
+  }
+
+  @ReactMethod
+  fun stopVolumeUpdates() {
+    volumeReceiver?.let { receiver ->
+      try {
+        context.unregisterReceiver(receiver)
+      } catch (_: IllegalArgumentException) {
+        // Already unregistered.
+      }
+    }
+    volumeReceiver = null
+  }
+
   override fun invalidate() {
+    stopVolumeUpdates()
     context.contentResolver.unregisterContentObserver(audioObserver)
     observerRefresh?.let(observerHandler::removeCallbacks)
     context.removeActivityEventListener(activityEventListener)

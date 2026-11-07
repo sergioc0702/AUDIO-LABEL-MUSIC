@@ -5,7 +5,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { resolveAppearance, type Palette } from './themes';
+import { resolveAppearance, type Palette, type TextRole } from './themes';
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
@@ -13,24 +13,69 @@ export const radius = { sm: 6, md: 10, lg: 16, sheet: 20, full: 999 };
 
 export const screenPadding = spacing.lg;
 
+type TextStyleValue = {
+  color: string;
+  fontSize: number;
+  fontWeight?: TextStyle['fontWeight'];
+  fontFamily?: string;
+  textTransform?: TextStyle['textTransform'];
+  lineHeight?: number;
+};
+
+const baseType: Record<
+  TextRole,
+  { size: number; weight?: TextStyle['fontWeight']; secondary?: boolean }
+> = {
+  display: { size: 30, weight: '700' },
+  headline: { size: 22, weight: '700' },
+  title: { size: 17, weight: '600' },
+  body: { size: 15 },
+  bodyStrong: { size: 15, weight: '600' },
+  secondary: { size: 14, secondary: true },
+  label: { size: 13, weight: '600' },
+  caption: { size: 12, secondary: true },
+};
+
+/**
+ * A theme's font files already carry their weight, so they get no weight of
+ * their own: Android would otherwise fake a bolder version.
+ */
 function typeValuesFor(colors: Palette) {
-  return {
-    display: { color: colors.text, fontSize: 30, fontWeight: '700' as const },
-    headline: { color: colors.text, fontSize: 22, fontWeight: '700' as const },
-    title: { color: colors.text, fontSize: 17, fontWeight: '600' as const },
-    body: { color: colors.text, fontSize: 15 },
-    bodyStrong: {
-      color: colors.text,
-      fontSize: 15,
-      fontWeight: '600' as const,
-    },
-    secondary: { color: colors.textSecondary, fontSize: 14 },
-    label: { color: colors.text, fontSize: 13, fontWeight: '600' as const },
-    caption: { color: colors.textSecondary, fontSize: 12 },
-  };
+  const { design } = colors;
+  const entries = (Object.keys(baseType) as TextRole[]).map(role => {
+    const base = baseType[role];
+    const family = design.fonts[role];
+    const fontSize = Math.round(base.size * (design.scale[role] ?? 1));
+    const value: TextStyleValue = {
+      color: base.secondary ? colors.textSecondary : colors.text,
+      fontSize,
+    };
+    if (family) {
+      value.fontFamily = family;
+      value.fontWeight = 'normal';
+    } else if (base.weight) {
+      value.fontWeight = base.weight;
+    }
+    if (design.upper.includes(role)) {
+      value.textTransform = 'uppercase';
+    }
+    if (family && fontSize >= 28) {
+      value.lineHeight = Math.round(fontSize * 1.08);
+    }
+    return [role, value] as const;
+  });
+  return Object.fromEntries(entries) as Record<TextRole, TextStyleValue>;
 }
 
 type TypeValues = ReturnType<typeof typeValuesFor>;
+
+/** Bold text in the active theme: its own bold face, or the system bold. */
+export function strongFont(colors: Palette): TextStyle {
+  const family = colors.design.fonts.bodyStrong;
+  return family
+    ? { fontFamily: family, fontWeight: 'normal' }
+    : { fontWeight: '700' };
+}
 
 export const ColorsContext = createContext<Palette>(
   resolveAppearance(null).palette,

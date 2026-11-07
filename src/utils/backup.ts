@@ -14,7 +14,9 @@ function toBackupTrack({ title, artist, album }: Track): BackupTrack {
 }
 
 function trackKey({ title, artist, album }: BackupTrack) {
-  return `${normalizeText(title)}|${normalizeText(artist)}|${normalizeText(album ?? '')}`;
+  return `${normalizeText(title)}|${normalizeText(artist)}|${normalizeText(
+    album ?? '',
+  )}`;
 }
 
 function legacyTrackKey({ title, artist }: BackupTrack) {
@@ -90,11 +92,10 @@ export function matchBackup(backup: LibraryBackup, tracks: Track[]) {
   const missing = new Set<string>();
   const findIds = (saved: BackupTrack[]) =>
     saved.flatMap(track => {
-      const key = track.album === undefined ? legacyTrackKey(track) : trackKey(track);
+      const key =
+        track.album === undefined ? legacyTrackKey(track) : trackKey(track);
       const ids =
-        track.album === undefined
-          ? idsByLegacyKey.get(key)
-          : idsByKey.get(key);
+        track.album === undefined ? idsByLegacyKey.get(key) : idsByKey.get(key);
       if (ids?.length !== 1) {
         missing.add(key);
         return [];

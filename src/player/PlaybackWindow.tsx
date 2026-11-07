@@ -23,10 +23,10 @@ import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useApp } from '../state/AppContext';
-import { createStyles, radius, spacing, useColors } from '../theme/theme';
+import { createStyles, spacing, useColors } from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { Snackbar } from '../ui/Snackbar';
-import { NowPlaying } from './NowPlaying';
+import { ThemedPlayer } from './skins';
 import { acceptsSwipe, playerMotion } from './playerMotion';
 import {
   EqualizerSheet,
@@ -223,7 +223,7 @@ export function PlaybackWindow() {
             pointerEvents={open && !panel.presented ? 'auto' : 'none'}
             style={[styles.player, playerStyle]}
           >
-            <NowPlaying
+            <ThemedPlayer
               covered={Boolean(
                 panel.presented ||
                   music.queueTrackDialog ||
@@ -289,8 +289,8 @@ const useStyles = createStyles(colors => ({
     bottom: 0,
     alignSelf: 'center',
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    borderTopLeftRadius: colors.design.radius.sheet,
+    borderTopRightRadius: colors.design.radius.sheet,
     overflow: 'hidden',
   },
   panelTop: {

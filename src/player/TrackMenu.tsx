@@ -22,7 +22,6 @@ import {
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
 import {
-  radius,
   screenPadding,
   spacing,
   createStyles,
@@ -433,7 +432,7 @@ const useStyles = createStyles(colors => ({
   },
   dialog: {
     backgroundColor: colors.surface,
-    borderRadius: radius.sheet,
+    borderRadius: colors.design.radius.sheet,
     gap: spacing.lg,
     maxWidth: 420,
     padding: spacing.xl,
@@ -441,7 +440,7 @@ const useStyles = createStyles(colors => ({
   },
   input: {
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     color: colors.text,
     fontSize: 15,
     height: 48,

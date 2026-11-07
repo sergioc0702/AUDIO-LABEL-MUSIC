@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { Text } from 'react-native';
-import { radius, spacing, createStyles, useColors } from '../theme/theme';
+import { spacing, createStyles, useColors } from '../theme/theme';
 import { Tap } from './Tap';
 
 type TapProps = ComponentProps<typeof Tap>;
@@ -82,14 +82,18 @@ const useStyles = createStyles(colors => ({
   },
   button: {
     alignItems: 'center',
-    borderRadius: radius.full,
+    borderRadius: colors.design.radius.full,
     flexDirection: 'row',
     gap: spacing.sm,
     height: 48,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
-  multilineButton: { height: 'auto', minHeight: 48, paddingVertical: spacing.sm },
+  multilineButton: {
+    height: 'auto',
+    minHeight: 48,
+    paddingVertical: spacing.sm,
+  },
   multilineText: { flexShrink: 1, textAlign: 'center' },
   filled: { backgroundColor: colors.accent },
   tonal: { backgroundColor: colors.surfaceHigh },

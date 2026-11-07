@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { Music2 } from 'lucide-react-native';
-import { radius, createStyles, useColors } from '../theme/theme';
+import { createStyles, useColors } from '../theme/theme';
 
 export const Cover = memo(function CoverImage({
   uri,
@@ -15,9 +15,16 @@ export const Cover = memo(function CoverImage({
   const { colors } = useColors();
   const styles = useStyles();
   const shape = {
-    borderRadius: round ? size / 2 : size >= 120 ? radius.md : radius.sm,
+    borderRadius: round
+      ? size / 2
+      : size >= 120
+      ? colors.design.radius.md
+      : colors.design.radius.sm,
     height: size,
     width: size,
+    // Brutalist covers are framed like everything else in that theme.
+    borderWidth: colors.design.line >= 3 && size >= 56 ? colors.design.line : 0,
+    borderColor: colors.text,
   };
 
   return (

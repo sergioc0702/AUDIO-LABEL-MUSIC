@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native';
+import {
+  ScrollView,
+  Switch,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Check } from 'lucide-react-native';
 import {
   getSleepTimer,
@@ -12,7 +18,7 @@ import {
 import { useApp } from '../state/AppContext';
 import { playbackRates } from '../state/useMusicController';
 import { appThemes } from '../theme/themes';
-import { radius, spacing, createStyles, useColors } from '../theme/theme';
+import { spacing, createStyles, useColors } from '../theme/theme';
 import { Button } from '../ui/Buttons';
 import { Sheet, SheetAction } from '../ui/Sheet';
 import { Snackbar } from '../ui/Snackbar';
@@ -194,7 +200,11 @@ export function EqualizerSheet() {
                 ]}
               >
                 <Text
-                  style={[type.label, styles.presetText, selected && styles.presetSelectedText]}
+                  style={[
+                    type.label,
+                    styles.presetText,
+                    selected && styles.presetSelectedText,
+                  ]}
                 >
                   {preset.name}
                 </Text>
@@ -474,7 +484,9 @@ export function QueueSheet() {
       subtitle={`${formatTrackCount(playbackQueue.length)} en la cola`}
       title="A continuación"
     >
-      <View style={[styles.queueActions, stacked && styles.stackedQueueActions]}>
+      <View
+        style={[styles.queueActions, stacked && styles.stackedQueueActions]}
+      >
         <Button
           accessibilityLabel="Guardar cola como lista"
           disabled={playbackQueue.length === 0 || queueUpdating}
@@ -515,7 +527,7 @@ const useStyles = createStyles(colors => ({
   },
   palette: {
     borderColor: colors.outline,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     borderWidth: 1,
     gap: spacing.sm,
     height: 112,
@@ -538,7 +550,7 @@ const useStyles = createStyles(colors => ({
   preset: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.full,
+    borderRadius: colors.design.radius.full,
     flex: 1,
     minHeight: 48,
     justifyContent: 'center',
@@ -572,6 +584,11 @@ const useStyles = createStyles(colors => ({
     paddingHorizontal: spacing.lg,
   },
   stackedQueueActions: { flexDirection: 'column' },
-  queueAction: { flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingHorizontal: spacing.sm },
+  queueAction: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    paddingHorizontal: spacing.sm,
+  },
   stackedQueueAction: { flexGrow: 0, flexBasis: 'auto' },
 }));

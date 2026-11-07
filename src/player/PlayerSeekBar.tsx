@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { createStyles, radius, useColors } from '../theme/theme';
+import { createStyles, useColors } from '../theme/theme';
 import { formatTime } from '../utils/formatTime';
 import { usePlaybackProgress } from './PlaybackProgress';
 import { clamp } from './playerMotion';
@@ -184,7 +184,7 @@ const useStyles = createStyles(colors => ({
   touchArea: { height: 48, justifyContent: 'center', marginHorizontal: 8 },
   track: {
     height: 4,
-    borderRadius: radius.full,
+    borderRadius: colors.design.radius.full,
     overflow: 'hidden',
     backgroundColor: colors.outline,
   },

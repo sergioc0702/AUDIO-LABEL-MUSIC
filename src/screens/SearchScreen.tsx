@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListMusic, Search, X } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
 import {
-  radius,
   screenPadding,
   spacing,
   createStyles,
@@ -314,7 +313,7 @@ const useStyles = createStyles(colors => ({
   searchBox: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     flexDirection: 'row',
     gap: spacing.sm,
     height: 48,
@@ -337,7 +336,7 @@ const useStyles = createStyles(colors => ({
   },
   genre: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     flex: 1,
     gap: spacing.xs,
     justifyContent: 'flex-end',

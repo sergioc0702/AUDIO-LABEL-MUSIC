@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { motionDuration, motionEasing } from '../theme/motion';
-import { radius, spacing, createStyles, useColors } from '../theme/theme';
+import { spacing, createStyles, useColors, strongFont } from '../theme/theme';
 import { Tap } from './Tap';
 
 /** Bottom sheet. Android Back, the scrim and dragging the handle all close it. */
@@ -226,8 +226,8 @@ const useStyles = createStyles(colors => ({
   fill: { flex: 1 },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    borderTopLeftRadius: colors.design.radius.sheet,
+    borderTopRightRadius: colors.design.radius.sheet,
     maxHeight: '88%',
   },
   handleArea: { alignItems: 'center', paddingVertical: spacing.md },
@@ -251,5 +251,5 @@ const useStyles = createStyles(colors => ({
   },
   actionLabel: { flex: 1 },
   danger: { color: colors.danger },
-  selected: { fontWeight: '700' },
+  selected: strongFont(colors),
 }));

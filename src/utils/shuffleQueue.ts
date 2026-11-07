@@ -8,7 +8,11 @@ export function resolveActiveQueueIndex(
   nativeIndex: number | null | undefined,
   fallbackActiveId?: string | null,
 ): number {
-  if (nativeIndex != null && nativeIndex >= 0 && nativeIndex < queueIds.length) {
+  if (
+    nativeIndex != null &&
+    nativeIndex >= 0 &&
+    nativeIndex < queueIds.length
+  ) {
     return nativeIndex;
   }
   return fallbackActiveId ? queueIds.indexOf(fallbackActiveId) : -1;
@@ -32,8 +36,15 @@ export function buildQueueMoves(
   const updatedIds = [...currentIds];
   const moves: QueueMove[] = [];
   const start = Math.max(0, Math.min(firstMovableIndex, updatedIds.length));
-  for (let targetIndex = start; targetIndex < targetIds.length; targetIndex += 1) {
-    const currentIndex = updatedIds.indexOf(targetIds[targetIndex], targetIndex);
+  for (
+    let targetIndex = start;
+    targetIndex < targetIds.length;
+    targetIndex += 1
+  ) {
+    const currentIndex = updatedIds.indexOf(
+      targetIds[targetIndex],
+      targetIndex,
+    );
     if (currentIndex < 0) {
       throw new Error('No se pudo encontrar una canción en la cola.');
     }

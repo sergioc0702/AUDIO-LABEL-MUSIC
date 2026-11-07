@@ -1,22 +1,70 @@
-import { useRef } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
+  Easing,
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { SkipForward } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { createStyles, radius, spacing, useColors } from '../theme/theme';
+import { createStyles, spacing, useColors } from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { Tap } from '../ui/Tap';
 import { PlayPauseIcon } from './PlayPauseIcon';
 import { usePlaybackProgress } from './PlaybackProgress';
 import { acceptsSwipe, clamp, playerMotion } from './playerMotion';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { ShihTzu } from './skins/ShihTzu';
+
+/** The record turns while the song plays, like on the turntable. */
+function SpinningRecord({
+  uri,
+  playing,
+}: {
+  uri: string | null | undefined;
+  playing: boolean;
+}) {
+  const reducedMotion = useReducedMotion();
+  const turn = useSharedValue(0);
+  useEffect(() => {
+    if (!playing || reducedMotion) {
+      cancelAnimation(turn);
+      return;
+    }
+    turn.value = withRepeat(
+      withTiming(turn.value + 360, { duration: 1800, easing: Easing.linear }),
+      -1,
+    );
+    return () => cancelAnimation(turn);
+  }, [playing, reducedMotion, turn]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${turn.value}deg` }],
+  }));
+  return (
+    <Animated.View
+      style={[
+        {
+          width: 46,
+          height: 46,
+          borderRadius: 23,
+          backgroundColor: '#101012',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        style,
+      ]}
+    >
+      <Cover round size={22} uri={uri} />
+    </Animated.View>
+  );
+}
 
 function MiniPosition() {
   const { position, duration } = usePlaybackProgress();
@@ -51,6 +99,15 @@ export function MiniPlayer() {
   } = music;
   const { colors, type } = useColors();
   const styles = useStyles();
+  const variant = colors.design.mini;
+  const ink =
+    variant === 'band'
+      ? colors.skin.bandInk
+      : variant === 'cassette'
+      ? colors.skin.shellInk
+      : variant === 'ticket'
+      ? colors.skin.ink
+      : colors.text;
   const shift = useSharedValue(0);
   const busy = useSharedValue(false);
   const inFlight = useRef(false);
@@ -110,7 +167,7 @@ export function MiniPlayer() {
   if (!track) return null;
 
   return (
-    <View style={styles.dock}>
+    <View style={[styles.dock, styles[variant]]}>
       <View style={styles.row}>
         <GestureDetector gesture={Gesture.Race(horizontal, upwards)}>
           <View collapsable={false} style={styles.trackArea}>
@@ -122,12 +179,36 @@ export function MiniPlayer() {
               style={styles.trackTouch}
             >
               <Animated.View style={[styles.song, artworkStyle]}>
-                <Cover size={44} uri={track.artwork} />
+                {variant === 'dog' ? (
+                  <ShihTzu
+                    active={isPlaying && !playerExpanded}
+                    bow={colors.skin.lazo ?? colors.accent}
+                    mood={isPlaying ? 'tranquilo' : 'triste'}
+                    quiet
+                    size={52}
+                  />
+                ) : variant === 'vinyl' ? (
+                  <SpinningRecord
+                    playing={isPlaying && !playerExpanded}
+                    uri={track.artwork}
+                  />
+                ) : (
+                  <Cover size={44} uri={track.artwork} />
+                )}
                 <View style={styles.info}>
-                  <Text numberOfLines={1} style={type.bodyStrong}>
+                  <Text
+                    numberOfLines={1}
+                    style={[type.bodyStrong, { color: ink }]}
+                  >
                     {track.title}
                   </Text>
-                  <Text numberOfLines={1} style={type.caption}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      type.caption,
+                      ink !== colors.text && { color: ink },
+                    ]}
+                  >
                     {track.artist}
                   </Text>
                 </View>
@@ -135,19 +216,33 @@ export function MiniPlayer() {
             </Tap>
           </View>
         </GestureDetector>
-        <IconButton
-          disabled={!playerReady}
-          label={isPlaying ? 'Pausar' : 'Reproducir'}
-          onPress={togglePlayback}
-        >
-          <PlayPauseIcon color={colors.text} isPlaying={isPlaying} size={24} />
-        </IconButton>
+        {variant === 'block' ? (
+          <Pressable
+            accessibilityLabel={isPlaying ? 'Pausar' : 'Reproducir'}
+            accessibilityRole="button"
+            disabled={!playerReady}
+            onPress={togglePlayback}
+            style={styles.blockPlay}
+          >
+            <Text style={[type.headline, { color: colors.skin.onHot }]}>
+              {isPlaying ? 'Pausa' : 'Play'}
+            </Text>
+          </Pressable>
+        ) : (
+          <IconButton
+            disabled={!playerReady}
+            label={isPlaying ? 'Pausar' : 'Reproducir'}
+            onPress={togglePlayback}
+          >
+            <PlayPauseIcon color={ink} isPlaying={isPlaying} size={24} />
+          </IconButton>
+        )}
         <IconButton
           disabled={!playerReady || queueUpdating}
           label="Siguiente canción"
           onPress={() => skip('next')}
         >
-          <SkipForward color={colors.text} fill={colors.text} size={24} />
+          <SkipForward color={ink} fill={ink} size={24} />
         </IconButton>
       </View>
       {playerExpanded ? <View style={styles.progress} /> : <MiniPosition />}
@@ -159,7 +254,7 @@ const useStyles = createStyles(colors => ({
   dock: {
     marginHorizontal: spacing.sm,
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.lg,
+    borderRadius: colors.design.radius.lg,
     overflow: 'hidden',
   },
   row: {
@@ -177,6 +272,28 @@ const useStyles = createStyles(colors => ({
   },
   song: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   info: { flex: 1, minWidth: 0, gap: 2 },
+  card: {},
+  dog: { borderRadius: 40 },
+  block: {
+    backgroundColor: colors.background,
+    borderWidth: colors.design.line,
+    borderColor: colors.text,
+    marginHorizontal: 0,
+  },
+  band: { backgroundColor: colors.skin.band ?? colors.surfaceHigh },
+  vinyl: {},
+  cassette: { backgroundColor: colors.skin.shell ?? colors.surfaceHigh },
+  ticket: {
+    backgroundColor: colors.skin.paper ?? colors.surfaceHigh,
+    borderRightWidth: 0,
+  },
+  blockPlay: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 92,
+    backgroundColor: colors.skin.hot ?? colors.accent,
+  },
   progress: { height: 2, backgroundColor: colors.outline },
   progressFill: {
     height: 2,

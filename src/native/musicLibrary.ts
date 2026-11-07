@@ -34,6 +34,10 @@ type MusicLibraryModule = {
   getLyrics(trackId: string): Promise<string | null>;
   saveLyrics(trackId: string, contents: string): Promise<void>;
   deleteLyrics(trackId: string): Promise<void>;
+  getMediaVolume(): Promise<MediaVolume>;
+  setMediaVolume(level: number): Promise<MediaVolume>;
+  startVolumeUpdates(): void;
+  stopVolumeUpdates(): void;
   saveAppearance(appearance: string): Promise<void>;
   getAppearance(): Promise<string | null>;
   getPlaybackRate(): Promise<number>;
@@ -41,6 +45,31 @@ type MusicLibraryModule = {
   getEqualizerSettings(): Promise<EqualizerSettings>;
   setEqualizerSettings(enabled: boolean, bandGainsDb: number[]): Promise<void>;
 };
+
+/** Media volume from 0 to 1. Fixed-volume devices cannot change it. */
+export type MediaVolume = { level: number; fixed: boolean };
+
+export function getMediaVolume(): Promise<MediaVolume> {
+  return (
+    musicLibrary?.getMediaVolume() ??
+    Promise.resolve({ level: 0.5, fixed: true })
+  );
+}
+
+export function setMediaVolume(level: number): Promise<MediaVolume> {
+  return (
+    musicLibrary?.setMediaVolume(level) ??
+    Promise.resolve({ level, fixed: true })
+  );
+}
+
+export function startVolumeUpdates() {
+  musicLibrary?.startVolumeUpdates();
+}
+
+export function stopVolumeUpdates() {
+  musicLibrary?.stopVolumeUpdates();
+}
 
 export type EqualizerSettings = {
   enabled: boolean;
@@ -208,7 +237,10 @@ export function importBackupFile(): Promise<string | null> {
   return musicLibrary.importBackup();
 }
 
-export function exportM3uFile(fileName: string, contents: string): Promise<boolean> {
+export function exportM3uFile(
+  fileName: string,
+  contents: string,
+): Promise<boolean> {
   if (!musicLibrary) {
     throw new Error('El módulo nativo de música no está disponible.');
   }

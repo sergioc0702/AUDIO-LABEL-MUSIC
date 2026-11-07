@@ -139,11 +139,7 @@ export async function movePlayerTracks(
   expectedQueueIds: string[],
   expectedActiveTrackId: string,
 ): Promise<void> {
-  await TrackPlayer.moveTracks(
-    moves,
-    expectedQueueIds,
-    expectedActiveTrackId,
-  );
+  await TrackPlayer.moveTracks(moves, expectedQueueIds, expectedActiveTrackId);
 }
 
 export async function removePlayerTrack(index: number): Promise<void> {

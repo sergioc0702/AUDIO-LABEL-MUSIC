@@ -3,11 +3,11 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Animated, Text, View } from 'react-native';
 import { ChevronRight, MoreVertical } from 'lucide-react-native';
 import {
-  radius,
   screenPadding,
   spacing,
   createStyles,
   useColors,
+  strongFont,
 } from '../theme/theme';
 import type { Track } from '../types/Track';
 import { IconButton } from './Buttons';
@@ -228,7 +228,7 @@ const useStyles = createStyles(colors => ({
     paddingRight: spacing.sm,
   },
   rowText: { flex: 1, gap: 2, minWidth: 0 },
-  current: { color: colors.accent, fontWeight: '600' },
+  current: { color: colors.accent, ...strongFont(colors) },
   bars: {
     alignItems: 'flex-end',
     flexDirection: 'row',
@@ -247,7 +247,7 @@ const useStyles = createStyles(colors => ({
   squareIcon: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.sm,
+    borderRadius: colors.design.radius.sm,
     height: 48,
     justifyContent: 'center',
     width: 48,

@@ -1,7 +1,12 @@
 import { buildM3u, parseM3u, resolveM3u } from '../src/utils/m3u';
 import type { Track } from '../src/types/Track';
 
-const track = (id: string, title: string, artist: string, filePath: string): Track => ({
+const track = (
+  id: string,
+  title: string,
+  artist: string,
+  filePath: string,
+): Track => ({
   id,
   uri: `content://media/external/audio/media/${id}`,
   filePath,
@@ -31,7 +36,10 @@ test('matches metadata when a saved path is unavailable and reports malformed or
   const parsed = parseM3u(
     '#EXTM3U\n#EXTINF:bad\n#EXTINF:-1,Artista A - Cancion Uno\n/old/uno.mp3\n/removed.mp3\n#EXTINF:bad\n',
   );
-  const result = resolveM3u('#EXTM3U\n#EXTINF:-1,Artista A - Cancion Uno\n/old/uno.mp3\n/removed.mp3\n#EXTINF:bad', tracks);
+  const result = resolveM3u(
+    '#EXTM3U\n#EXTINF:-1,Artista A - Cancion Uno\n/old/uno.mp3\n/removed.mp3\n#EXTINF:bad',
+    tracks,
+  );
   expect(parsed.malformedLines).toBe(2);
   expect(result.trackIds).toEqual(['1']);
   expect(result.missing).toHaveLength(1);

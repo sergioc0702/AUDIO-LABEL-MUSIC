@@ -26,7 +26,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RepeatMode } from 'react-native-track-player';
 import { useApp } from '../state/AppContext';
-import { createStyles, radius, spacing, useColors } from '../theme/theme';
+import { createStyles, spacing, useColors } from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { Tap } from '../ui/Tap';
@@ -253,7 +253,8 @@ export function NowPlaying({
           styles.scroll,
           landscape && styles.landscapeScroll,
           {
-            paddingBottom: insets.bottom + (landscape ? spacing.xs : spacing.lg),
+            paddingBottom:
+              insets.bottom + (landscape ? spacing.xs : spacing.lg),
             paddingLeft: insets.left + spacing.lg,
             paddingRight: insets.right + spacing.lg,
           },
@@ -437,11 +438,15 @@ const useStyles = createStyles(colors => ({
     paddingVertical: spacing.sm,
   },
   landscapeTransport: { paddingVertical: spacing.xs },
-  compactTransport: { flexWrap: 'wrap', justifyContent: 'center', rowGap: spacing.sm },
+  compactTransport: {
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    rowGap: spacing.sm,
+  },
   play: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.full,
+    borderRadius: colors.design.radius.full,
     width: 64,
     height: 64,
     backgroundColor: colors.control,
@@ -452,7 +457,7 @@ const useStyles = createStyles(colors => ({
     flexWrap: 'wrap',
     justifyContent: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: colors.design.radius.lg,
     overflow: 'hidden',
     marginTop: spacing.xs,
   },

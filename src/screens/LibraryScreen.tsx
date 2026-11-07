@@ -19,7 +19,6 @@ import {
 } from 'lucide-react-native';
 import { useApp, type LibraryFilter } from '../state/AppContext';
 import {
-  radius,
   screenPadding,
   spacing,
   createStyles,
@@ -424,7 +423,7 @@ const useStyles = createStyles(colors => ({
   chip: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.full,
+    borderRadius: colors.design.radius.full,
     height: 36,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,

@@ -32,7 +32,10 @@ function normalizePath(path: string): string {
   }
 }
 
-function splitDisplayName(value: string): { artist: string | null; title: string } {
+function splitDisplayName(value: string): {
+  artist: string | null;
+  title: string;
+} {
   const separator = value.indexOf(' - ');
   if (separator <= 0) {
     return { artist: null, title: value.trim() };
@@ -43,7 +46,10 @@ function splitDisplayName(value: string): { artist: string | null; title: string
   };
 }
 
-export function parseM3u(contents: string): { entries: M3uEntry[]; malformedLines: number } {
+export function parseM3u(contents: string): {
+  entries: M3uEntry[];
+  malformedLines: number;
+} {
   const entries: M3uEntry[] = [];
   let malformedLines = 0;
   let pending: Omit<M3uEntry, 'path'> | null = null;
@@ -62,7 +68,8 @@ export function parseM3u(contents: string): { entries: M3uEntry[]; malformedLine
       }
       const seconds = Number(line.slice(8, comma));
       const label = line.slice(comma + 1).trim();
-      const validDuration = Number.isFinite(seconds) && (seconds === -1 || seconds >= 0);
+      const validDuration =
+        Number.isFinite(seconds) && (seconds === -1 || seconds >= 0);
       if (!validDuration || !label) {
         malformedLines += 1;
       }
@@ -91,7 +98,10 @@ export function parseM3u(contents: string): { entries: M3uEntry[]; malformedLine
   return { entries, malformedLines };
 }
 
-export function resolveM3uEntries(entries: M3uEntry[], tracks: Track[]): PlaylistImportResult {
+export function resolveM3uEntries(
+  entries: M3uEntry[],
+  tracks: Track[],
+): PlaylistImportResult {
   const byPath = new Map<string, Track>();
   const byMetadata = new Map<string, Track[]>();
   const byTitle = new Map<string, Track[]>();
@@ -101,7 +111,9 @@ export function resolveM3uEntries(entries: M3uEntry[], tracks: Track[]): Playlis
         byPath.set(normalizePath(location), track);
       }
     }
-    const metadataKey = `${normalizeText(track.artist)}|${normalizeText(track.title)}`;
+    const metadataKey = `${normalizeText(track.artist)}|${normalizeText(
+      track.title,
+    )}`;
     const matches = byMetadata.get(metadataKey) ?? [];
     matches.push(track);
     byMetadata.set(metadataKey, matches);
@@ -121,7 +133,9 @@ export function resolveM3uEntries(entries: M3uEntry[], tracks: Track[]): Playlis
       ? `${normalizeText(entry.artist)}|${normalizeText(entry.title)}`
       : '';
     const titleOnlyKey = entry.title ? `|${normalizeText(entry.title)}` : '';
-    const titleMatches = entry.title ? byTitle.get(normalizeText(entry.title)) ?? [] : [];
+    const titleMatches = entry.title
+      ? byTitle.get(normalizeText(entry.title)) ?? []
+      : [];
     const metadataMatch = entry.artist
       ? byMetadata.get(metadataKey)?.[0]
       : titleOnlyKey && titleMatches.length === 1
@@ -140,7 +154,10 @@ export function resolveM3uEntries(entries: M3uEntry[], tracks: Track[]): Playlis
   return { trackIds, missing, duplicates, malformedLines: 0 };
 }
 
-export function resolveM3u(contents: string, tracks: Track[]): PlaylistImportResult {
+export function resolveM3u(
+  contents: string,
+  tracks: Track[],
+): PlaylistImportResult {
   const parsed = parseM3u(contents);
   const resolved = resolveM3uEntries(parsed.entries, tracks);
   return { ...resolved, malformedLines: parsed.malformedLines };
@@ -149,7 +166,9 @@ export function resolveM3u(contents: string, tracks: Track[]): PlaylistImportRes
 export function buildM3u(tracks: Track[]): string {
   const lines = ['#EXTM3U'];
   for (const track of tracks) {
-    const display = [track.artist.trim(), track.title.trim()].filter(Boolean).join(' - ');
+    const display = [track.artist.trim(), track.title.trim()]
+      .filter(Boolean)
+      .join(' - ');
     lines.push(`#EXTINF:${Math.max(0, Math.round(track.duration))},${display}`);
     lines.push(track.filePath || track.uri);
   }

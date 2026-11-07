@@ -21,7 +21,12 @@ import { LibraryScreen } from './src/screens/LibraryScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AppProvider, useApp, type Tab } from './src/state/AppContext';
-import { spacing, createStyles, useColors } from './src/theme/theme';
+import {
+  spacing,
+  createStyles,
+  useColors,
+  strongFont,
+} from './src/theme/theme';
 import { Snackbar } from './src/ui/Snackbar';
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -35,6 +40,71 @@ function TabBar() {
   const styles = useStyles();
   const { nav } = useApp();
   const insets = useSafeAreaInsets();
+  const variant = colors.design.tabs;
+
+  if (variant !== 'pill') {
+    return (
+      <View
+        accessibilityRole="tablist"
+        style={[
+          styles.tabBar,
+          variant === 'blocks' && styles.blockBar,
+          { paddingBottom: insets.bottom },
+        ]}
+      >
+        {tabs.map((tab, index) => {
+          const selected = nav.tab === tab.id;
+          const inverted = variant === 'blocks' && selected;
+          return (
+            <Pressable
+              key={tab.id}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected }}
+              android_ripple={{ color: colors.ripple }}
+              onPress={() => nav.selectTab(tab.id)}
+              style={[
+                styles.tab,
+                variant === 'blocks' && styles.blockTab,
+                variant === 'blocks' && index > 0 && styles.blockDivider,
+                inverted && styles.blockSelected,
+              ]}
+            >
+              {variant === 'brackets' ? null : (
+                <tab.icon
+                  color={
+                    inverted
+                      ? colors.background
+                      : selected
+                      ? colors.accent
+                      : colors.textSecondary
+                  }
+                  size={22}
+                />
+              )}
+              <Text
+                style={[
+                  type.label,
+                  { color: selected ? colors.text : colors.textSecondary },
+                  selected && variant === 'brackets' && styles.bracketSelected,
+                  inverted && styles.blockLabelSelected,
+                ]}
+              >
+                {variant === 'brackets' && selected
+                  ? `[${tab.label}]`
+                  : tab.label}
+              </Text>
+              {variant === 'underline' ? (
+                <View
+                  style={[styles.underline, selected && styles.underlineOn]}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
 
   return (
     <View
@@ -62,7 +132,13 @@ function TabBar() {
               style={[styles.tabIcon, selected && styles.tabIconSelected]}
             >
               <tab.icon
-                color={selected ? colors.text : colors.textSecondary}
+                color={
+                  !selected
+                    ? colors.textSecondary
+                    : colors.design.player === 'kawaii'
+                    ? colors.onAccent
+                    : colors.text
+                }
                 size={22}
               />
             </View>
@@ -98,12 +174,13 @@ function Screens() {
 
 function AppContent() {
   const styles = useStyles();
+  const { colors } = useColors();
   const { music } = useApp();
   const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.app}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={colors.isLight ? 'dark-content' : 'light-content'} />
       <Screens />
       <View style={[styles.statusBar, { height: insets.top }]} />
       <MiniPlayer />
@@ -171,6 +248,25 @@ const useStyles = createStyles(colors => ({
     justifyContent: 'center',
     width: 64,
   },
-  tabIconSelected: { backgroundColor: colors.surfaceHigh },
-  tabLabelSelected: { color: colors.text, fontWeight: '600' },
+  tabIconSelected: {
+    backgroundColor:
+      colors.design.player === 'kawaii' ? colors.accent : colors.surfaceHigh,
+  },
+  blockBar: {
+    marginTop: 0,
+    paddingTop: 0,
+    borderTopWidth: colors.design.line,
+    borderColor: colors.text,
+  },
+  blockTab: { justifyContent: 'center', minHeight: 64 },
+  blockDivider: {
+    borderLeftWidth: colors.design.line,
+    borderColor: colors.text,
+  },
+  blockSelected: { backgroundColor: colors.text },
+  blockLabelSelected: { color: colors.background },
+  bracketSelected: { color: colors.accent },
+  underline: { height: 3, width: 28, borderRadius: 2 },
+  underlineOn: { backgroundColor: colors.accent },
+  tabLabelSelected: { color: colors.text, ...strongFont(colors) },
 }));

@@ -12,7 +12,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { createStyles, radius, spacing, useColors } from '../theme/theme';
+import { createStyles, spacing, useColors } from '../theme/theme';
 import type { Track } from '../types/Track';
 import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
@@ -363,7 +363,7 @@ const useStyles = createStyles(colors => ({
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
   },
   empty: { padding: spacing.xl, textAlign: 'center' },
 }));

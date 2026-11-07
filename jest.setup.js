@@ -10,7 +10,11 @@ jest.mock('react-native-reanimated', () => {
   const { Easing, FlatList, View } = require('react-native');
   return {
     __esModule: true,
-    default: { View, FlatList, createAnimatedComponent: Component => Component },
+    default: {
+      View,
+      FlatList,
+      createAnimatedComponent: Component => Component,
+    },
     Easing,
     ReduceMotion: { System: 'system' },
     useSharedValue: value => React.useRef({ value }).current,
@@ -26,5 +30,9 @@ jest.mock('react-native-reanimated', () => {
       onFinish?.(true);
       return value;
     },
+    withRepeat: value => value,
+    withSequence: (...values) => values[values.length - 1],
+    withDelay: (_delay, value) => value,
+    useAnimatedProps: read => read(),
   };
 });
