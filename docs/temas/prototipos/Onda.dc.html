@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tema Terminal: reproductor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;border-radius:0}
+button:focus-visible{outline:2px dashed currentColor;outline-offset:-4px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 14px; background: {{p.bg}}; color: {{p.fg}}">
+  <div style="position: absolute; left: 0; right: 0; top: 0; height: 128px; box-sizing: border-box; padding-top: 26px; background: {{p.band}}; color: {{p.bandInk}}">
+    <div style="display: flex; justify-content: space-between; height: 44px">
+      <button aria-label="Cerrar reproductor" style="padding: 0 10px; font-weight: 700">[ Salir ]</button>
+      <button aria-label="Añadir a favoritas" aria-pressed="{{fav}}" onClick="{{toggleFav}}" style="padding: 0 10px; font-weight: 700">{{favText}}</button>
+    </div>
+    <p style="margin: 0; padding: 0 10px; font-weight: 700; white-space: pre; overflow: hidden">Reproduciendo: {{t.title}}</p>
+    <button aria-label="Cambiar la posición de la canción" onClick="{{seek}}" style="display: block; width: 390px; height: 32px; box-sizing: border-box; padding: 0 10px; text-align: left; white-space: pre">{{bar}}</button>
+  </div>
+  <div style="position: absolute; left: 10px; right: 10px; top: 134px; height: 366px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; line-height: 20px">
+    <sc-for list="{{lines}}" as="l" hint-placeholder-count="14">
+      <div style="white-space: pre; min-height: 20px"><span style="color: {{l.ca}}">{{l.a}}</span><span style="color: {{l.cb}}">{{l.b}}</span></div>
+    </sc-for>
+    <div style="white-space: pre; min-height: 20px"><span>{{prompt}}</span><span style="color: {{p.cmd}}">{{typing}}</span><span style="color: {{p.fg}}">{{cursor}}</span></div>
+  </div>
+  <button aria-label="Forma de la canción. Toca para cambiar la posición" onClick="{{seek}}" style="position: absolute; left: 10px; right: 10px; top: 506px; height: 84px; display: block; text-align: left; font-size: 13px; line-height: 14px; overflow: hidden">
+    <sc-for list="{{wave}}" as="row" hint-placeholder-count="6">
+      <span style="display: block; height: 14px; white-space: pre"><span style="color: {{p.cmd}}">{{row.played}}</span><span style="color: {{p.dim}}">{{row.rest}}</span></span>
+    </sc-for>
+  </button>
+  <div style="position: absolute; left: 10px; right: 10px; top: 600px; height: 80px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: 6px; font-weight: 700">
+    <button aria-label="Canción anterior" onClick="{{prev}}" style="border: 1px solid {{p.fg}}; font-size: 20px">&lt;&lt;</button>
+    <button aria-label="{{playLabel}}" onClick="{{toggle}}" style="background: {{p.fg}}; color: {{p.bg}}; font-size: 20px">{{playText}}</button>
+    <button aria-label="Canción siguiente" onClick="{{next}}" style="border: 1px solid {{p.fg}}; font-size: 20px">&gt;&gt;</button>
+  </div>
+  <div style="position: absolute; left: 10px; right: 10px; top: 688px; height: 128px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 6px">
+    <sc-for list="{{keys}}" as="key" hint-placeholder-count="6">
+      <button onClick="{{key.press}}" aria-pressed="{{key.on}}" style="border: 1px solid {{key.line}}; background: {{key.bg}}; color: {{key.fg}}">{{key.label}}</button>
+    </sc-for>
+  </div>
+  <sc-if value="{{queueOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; top: 500px; background: {{p.bg}}; border-top: 1px solid {{p.fg}}; display: flex; flex-direction: column; padding-top: 6px">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-left: 10px">
+        <p style="margin: 0; color: {{p.cmd}}">Get-Cola | Select -First 4</p>
+        <button aria-label="Cerrar cola" onClick="{{closeQueue}}" style="height: 48px; padding: 0 10px; font-weight: 700">[ Cerrar ]</button>
+      </div>
+      <sc-for list="{{list}}" as="item" hint-placeholder-count="4">
+        <button onClick="{{item.pick}}" style="min-height: 60px; padding: 0 10px; text-align: left; white-space: pre; color: {{item.color}}">{{item.row}}</button>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"paleta":{"editor":"enum","options":["Azul clásico","Negro","Ámbar","Fósforo","Papel","Púrpura"],"default":"Ámbar"},"$preview":{"width":390,"height":844}}'>
+const TRACKS = [
+  { title: 'Luz de agosto', artist: 'Marea Alta', album: 'Costa norte', dur: 214 },
+  { title: 'Sal y cobre', artist: 'Los Faros', album: 'Puerto viejo', dur: 188 },
+  { title: 'Última línea', artist: 'Noa Reyes', album: 'Sin parada', dur: 241 },
+  { title: 'Ruta once', artist: 'Marea Alta', album: 'Costa norte', dur: 203 },
+];
+const PALETTES = {
+  'Azul clásico': { bg: '#012456', fg: '#eeedf0', cmd: '#ffff00', dim: '#8fa8cc', band: '#00b4c8', bandInk: '#00212b' },
+  'Negro': { bg: '#0c0c0c', fg: '#cccccc', cmd: '#f9f1a5', dim: '#8a8a8a', band: '#3a96dd', bandInk: '#000000' },
+  'Ámbar': { bg: '#140c02', fg: '#ffb000', cmd: '#ffe08a', dim: '#b27a14', band: '#ffb000', bandInk: '#140c02' },
+  'Fósforo': { bg: '#04140a', fg: '#33ff66', cmd: '#c8ffd4', dim: '#22a650', band: '#33ff66', bandInk: '#04140a' },
+  'Papel': { bg: '#f7f5ee', fg: '#1f2430', cmd: '#a13a00', dim: '#62666f', band: '#1f2430', bandInk: '#f7f5ee' },
+  'Púrpura': { bg: '#1e1033', fg: '#e8def8', cmd: '#ff9ee8', dim: '#a896cc', band: '#b794f6', bandInk: '#1e1033' },
+};
+const PROMPT = 'PS C:\\Música> ';
+const SLEEP = ['Dormir', '15 min', '30 min', '60 min'];
+const RATES = [1, 1.25, 1.5, 2, 0.75];
+const LOG_LINES = 16;
+const COLUMNS = 46;
+const ROWS = 6;
+const BAR = 30;
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+const noise = seed => {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+};
+const details = t => [
+  { text: ' ' },
+  { text: 'Título   : ' + t.title },
+  { text: 'Artista  : ' + t.artist },
+  { text: 'Álbum    : ' + t.album },
+  { text: 'Duración : ' + fmt(t.dur) },
+  { text: ' ' },
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      i: 0, pos: 71, playing: true, tick: 0, shuffle: false, repeat: false, fav: false, queue: false, sleep: 0, rate: 0, eq: true,
+      log: [{ text: 'Mi Música. Biblioteca local: 37 canciones.', dim: true }, { text: ' ' }],
+      command: 'Get-Cancion -Actual', typed: 0, output: details(TRACKS[0]),
+    };
+  }
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      const s = this.state;
+      const next = { tick: s.tick + 1 };
+      if (s.playing) {
+        const pos = s.pos + 0.04 * RATES[s.rate];
+        if (pos >= TRACKS[s.i].dur) {
+          this.go(1);
+          return;
+        }
+        next.pos = pos;
+      }
+      if (s.command) {
+        if (s.typed > s.command.length + 4) {
+          next.log = [...s.log, { command: s.command }, ...s.output].slice(-LOG_LINES);
+          next.command = '';
+          next.typed = 0;
+          next.output = [];
+        } else {
+          next.typed = s.typed + 1;
+        }
+      }
+      this.setState(next);
+    }, 40);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  run(command, output, change) {
+    const s = this.state;
+    const log = s.command ? [...s.log, { command: s.command }, ...s.output].slice(-LOG_LINES) : s.log;
+    this.setState({ ...change, log, command, typed: 0, output: output ?? [] });
+  }
+  go(step, label) {
+    const i = (this.state.i + step + TRACKS.length) % TRACKS.length;
+    this.run('Skip-Cancion -' + (label ?? 'Siguiente'), details(TRACKS[i]), { i, pos: 0 });
+  }
+  renderVals() {
+    const s = this.state;
+    const t = TRACKS[s.i];
+    const p = PALETTES[this.props.paleta ?? 'Azul clásico'] ?? PALETTES['Azul clásico'];
+    const f = s.pos / t.dur;
+    const filled = Math.round(f * BAR);
+    const playhead = Math.round(f * COLUMNS);
+    const heights = Array.from({ length: COLUMNS }, (_, column) => {
+      const base = 1 + Math.abs(Math.sin(column * 0.31 + s.i * 1.7) * Math.sin(column * 0.13 + s.i)) * 4.4;
+      const near = s.playing && Math.abs(column - playhead) < 6;
+      return base + (near ? noise(column + Math.floor(s.tick / 3)) * 2.4 : 0);
+    });
+    const key = (label, on, press) => ({ label, on, press, bg: on ? p.cmd : 'transparent', fg: on ? p.bg : p.fg, line: on ? p.cmd : p.dim });
+    return {
+      t, p,
+      prompt: PROMPT,
+      typing: s.command.slice(0, s.typed),
+      cursor: Math.floor(s.tick / 12) % 2 ? ' ' : '█',
+      bar: '[' + 'o'.repeat(filled) + ' '.repeat(BAR - filled) + '] ' + fmt(s.pos) + '/' + fmt(t.dur),
+      lines: s.log.map(line => line.command
+        ? { a: PROMPT, b: line.command, ca: p.fg, cb: p.cmd }
+        : { a: line.text, b: '', ca: line.dim ? p.dim : p.fg, cb: p.fg }),
+      wave: Array.from({ length: ROWS }, (_, row) => {
+        const level = ROWS - row;
+        const cells = heights.map(height => (height >= level ? '█' : ' ')).join('');
+        return { played: cells.slice(0, playhead), rest: cells.slice(playhead) };
+      }),
+      favText: s.fav ? '[ Favorita: sí ]' : '[ Favorita: no ]',
+      fav: s.fav,
+      playText: s.playing ? 'Suspender' : 'Reanudar',
+      playLabel: s.playing ? 'Pausar' : 'Reproducir',
+      queueOpen: s.queue,
+      keys: [
+        key('Cola', s.queue, () => this.run('Get-Cola | Select -First 4', [], { queue: true })),
+        key('Mezcla', s.shuffle, () => this.run('Set-Mezcla $' + !s.shuffle, [], { shuffle: !s.shuffle })),
+        key('Repetir', s.repeat, () => this.run('Set-Repetir $' + !s.repeat, [], { repeat: !s.repeat })),
+        key(SLEEP[s.sleep], s.sleep > 0, () => this.run('Set-Temporizador "' + SLEEP[(s.sleep + 1) % SLEEP.length] + '"', [], { sleep: (s.sleep + 1) % SLEEP.length })),
+        key(RATES[s.rate] + '×', s.rate > 0, () => this.run('Set-Velocidad ' + RATES[(s.rate + 1) % RATES.length], [], { rate: (s.rate + 1) % RATES.length })),
+        key('Ecualiz.', s.eq, () => this.run('Set-Ecualizador $' + !s.eq, [], { eq: !s.eq })),
+      ],
+      list: TRACKS.map((x, i) => ({
+        ...x,
+        row: '[' + (i + 1) + '] ' + x.title.padEnd(16) + x.artist,
+        color: i === s.i ? p.cmd : p.fg,
+        pick: () => this.run('Start-Cancion ' + (i + 1), details(x), { i, pos: 0, queue: false }),
+      })),
+      toggle: () => this.run(s.playing ? 'Suspend-Musica' : 'Resume-Musica', [], { playing: !s.playing }),
+      next: () => this.go(1),
+      prev: () => (s.pos > 3 ? this.run('Set-Posicion 0:00', [], { pos: 0 }) : this.go(-1, 'Anterior')),
+      toggleFav: () => this.run(s.fav ? 'Remove-Favorita' : 'Add-Favorita', [], { fav: !s.fav }),
+      closeQueue: () => this.setState({ queue: false }),
+      seek: e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const pos = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * t.dur;
+        this.run('Set-Posicion ' + fmt(pos), [], { pos });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,21 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StatusBar, Text, View } from 'react-native';
+import { Pressable, StatusBar, Text, View } from 'react-native';
 import { Home, Library, Search } from 'lucide-react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useReducedMotion } from './src/hooks/useReducedMotion';
 import { MiniPlayer } from './src/player/MiniPlayer';
-import { NowPlaying } from './src/player/NowPlaying';
-import {
-  EqualizerSheet,
-  QueueSheet,
-  SleepTimerSheet,
-  SpeedSheet,
-  PaletteSheet,
-  ThemeSheet,
-} from './src/player/Sheets';
+import { PlaybackProgressProvider } from './src/player/PlaybackProgress';
+import { PlaybackWindow } from './src/player/PlaybackWindow';
+import { PaletteSheet, ThemeSheet } from './src/player/Sheets';
 import {
   AddToPlaylistSheet,
   PlaylistDialogs,
@@ -28,7 +21,6 @@ import { LibraryScreen } from './src/screens/LibraryScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AppProvider, useApp, type Tab } from './src/state/AppContext';
-import { motionDuration, motionEasing } from './src/theme/motion';
 import { spacing, createStyles, useColors } from './src/theme/theme';
 import { Snackbar } from './src/ui/Snackbar';
 
@@ -87,25 +79,8 @@ function TabBar() {
 function Screens() {
   const styles = useStyles();
   const { nav } = useApp();
-  const reducedMotion = useReducedMotion();
-  const reveal = useRef(new Animated.Value(1)).current;
-  const routeKey = `${nav.tab}:${JSON.stringify(nav.route)}`;
-
-  useEffect(() => {
-    if (reducedMotion) {
-      return;
-    }
-    reveal.setValue(0);
-    Animated.timing(reveal, {
-      toValue: 1,
-      duration: motionDuration.state,
-      easing: motionEasing.enter,
-      useNativeDriver: true,
-    }).start();
-  }, [reducedMotion, reveal, routeKey]);
-
   return (
-    <Animated.View style={[styles.screens, { opacity: reveal }]}>
+    <View style={styles.screens}>
       {nav.route?.name === 'collection' ? (
         <CollectionScreen collection={nav.route.ref} />
       ) : nav.route?.name === 'settings' ? (
@@ -117,7 +92,7 @@ function Screens() {
       ) : (
         <LibraryScreen />
       )}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -137,11 +112,7 @@ function AppContent() {
         bottom={insets.bottom + (music.currentTrack ? 140 : 76)}
         placement="app"
       />
-      <NowPlaying />
-      <QueueSheet />
-      <SleepTimerSheet />
-      <SpeedSheet />
-      <EqualizerSheet />
+      <PlaybackWindow />
       <ThemeSheet />
       <PaletteSheet />
       <TrackMenu />
@@ -158,11 +129,15 @@ export default function App({
   initialScreen?: Tab;
 }) {
   return (
-    <SafeAreaProvider>
-      <AppProvider initialTab={initialScreen}>
-        <AppContent />
-      </AppProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView>
+      <SafeAreaProvider>
+        <AppProvider initialTab={initialScreen}>
+          <PlaybackProgressProvider>
+            <AppContent />
+          </PlaybackProgressProvider>
+        </AppProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

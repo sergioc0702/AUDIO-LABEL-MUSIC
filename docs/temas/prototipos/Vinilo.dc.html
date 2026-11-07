@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tema Tornamesa: reproductor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'Bricolage Grotesque', sans-serif; background: {{p.bg}}; color: {{p.fg}}">
+  <div style="position: absolute; left: 0; right: 0; top: 40px; display: flex; justify-content: space-between; padding: 0 8px; z-index: 3">
+    <button aria-label="Cerrar reproductor" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+    <button aria-label="Añadir a favoritas" aria-pressed="{{fav}}" onClick="{{toggleFav}}" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; color: {{favColor}}">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="{{favFill}}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7.5-4.6-9.2-9A5 5 0 0 1 12 7a5 5 0 0 1 9.2 4c-1.7 4.4-9.2 9-9.2 9z"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 12px; top: 96px; width: 330px; height: 330px; border-radius: 50%; background: {{p.mat}}; box-shadow: 0 10px 24px rgba(0,0,0,.35)">
+    <svg width="330" height="330" viewBox="0 0 330 330" aria-hidden="true" style="display: block; transform: rotate({{strobe}}deg)">
+      <circle cx="165" cy="165" r="161" fill="none" stroke="{{p.ac}}" stroke-width="4" stroke-dasharray="3 9"></circle>
+    </svg>
+  </div>
+  <div style="position: absolute; left: 12px; top: 96px; width: 330px; height: 330px; transform: translateX({{discX}}px) rotate({{deg}}deg)">
+    <svg width="330" height="330" viewBox="0 0 330 330" aria-hidden="true" style="display: block">
+      <circle cx="165" cy="165" r="154" fill="#101012"></circle>
+      <circle cx="165" cy="165" r="142" fill="none" stroke="#2b2b30" stroke-width="1"></circle>
+      <circle cx="165" cy="165" r="128" fill="none" stroke="#26262b" stroke-width="1"></circle>
+      <circle cx="165" cy="165" r="114" fill="none" stroke="#2b2b30" stroke-width="1"></circle>
+      <circle cx="165" cy="165" r="100" fill="none" stroke="#26262b" stroke-width="1"></circle>
+      <circle cx="165" cy="165" r="86" fill="none" stroke="#2b2b30" stroke-width="1"></circle>
+      <path d="M165 11 A154 154 0 0 1 274 56 L222 108 A80 80 0 0 0 165 85 Z" fill="#ffffff" opacity=".06"></path>
+      <circle cx="165" cy="165" r="62" fill="{{t.c}}"></circle>
+      <path d="M165 103 A62 62 0 0 1 227 165 L165 165 Z" fill="{{t.a}}"></path>
+      <path d="M103 165 A62 62 0 0 0 165 227 L165 165 Z" fill="{{t.b}}"></path>
+      <circle cx="165" cy="165" r="6" fill="{{p.mat}}"></circle>
+    </svg>
+  </div>
+  <svg width="390" height="470" viewBox="0 0 390 470" aria-hidden="true" style="position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; transform-origin: 345px 105px; transform: rotate({{arm}}deg)">
+    <path d="M345 105 L345 300 L335 335" fill="none" stroke="{{p.arm}}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"></path>
+    <rect x="325" y="328" width="20" height="28" rx="3" fill="{{p.arm}}" transform="rotate(16 335 342)"></rect>
+    <circle cx="345" cy="105" r="17" fill="{{p.arm}}"></circle>
+    <circle cx="345" cy="105" r="6" fill="{{p.bg}}"></circle>
+  </svg>
+  <div style="position: absolute; left: 20px; right: 142px; top: 446px">
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700; line-height: 1.12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{t.title}}</h1>
+    <p style="margin: 2px 0 0; font-size: 17px; font-weight: 500; color: {{p.sub}}">{{t.artist}}</p>
+  </div>
+  <div aria-hidden="true" style="position: absolute; right: 20px; top: 444px; width: 112px; height: 70px; border-radius: 6px; background: {{p.meter}}; overflow: hidden">
+    <svg width="112" height="70" viewBox="0 0 112 70" style="display: block">
+      <path d="M12 56 A44 44 0 0 1 100 56" fill="none" stroke="{{p.meterInk}}" stroke-width="1.5"></path>
+      <path d="M82 25 A44 44 0 0 1 100 56" fill="none" stroke="#c8321f" stroke-width="4"></path>
+      <path d="M56 66 L 56 22" stroke="{{p.meterInk}}" stroke-width="2.4" stroke-linecap="round" transform="rotate({{vu}} 56 66)"></path>
+      <circle cx="56" cy="66" r="6" fill="{{p.meterInk}}"></circle>
+    </svg>
+  </div>
+  <button aria-label="Cambiar la posición de la canción" onClick="{{seek}}" style="position: absolute; left: 20px; right: 20px; top: 526px; height: 44px; display: block">
+    <span style="position: absolute; left: 0; right: 0; top: 19px; height: 6px; border-radius: 3px; background: {{p.line}}"></span>
+    <span style="position: absolute; left: 0; top: 19px; height: 6px; border-radius: 3px; width: {{pct}}%; background: {{p.ac}}"></span>
+  </button>
+  <div style="position: absolute; left: 20px; right: 20px; top: 566px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; color: {{p.sub}}">
+    <span>{{now}}</span><span>{{total}}</span>
+  </div>
+  <div style="position: absolute; left: 20px; right: 20px; top: 606px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+    <button aria-label="Mezclar" aria-pressed="{{shuffle}}" onClick="{{toggleShuffle}}" style="height: 80px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{p.key}}; box-shadow: 0 3px 0 {{p.keyEdge}}; color: {{shuffleColor}}">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h4l10 10h4"></path><path d="M3 17h4l3-3"></path><path d="M14 10l3-3h4"></path><path d="m18 4 3 3-3 3"></path><path d="m18 14 3 3-3 3"></path></svg>
+    </button>
+    <button aria-label="Canción anterior" onClick="{{prev}}" style="height: 80px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{p.key}}; box-shadow: 0 3px 0 {{p.keyEdge}}">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2.5v14H6zM19 5v14L9 12z"></path></svg>
+    </button>
+    <button aria-label="{{playLabel}}" onClick="{{toggle}}" style="height: 80px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{p.ac}}; color: {{p.on}}; box-shadow: 0 3px 0 {{p.keyEdge}}">
+      <sc-if value="{{playing}}" hint-placeholder-val="{{ true }}">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+      </sc-if>
+      <sc-if value="{{paused}}" hint-placeholder-val="{{ false }}">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>
+      </sc-if>
+    </button>
+    <button aria-label="Canción siguiente" onClick="{{next}}" style="height: 80px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{p.key}}; box-shadow: 0 3px 0 {{p.keyEdge}}">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 5H18v14h-2.5zM5 5l10 7-10 7z"></path></svg>
+    </button>
+    <button aria-label="Repetir" aria-pressed="{{repeat}}" onClick="{{toggleRepeat}}" style="height: 80px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{p.key}}; box-shadow: 0 3px 0 {{p.keyEdge}}; color: {{repeatColor}}">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"></path><path d="M3 11V9a3 3 0 0 1 3-3h15"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v2a3 3 0 0 1-3 3H3"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 12px; right: 12px; top: 708px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr))">
+    <button onClick="{{openQueue}}" style="height: 64px; font-size: 14px; font-weight: 500">Cola · 31</button>
+    <button onClick="{{cycleSleep}}" style="height: 64px; font-size: 14px; font-weight: 500; color: {{sleepColor}}">{{sleep}}</button>
+    <button onClick="{{cycleRate}}" style="height: 64px; font-size: 14px; font-weight: 500; color: {{rateColor}}">{{rate}}×</button>
+    <button onClick="{{toggleEq}}" style="height: 64px; font-size: 14px; font-weight: 500; color: {{eqColor}}">Ecualizador</button>
+  </div>
+  <sc-if value="{{queueOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; top: 420px; z-index: 4; background: {{p.sheet}}; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; padding: 12px 0 16px">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 24px">
+        <h2 style="margin: 0; font-size: 24px; font-weight: 700">A continuación</h2>
+        <button aria-label="Cerrar cola" onClick="{{closeQueue}}" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <sc-for list="{{list}}" as="item" hint-placeholder-count="4">
+        <button onClick="{{item.pick}}" style="display: flex; align-items: center; justify-content: space-between; min-height: 64px; padding: 0 24px; text-align: left">
+          <span style="font-size: 18px; font-weight: 700; color: {{item.color}}">{{item.title}}</span>
+          <span style="font-size: 15px; color: {{p.sub}}">{{item.artist}}</span>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"paleta":{"editor":"enum","options":["Nogal","Aluminio","Mesa verde","Cerezo","Crema","Medianoche"],"default":"Nogal"},"$preview":{"width":390,"height":844}}'>
+const TRACKS = [
+  { title: 'Luz de agosto', artist: 'Marea Alta', dur: 214, a: '#e4572e', b: '#f3c14b', c: '#17324d' },
+  { title: 'Sal y cobre', artist: 'Los Faros', dur: 188, a: '#2a9d8f', b: '#e9c46a', c: '#143a3a' },
+  { title: 'Última línea', artist: 'Noa Reyes', dur: 241, a: '#c1467e', b: '#f4a3b5', c: '#3a1737' },
+  { title: 'Ruta once', artist: 'Marea Alta', dur: 203, a: '#4f7cff', b: '#a7c4ff', c: '#141f4d' },
+];
+const PALETTES = {
+  'Nogal': { bg: '#3a2417', sheet: '#4a2f1f', mat: '#26170e', key: '#54382a', keyEdge: '#21130b', arm: '#d8c9b4', fg: '#f7ecdd', sub: '#d9c6ad', ac: '#f2a33c', on: '#2a1606', line: '#5e4131', meter: '#f3e3c3', meterInk: '#2a1606' },
+  'Aluminio': { bg: '#d5d7d9', sheet: '#c6c8cb', mat: '#a9acb0', key: '#e9eaec', keyEdge: '#9b9ea2', arm: '#2b2d30', fg: '#17181a', sub: '#44474b', ac: '#c62f19', on: '#ffffff', line: '#aeb1b5', meter: '#fffdf4', meterInk: '#17181a' },
+  'Mesa verde': { bg: '#12362c', sheet: '#1a463a', mat: '#0b241d', key: '#1d4d40', keyEdge: '#091c16', arm: '#e6dcc2', fg: '#f0efe2', sub: '#bcd0c0', ac: '#e8c35a', on: '#1c1604', line: '#2a5d4f', meter: '#ece3c8', meterInk: '#1c1604' },
+  'Cerezo': { bg: '#4a1a1f', sheet: '#5a242a', mat: '#2c0d11', key: '#662b31', keyEdge: '#250a0e', shelf: '#7a3a3f', shelfEdge: '#250a0e', arm: '#e8d6c4', fg: '#fbeee3', sub: '#e0c5b8', ac: '#f0b35c', on: '#2c1404', line: '#6e3a40', meter: '#f5e6c8', meterInk: '#2c1404' },
+  'Crema': { bg: '#efe3cf', sheet: '#e3d4ba', mat: '#cdb999', key: '#f8efe0', keyEdge: '#b9a483', shelf: '#a58c68', shelfEdge: '#7c6547', arm: '#3a2a1c', fg: '#2a1d12', sub: '#5a4632', ac: '#a8481c', on: '#ffffff', line: '#c7b494', meter: '#fffaf0', meterInk: '#2a1d12' },
+  'Medianoche': { bg: '#141a2e', sheet: '#1d2540', mat: '#0b0f1e', key: '#252e4e', keyEdge: '#070a15', shelf: '#39436a', shelfEdge: '#070a15', arm: '#cfd6e6', fg: '#eef1f8', sub: '#b4bdd3', ac: '#6fc3ff', on: '#06202f', line: '#323c60', meter: '#e9edf5', meterInk: '#0b0f1e' },
+};
+const SLEEP = ['Dormir', '15 min', '30 min', '60 min'];
+const RATES = [1, 1.25, 1.5, 2, 0.75];
+const FULL_SPEED = 6;
+const SWAP_FRAMES = 26;
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.deg = 0;
+    this.speed = FULL_SPEED;
+    this.armAngle = 20;
+    this.vu = -10;
+    this.state = { i: 0, pos: 71, playing: true, frame: 0, swap: 0, pending: null, shuffle: false, repeat: false, fav: false, queue: false, sleep: 0, rate: 0, eq: true };
+  }
+  componentDidMount() {
+    this.timer = setInterval(() => this.tick(), 33);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  tick() {
+    const s = this.state;
+    const running = s.playing && s.swap === 0;
+    this.speed += ((running ? FULL_SPEED : 0) - this.speed) * 0.05;
+    this.deg = (this.deg + this.speed) % 360;
+    const dur = TRACKS[s.i].dur;
+    const next = { frame: s.frame + 1 };
+    const target = running ? 12 + (s.pos / dur) * 22 : 0;
+    this.armAngle += (target - this.armAngle) * 0.12;
+    const level = running ? -28 + 40 * Math.abs(Math.sin(s.frame * 0.19) * Math.sin(s.frame * 0.043 + 1)) + Math.sin(s.frame * 0.9) * 4 : -44;
+    this.vu += (level - this.vu) * 0.22;
+    if (s.swap > 0) {
+      next.swap = s.swap - 1;
+      if (s.swap === Math.floor(SWAP_FRAMES / 2) && s.pending !== null) {
+        next.i = s.pending;
+        next.pos = 0;
+        next.pending = null;
+      }
+    } else if (s.playing) {
+      const pos = s.pos + 0.033 * RATES[s.rate];
+      if (pos >= dur) {
+        this.go(1);
+        return;
+      }
+      next.pos = pos;
+    }
+    this.setState(next);
+  }
+  change(i) {
+    this.setState({ swap: SWAP_FRAMES, pending: i, queue: false });
+  }
+  go(step) {
+    this.change((this.state.i + step + TRACKS.length) % TRACKS.length);
+  }
+  renderVals() {
+    const s = this.state;
+    const t = TRACKS[s.i];
+    const p = PALETTES[this.props.paleta ?? 'Nogal'] ?? PALETTES['Nogal'];
+    const half = SWAP_FRAMES / 2;
+    const leaving = s.swap > half;
+    const travel = s.swap === 0 ? 0 : leaving ? (SWAP_FRAMES - s.swap) / half : s.swap / half;
+    const eased = 1 - Math.pow(1 - travel, 3);
+    return {
+      t, p,
+      pct: (s.pos / t.dur) * 100,
+      deg: Math.round(this.deg * 10) / 10,
+      strobe: Math.round(this.deg * 0.25 * 10) / 10,
+      discX: Math.round(eased * (leaving ? 430 : -430)),
+      arm: Math.round(this.armAngle * 10) / 10,
+      vu: Math.round(this.vu * 10) / 10,
+      now: fmt(s.pos), total: fmt(t.dur),
+      playing: s.playing, paused: !s.playing,
+      playLabel: s.playing ? 'Pausar' : 'Reproducir',
+      shuffle: s.shuffle, shuffleColor: s.shuffle ? p.ac : p.fg,
+      repeat: s.repeat, repeatColor: s.repeat ? p.ac : p.fg,
+      fav: s.fav, favColor: s.fav ? p.ac : p.fg, favFill: s.fav ? 'currentColor' : 'none',
+      sleep: SLEEP[s.sleep], sleepColor: s.sleep ? p.ac : p.fg,
+      rate: RATES[s.rate], rateColor: s.rate ? p.ac : p.fg,
+      eqColor: s.eq ? p.ac : p.fg,
+      queueOpen: s.queue,
+      list: TRACKS.map((x, i) => ({ ...x, color: i === s.i ? p.ac : p.fg, pick: () => this.change(i) })),
+      toggle: () => this.setState({ playing: !s.playing }),
+      next: () => this.go(1),
+      prev: () => (s.pos > 3 ? this.setState({ pos: 0 }) : this.go(-1)),
+      toggleShuffle: () => this.setState({ shuffle: !s.shuffle }),
+      toggleRepeat: () => this.setState({ repeat: !s.repeat }),
+      toggleFav: () => this.setState({ fav: !s.fav }),
+      openQueue: () => this.setState({ queue: true }),
+      closeQueue: () => this.setState({ queue: false }),
+      cycleSleep: () => this.setState({ sleep: (s.sleep + 1) % SLEEP.length }),
+      cycleRate: () => this.setState({ rate: (s.rate + 1) % RATES.length }),
+      toggleEq: () => this.setState({ eq: !s.eq }),
+      seek: e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        this.setState({ pos: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * t.dur });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

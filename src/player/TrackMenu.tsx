@@ -401,7 +401,6 @@ export function PlaylistTrackPicker() {
                 accessibilityLabel={`${item.title} de ${item.artist}`}
                 accessibilityState={{ checked: selected }}
                 onPress={() => toggleDraftPlaylistTrack(item.id)}
-                pressedScale={0.985}
                 style={styles.pickerRow}
               >
                 <Cover size={48} uri={item.artwork} />

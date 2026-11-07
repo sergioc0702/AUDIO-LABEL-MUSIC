@@ -37,11 +37,13 @@ export function NowPlayingBars({ isPlaying }: { isPlaying: boolean }) {
           Animated.timing(bar, {
             toValue: 1,
             duration: 320 + index * 90,
+            isInteraction: false,
             useNativeDriver: true,
           }),
           Animated.timing(bar, {
             toValue: 0.3,
             duration: 300 + index * 70,
+            isInteraction: false,
             useNativeDriver: true,
           }),
         ]),
@@ -101,7 +103,6 @@ export const TrackRow = memo(function TrackRowContent({
         android_ripple={{ color: colors.ripple }}
         onLongPress={onMore}
         onPress={onPress}
-        pressedScale={0.985}
         style={styles.rowMain}
       >
         <Cover uri={track.artwork} size={48} />
@@ -154,7 +155,6 @@ export function ListRow({
         accessibilityLabel={accessibilityLabel ?? title}
         android_ripple={{ color: colors.ripple }}
         onPress={onPress}
-        pressedScale={0.985}
         style={styles.rowMain}
       >
         {leading}

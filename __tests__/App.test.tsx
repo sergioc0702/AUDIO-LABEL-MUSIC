@@ -4,7 +4,7 @@
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Alert, BackHandler, DeviceEventEmitter } from 'react-native';
+import { Alert, BackHandler, DeviceEventEmitter, Modal } from 'react-native';
 import TrackPlayer, {
   useActiveTrack,
   type Track as PlayerTrack,
@@ -73,6 +73,7 @@ jest.mock('react-native-track-player', () => ({
     getProgress: jest.fn().mockResolvedValue({ position: 0 }),
     getRepeatMode: jest.fn().mockResolvedValue(0),
     move: jest.fn().mockResolvedValue(undefined),
+    moveTracks: jest.fn().mockResolvedValue(undefined),
     remove: jest.fn().mockResolvedValue(undefined),
     skip: jest.fn().mockResolvedValue(undefined),
     play: jest.fn().mockResolvedValue(undefined),
@@ -244,6 +245,12 @@ function mockLiveQueue(tracks: Track[]) {
     const [moved] = queue.splice(from, 1);
     queue.splice(to, 0, moved);
   });
+  jest.mocked(TrackPlayer.moveTracks).mockImplementation(async moves => {
+    for (const { from, to } of moves) {
+      const [moved] = queue.splice(from, 1);
+      queue.splice(to, 0, moved);
+    }
+  });
   jest.mocked(TrackPlayer.remove).mockImplementation(async index => {
     queue.splice(index as number, 1);
   });
@@ -260,6 +267,7 @@ beforeEach(() => {
   jest.mocked(useActiveTrack).mockReset().mockReturnValue(undefined);
   jest.mocked(TrackPlayer.getQueue).mockReset().mockResolvedValue([]);
   jest.mocked(TrackPlayer.move).mockReset().mockResolvedValue(undefined);
+  jest.mocked(TrackPlayer.moveTracks).mockReset().mockResolvedValue(undefined);
   jest.mocked(TrackPlayer.remove).mockReset().mockResolvedValue(undefined);
   jest
     .mocked(TrackPlayer.getActiveTrackIndex)
@@ -397,7 +405,7 @@ test('search groups results and ignores accents', async () => {
   const input = renderer.root.findAll(
     node =>
       node.props.accessibilityLabel ===
-        'Buscar canciones, artistas o álbumes' &&
+        'Buscar canciones, artistas, álbumes o listas' &&
       typeof node.props.onChangeText === 'function',
     { deep: false },
   )[0];
@@ -514,6 +522,7 @@ test('shuffle keeps the current song and restores the order after a library refr
   await press('Activar mezcla');
   randomSpy.mockRestore();
   expect(queue.map(item => item.id)).toEqual(['1', '3', '2']);
+  expect(TrackPlayer.moveTracks).toHaveBeenCalledTimes(1);
 
   await ReactTestRenderer.act(async () => {
     DeviceEventEmitter.emit('musicLibraryChanged');
@@ -762,6 +771,88 @@ test('renames and deletes a list without touching its audio', async () => {
   expect(deleteTrackFromDevice).not.toHaveBeenCalled();
 });
 
+test('shuffle starts from the live native queue when React state is stale', async () => {
+  const tracks = ['1', '2', '3'].map(id => makeTrack(id));
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  const queue = mockLiveQueue(tracks);
+  setActive(tracks[0]);
+  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  await renderApp('library');
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  queue.splice(1, 2, queue[2], queue[1]);
+  await press('Activar mezcla');
+  randomSpy.mockRestore();
+
+  expect(queue.map(item => item.id)).toEqual(['1', '2', '3']);
+});
+
+test('shuffle restores the original order when a native move fails halfway', async () => {
+  const tracks = ['1', '2', '3', '4', '5'].map(id => makeTrack(id));
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  const queue = mockLiveQueue(tracks);
+  setActive(tracks[0]);
+  jest.mocked(TrackPlayer.moveTracks).mockImplementationOnce(async moves => {
+    const firstMove = moves[0];
+    if (firstMove) {
+      const [moved] = queue.splice(firstMove.from, 1);
+      queue.splice(firstMove.to, 0, moved);
+    }
+    throw new Error('fallo nativo');
+  });
+  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  await renderApp('library');
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  await press('Activar mezcla');
+  randomSpy.mockRestore();
+
+  expect(queue.map(item => item.id)).toEqual(['1', '2', '3', '4', '5']);
+  expect(hasLabel('Activar mezcla')).toBe(true);
+  expect(screenText()).toContain('fallo nativo');
+});
+
+test('ignores a second shuffle tap while the first native reorder is pending', async () => {
+  const tracks = ['1', '2', '3', '4', '5'].map(id => makeTrack(id));
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  const queue = mockLiveQueue(tracks);
+  setActive(tracks[0]);
+  const pendingMove: { release?: () => void } = {};
+  jest.mocked(TrackPlayer.moveTracks).mockImplementationOnce(moves => {
+    return new Promise(resolve => {
+      pendingMove.release = () => {
+        for (const { from, to } of moves) {
+          const [moved] = queue.splice(from, 1);
+          queue.splice(to, 0, moved);
+        }
+        resolve();
+      };
+    });
+  });
+  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  await renderApp('library');
+  await press('Abrir reproductor: Tema 1 de Artista');
+  const shuffleButton = byLabel('Activar mezcla')[0];
+  let firstOperation!: Promise<void>;
+
+  await ReactTestRenderer.act(async () => {
+    firstOperation = shuffleButton.props.onPress();
+    await Promise.resolve();
+  });
+  expect(hasLabel('Desactivar mezcla')).toBe(true);
+  await ReactTestRenderer.act(async () => {
+    await shuffleButton.props.onPress();
+  });
+  pendingMove.release?.();
+  await ReactTestRenderer.act(async () => {
+    await firstOperation;
+  });
+  randomSpy.mockRestore();
+
+  expect(queue.map(item => item.id)).toEqual(['1', '3', '4', '5', '2']);
+  expect(hasLabel('Desactivar mezcla')).toBe(true);
+});
+
 test('removes a song from the queue and can undo it', async () => {
   const tracks = ['1', '2'].map(id => makeTrack(id));
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
@@ -779,6 +870,28 @@ test('removes a song from the queue and can undo it', async () => {
     expect.objectContaining({ id: '2' }),
     1,
   );
+});
+
+test('closes the queue before the player in the same playback window', async () => {
+  const tracks = ['1', '2'].map(id => makeTrack(id));
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  mockLiveQueue(tracks);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+  await press('Abrir cola de reproducción con 2 canciones');
+
+  const windows = () => renderer.root.findAllByType(Modal).filter(node => node.props.visible);
+  expect(windows()).toHaveLength(1);
+  expect(hasLabel('Cerrar cola')).toBe(true);
+
+  await ReactTestRenderer.act(async () => windows()[0].props.onRequestClose());
+  expect(hasLabel('Cerrar cola')).toBe(false);
+  expect(hasLabel('Cerrar reproductor')).toBe(true);
+
+  await ReactTestRenderer.act(async () => windows()[0].props.onRequestClose());
+  expect(windows()).toHaveLength(0);
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
 });
 
 test('picks a palette in the settings and saves it', async () => {

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tema Taquilla: Inicio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&amp;family=Courier+Prime:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'Courier Prime', monospace; background: {{p.bg}}; color: {{p.fg}}">
+  <div style="position: absolute; left: 20px; right: 8px; top: 44px; display: flex; align-items: center; justify-content: space-between">
+    <h1 style="margin: 0; font-family: 'Alfa Slab One', serif; font-weight: 400; font-size: 34px; line-height: 1.05; text-transform: uppercase">Buenos días</h1>
+    <button aria-label="Ajustes" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 20px; right: 20px; top: 112px; display: flex; flex-direction: column; gap: 8px">
+    <sc-for list="{{tickets}}" as="k" hint-placeholder-count="6">
+      <button style="position: relative; height: 72px; border-radius: 8px; display: grid; grid-template-columns: minmax(0, 1fr) 76px; align-items: center; text-align: left; overflow: hidden; background: {{p.paper}}; color: {{p.ink}}">
+        <span style="padding: 0 18px; font-family: 'Alfa Slab One', serif; font-size: 19px; line-height: 1.1; text-transform: uppercase">{{k.label}}</span>
+        <span style="height: 72px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-left: 3px dashed {{p.perf}}; font-size: 20px; font-weight: 700">{{k.count}}</span>
+        <span style="position: absolute; right: 64px; top: -11px; width: 22px; height: 22px; border-radius: 50%; background: {{p.bg}}"></span>
+        <span style="position: absolute; right: 64px; bottom: -11px; width: 22px; height: 22px; border-radius: 50%; background: {{p.bg}}"></span>
+      </button>
+    </sc-for>
+  </div>
+  <div style="position: absolute; left: 20px; right: 20px; top: 608px; height: 108px; border-radius: 8px; overflow: hidden; display: grid; grid-template-columns: 108px minmax(0, 1fr) 72px; background: {{p.paper}}; color: {{p.ink}}">
+    <svg width="108" height="108" viewBox="0 0 108 108" aria-hidden="true" style="display: block">
+      <rect width="108" height="108" fill="#17324d"></rect>
+      <circle cx="72" cy="42" r="38" fill="#e4572e"></circle>
+      <path d="M-4 78 C 26 52 54 96 112 62 L 112 112 L -4 112 Z" fill="#f3c14b"></path>
+    </svg>
+    <div style="padding: 0 10px; display: flex; flex-direction: column; justify-content: center; min-width: 0">
+      <p style="margin: 0; font-size: 13px">Sonando</p>
+      <p style="margin: 0; font-family: 'Alfa Slab One', serif; font-size: 17px; line-height: 1.15; text-transform: uppercase">Luz de agosto</p>
+      <p style="margin: 2px 0 0; font-size: 14px">Marea Alta</p>
+    </div>
+    <button aria-label="Pausar" style="display: flex; align-items: center; justify-content: center; border-left: 3px dashed {{p.perf}}">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 12px; right: 12px; top: 730px; height: 72px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+    <sc-for list="{{tabs}}" as="tab" hint-placeholder-count="3">
+      <button style="font-size: 16px; font-weight: 700; color: {{tab.fg}}">{{tab.label}}</button>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"paleta":{"editor":"enum","options":["Taquilla rosa","Verde función","Kraft","Azul platea","Amarillo palco","Lila"],"default":"Taquilla rosa"},"$preview":{"width":390,"height":844}}'>
+const PALETTES = {
+  'Taquilla rosa': { bg: '#2b1030', paper: '#ffc2d4', ink: '#2b1030', perf: '#8a4d68', fg: '#ffe9f0', ac: '#ffc2d4', dim: '#d9a8bc' },
+  'Verde función': { bg: '#0f2a22', paper: '#bfe8c4', ink: '#0f2a22', perf: '#4f7f60', fg: '#e5f6e7', ac: '#bfe8c4', dim: '#a5c9ae' },
+  'Kraft': { bg: '#1c1712', paper: '#d9b98a', ink: '#23180c', perf: '#7a5a34', fg: '#f3e6d0', ac: '#f0c27a', dim: '#c4b298' },
+  'Azul platea': { bg: '#0f1f4a', paper: '#bcd7ff', ink: '#0f1f4a', perf: '#4f6ea8', faded: '#8fb2e6', fg: '#e7f0ff', ac: '#bcd7ff', stamp: '#1a3fa8', dim: '#a9bfe6' },
+  'Amarillo palco': { bg: '#2a2000', paper: '#ffd84d', ink: '#2a2000', perf: '#8c7420', faded: '#e3bb33', fg: '#fff5cf', ac: '#ffd84d', stamp: '#a81f18', dim: '#d9c98f' },
+  'Lila': { bg: '#231238', paper: '#d9c2ff', ink: '#231238', perf: '#6f4fa0', faded: '#b799e6', fg: '#efe6ff', ac: '#d9c2ff', stamp: '#5c1a9c', dim: '#bfa9dc' },
+};
+const TICKETS = [
+  { label: 'Favoritas', count: '12' },
+  { label: 'Mezclar todo', count: '37' },
+  { label: 'Más escuchadas', count: '20' },
+  { label: 'Recientes', count: '8' },
+  { label: 'Añadidas', count: '37' },
+  { label: 'Tus listas', count: '3' },
+];
+class Component extends DCLogic {
+  renderVals() {
+    const p = PALETTES[this.props.paleta ?? 'Taquilla rosa'] ?? PALETTES['Taquilla rosa'];
+    return {
+      p,
+      tickets: TICKETS,
+      tabs: ['Inicio', 'Buscar', 'Biblioteca'].map((label, index) => ({ label, fg: index === 0 ? p.ac : p.dim })),
+    };
+  }
+}
+</script>
+</body>
+</html>

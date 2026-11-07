@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { FlatList, ScrollView, Switch, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import {
   getSleepTimer,
@@ -13,14 +13,17 @@ import { useApp } from '../state/AppContext';
 import { playbackRates } from '../state/useMusicController';
 import { appThemes } from '../theme/themes';
 import { radius, spacing, createStyles, useColors } from '../theme/theme';
-import type { Track } from '../types/Track';
 import { Button } from '../ui/Buttons';
 import { Sheet, SheetAction } from '../ui/Sheet';
 import { Snackbar } from '../ui/Snackbar';
 import { Tap } from '../ui/Tap';
 import { formatTime } from '../utils/formatTime';
 import { formatTrackCount } from '../utils/formatTrackCount';
-import { EqualizerBandControl, QueueTrackRow } from './controls';
+import { currentLyricIndex, parseLrc } from '../utils/lyrics';
+import { EqualizerBandControl } from './controls';
+import { PlaybackPanel } from './PlaybackPanel';
+import { usePlaybackProgress } from './PlaybackProgress';
+import { PlaybackQueue } from './PlaybackQueue';
 
 const equalizerBands = [
   { label: 'Graves', frequency: '60 Hz' },
@@ -60,14 +63,12 @@ export function useSleepTimer() {
 }
 
 export function SleepTimerSheet() {
-  const { playerSheet, setPlayerSheet, music } = useApp();
+  const { setPlayerSheet, music } = useApp();
   const { timer, secondsLeft } = useSleepTimer();
   const close = () => setPlayerSheet(null);
 
   return (
-    <Sheet
-      closeLabel="Cerrar temporizador"
-      onClose={close}
+    <PlaybackPanel
       subtitle={
         timer.mode === 'time'
           ? `Se pausará en ${formatTime(secondsLeft)}`
@@ -76,7 +77,6 @@ export function SleepTimerSheet() {
           : 'Pausa la música automáticamente'
       }
       title="Temporizador"
-      visible={playerSheet === 'sleep'}
     >
       {[15, 30, 45, 60, 90].map(minutes => (
         <SheetAction
@@ -112,20 +112,16 @@ export function SleepTimerSheet() {
           }}
         />
       ) : null}
-    </Sheet>
+    </PlaybackPanel>
   );
 }
 
 export function SpeedSheet() {
   const { colors } = useColors();
-  const { playerSheet, setPlayerSheet, music } = useApp();
+  const { setPlayerSheet, music } = useApp();
 
   return (
-    <Sheet
-      onClose={() => setPlayerSheet(null)}
-      title="Velocidad de reproducción"
-      visible={playerSheet === 'speed'}
-    >
+    <PlaybackPanel title="Velocidad de reproducción">
       {playbackRates.map(rate => (
         <SheetAction
           key={rate}
@@ -142,26 +138,25 @@ export function SpeedSheet() {
           }
         />
       ))}
-    </Sheet>
+    </PlaybackPanel>
   );
 }
 
 export function EqualizerSheet() {
+  const { fontScale } = useWindowDimensions();
   const { colors, type } = useColors();
   const styles = useStyles();
-  const { playerSheet, setPlayerSheet, music } = useApp();
+  const { music } = useApp();
   const { equalizerSettings, updateEqualizerSettings, changeEqualizerBand } =
     music;
 
   return (
-    <Sheet
-      closeLabel="Cerrar ecualizador"
-      onClose={() => setPlayerSheet(null)}
-      visible={playerSheet === 'equalizer'}
-    >
+    <PlaybackPanel title="Ecualizador">
       <View style={styles.equalizer}>
         <View style={styles.equalizerHeader}>
-          <Text style={type.title}>Ecualizador</Text>
+          <Text style={type.bodyStrong}>
+            {equalizerSettings.enabled ? 'Activado' : 'Desactivado'}
+          </Text>
           <Switch
             accessibilityLabel="Activar ecualizador"
             onValueChange={enabled =>
@@ -192,12 +187,14 @@ export function EqualizerSheet() {
                     bandGainsDb: [...preset.gains],
                   })
                 }
-                style={[styles.preset, selected && styles.presetSelected]}
+                style={[
+                  styles.preset,
+                  { minWidth: 66 * fontScale },
+                  selected && styles.presetSelected,
+                ]}
               >
                 <Text
-                  adjustsFontSizeToFit
-                  numberOfLines={1}
-                  style={[type.label, selected && styles.presetSelectedText]}
+                  style={[type.label, styles.presetText, selected && styles.presetSelectedText]}
                 >
                   {preset.name}
                 </Text>
@@ -218,7 +215,147 @@ export function EqualizerSheet() {
           ))}
         </View>
       </View>
-    </Sheet>
+    </PlaybackPanel>
+  );
+}
+
+export function LyricsSheet() {
+  const { type } = useColors();
+  const styles = useStyles();
+  const { playerSheet, music } = useApp();
+  const { currentTrack, importTrackLyrics, getTrackLyrics, deleteTrackLyrics } =
+    music;
+  const [contents, setContents] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const visible = playerSheet === 'lyrics';
+  const trackId = currentTrack?.id;
+  const liveTrackId = useRef(trackId);
+  liveTrackId.current = trackId;
+  const lines = useMemo(() => parseLrc(contents ?? ''), [contents]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!visible || !trackId) {
+      return () => {
+        mounted = false;
+      };
+    }
+    setLoading(true);
+    setLoadError(null);
+    setContents(null);
+    getTrackLyrics(trackId)
+      .then(value => {
+        if (mounted) setContents(value);
+      })
+      .catch(error => {
+        if (mounted) {
+          setContents(null);
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : 'No se pudieron cargar las letras.',
+          );
+        }
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [getTrackLyrics, trackId, visible]);
+
+  async function chooseLyrics() {
+    if (!currentTrack) return;
+    if (await importTrackLyrics(currentTrack)) {
+      try {
+        const next = await getTrackLyrics(currentTrack.id);
+        if (liveTrackId.current === currentTrack.id) {
+          setContents(next);
+          setLoadError(null);
+        }
+      } catch (error) {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : 'No se pudieron cargar las letras.',
+        );
+      }
+    }
+  }
+
+  return (
+    <PlaybackPanel
+      scroll={false}
+      subtitle={currentTrack?.artist}
+      title={currentTrack?.title ?? 'Letras'}
+    >
+      {loading ? (
+        <Text style={[type.secondary, styles.lyricsMessage]}>
+          Cargando letras…
+        </Text>
+      ) : loadError ? (
+        <Text
+          accessibilityRole="alert"
+          style={[type.secondary, styles.lyricsMessage]}
+        >
+          {loadError}
+        </Text>
+      ) : lines.length === 0 ? (
+        <Text style={[type.secondary, styles.lyricsMessage]}>
+          Aún no hay letras locales para esta canción.
+        </Text>
+      ) : (
+        <SyncedLyrics lines={lines} />
+      )}
+      <View style={styles.lyricsActions}>
+        <Button
+          label="Importar archivo LRC"
+          multiline
+          onPress={chooseLyrics}
+          variant="tonal"
+        />
+        {contents && currentTrack ? (
+          <Button
+            label="Eliminar letras"
+            multiline
+            onPress={async () => {
+              if (await deleteTrackLyrics(currentTrack.id)) setContents(null);
+            }}
+            variant="tonal"
+          />
+        ) : null}
+      </View>
+    </PlaybackPanel>
+  );
+}
+
+function SyncedLyrics({ lines }: { lines: ReturnType<typeof parseLrc> }) {
+  const { colors, type } = useColors();
+  const styles = useStyles();
+  const { position } = usePlaybackProgress();
+  const activeIndex = currentLyricIndex(lines, position);
+
+  return (
+    <ScrollView contentContainerStyle={styles.lyricsLines}>
+      {lines.map((line, index) => {
+        const active = index === activeIndex;
+        return (
+          <Text
+            accessibilityState={{ selected: active }}
+            key={`${line.timeMs}-${index}`}
+            style={[
+              active ? type.title : type.body,
+              { color: active ? colors.accent : colors.textSecondary },
+              styles.lyricLine,
+            ]}
+          >
+            {line.text}
+          </Text>
+        );
+      })}
+    </ScrollView>
   );
 }
 
@@ -316,12 +453,11 @@ export function PaletteSheet() {
 }
 
 export function QueueSheet() {
-  const { type } = useColors();
   const styles = useStyles();
+  const { width, fontScale } = useWindowDimensions();
+  const stacked = width < 340 && fontScale > 1.25;
   const { music } = useApp();
   const {
-    queueVisible,
-    setQueueVisible,
     playbackQueue,
     currentTrack,
     queueUpdating,
@@ -331,117 +467,43 @@ export function QueueSheet() {
     moveQueueTrack,
     removeQueueTrack,
   } = music;
-  const [draggingTrackId, setDraggingTrackId] = useState<string | null>(null);
-  const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
-  const listRef = useRef<FlatList<Track>>(null);
-  const scrollOffset = useRef(0);
-  const contentHeight = useRef(0);
-  const viewportHeight = useRef(0);
-
-  function updateDrag(trackId: string | null, targetIndex: number | null) {
-    setDraggingTrackId(current => (current === trackId ? current : trackId));
-    setDragTargetIndex(current =>
-      current === targetIndex ? current : targetIndex,
-    );
-  }
-
-  function scrollQueueBy(delta: number) {
-    const maxOffset = Math.max(
-      0,
-      contentHeight.current - viewportHeight.current,
-    );
-    const offset = Math.max(
-      0,
-      Math.min(scrollOffset.current + delta, maxOffset),
-    );
-    if (offset !== scrollOffset.current) {
-      scrollOffset.current = offset;
-      listRef.current?.scrollToOffset({ offset, animated: false });
-    }
-  }
 
   return (
-    <Sheet
-      closeLabel="Cerrar cola"
-      onClose={() => setQueueVisible(false)}
-      sheetStyle={styles.queueSheet}
+    <PlaybackPanel
+      scroll={false}
       subtitle={`${formatTrackCount(playbackQueue.length)} en la cola`}
       title="A continuación"
-      visible={queueVisible}
     >
-      <View style={styles.queueActions}>
+      <View style={[styles.queueActions, stacked && styles.stackedQueueActions]}>
         <Button
           accessibilityLabel="Guardar cola como lista"
           disabled={playbackQueue.length === 0 || queueUpdating}
           label="Guardar como lista"
+          multiline
           onPress={saveQueueAsPlaylist}
-          style={styles.queueAction}
+          style={[styles.queueAction, stacked && styles.stackedQueueAction]}
           variant="tonal"
         />
         <Button
           accessibilityLabel="Vaciar canciones siguientes"
           disabled={playbackQueue.length <= 1 || queueUpdating}
           label="Vaciar siguientes"
+          multiline
           onPress={confirmClearQueue}
-          style={styles.queueAction}
+          style={[styles.queueAction, stacked && styles.stackedQueueAction]}
           variant="tonal"
         />
       </View>
-      <View
-        onLayout={event => {
-          viewportHeight.current = event.nativeEvent.layout.height;
-        }}
-        style={styles.queueList}
-      >
-        <FlatList
-          ref={listRef}
-          data={playbackQueue}
-          initialNumToRender={12}
-          // Android detaches rows scrolled out of view, and the dragged row must stay.
-          removeClippedSubviews={false}
-          keyExtractor={track => track.id}
-          ListEmptyComponent={
-            <Text style={[type.secondary, styles.queueEmpty]}>
-              No hay canciones en la cola.
-            </Text>
-          }
-          maxToRenderPerBatch={8}
-          onContentSizeChange={(_width, height) => {
-            contentHeight.current = height;
-          }}
-          onScroll={event => {
-            // While dragging, the drag owns the offset: these events arrive late.
-            if (draggingTrackId === null) {
-              scrollOffset.current = event.nativeEvent.contentOffset.y;
-            }
-          }}
-          renderItem={({ item: track, index }) => (
-            <QueueTrackRow
-              disabled={queueUpdating}
-              dropTarget={
-                dragTargetIndex === index && draggingTrackId !== track.id
-              }
-              getScrollOffset={() => scrollOffset.current}
-              getViewportHeight={() => viewportHeight.current}
-              index={index}
-              isCurrent={track.id === currentTrack?.id}
-              onAutoScroll={scrollQueueBy}
-              onDragStateChange={updateDrag}
-              onMove={moveQueueTrack}
-              onPress={() => playQueueTrack(index)}
-              onRemove={() => removeQueueTrack(track, index)}
-              queueLength={playbackQueue.length}
-              track={track}
-            />
-          )}
-          scrollEnabled={!queueUpdating && draggingTrackId === null}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-          windowSize={7}
-        />
-      </View>
+      <PlaybackQueue
+        tracks={playbackQueue}
+        currentId={currentTrack?.id}
+        disabled={queueUpdating}
+        onMove={moveQueueTrack}
+        onPlay={playQueueTrack}
+        onRemove={removeQueueTrack}
+      />
       <Snackbar bottom={spacing.lg} placement="queue" />
-    </Sheet>
+    </PlaybackPanel>
   );
 }
 
@@ -471,28 +533,45 @@ const useStyles = createStyles(colors => ({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  presets: { flexDirection: 'row', gap: spacing.sm },
+  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   off: { opacity: 0.45 },
   preset: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
     borderRadius: radius.full,
     flex: 1,
-    height: 48,
+    minHeight: 48,
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.sm,
   },
+  presetText: { textAlign: 'center' },
   presetSelected: { backgroundColor: colors.text },
   presetSelectedText: { color: colors.background },
-  bands: { flexDirection: 'row', paddingBottom: spacing.md },
-  queueSheet: { height: '80%' },
+  bands: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: spacing.md },
+  lyricsMessage: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  lyricsLines: {
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  lyricLine: { textAlign: 'center' },
+  lyricsActions: {
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   queueActions: {
     flexDirection: 'row',
     gap: spacing.sm,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
-  queueAction: { flex: 1, paddingHorizontal: spacing.sm },
-  queueList: { flex: 1 },
-  queueEmpty: { padding: spacing.xl, textAlign: 'center' },
+  stackedQueueActions: { flexDirection: 'column' },
+  queueAction: { flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingHorizontal: spacing.sm },
+  stackedQueueAction: { flexGrow: 0, flexBasis: 'auto' },
 }));

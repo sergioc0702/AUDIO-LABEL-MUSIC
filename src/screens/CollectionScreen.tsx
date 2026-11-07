@@ -4,12 +4,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   ListPlus,
+  Download,
   Minus,
   MoreVertical,
   Pencil,
   Play,
   Shuffle,
   Trash2,
+  Upload,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
 import {
@@ -63,6 +65,8 @@ export function CollectionScreen({
     removeTrackFromPlaylist,
     movePlaylistTrack,
     clearRecentPlayback,
+    importPlaylistFile,
+    exportPlaylistM3u,
   } = music;
   const resolved = useMemo(
     () =>
@@ -330,6 +334,24 @@ export function CollectionScreen({
       >
         {playlist ? (
           <>
+            <SheetAction
+              accessibilityLabel={`Importar lista M3U a ${title}`}
+              icon={<Download color={colors.text} size={22} />}
+              label="Importar M3U/M3U8"
+              onPress={() => {
+                setMenuVisible(false);
+                importPlaylistFile(playlist);
+              }}
+            />
+            <SheetAction
+              accessibilityLabel={`Exportar ${title} como M3U8`}
+              icon={<Upload color={colors.text} size={22} />}
+              label="Exportar M3U8"
+              onPress={() => {
+                setMenuVisible(false);
+                exportPlaylistM3u(playlist);
+              }}
+            />
             <SheetAction
               accessibilityLabel={`Añadir canciones a ${title}`}
               icon={<ListPlus color={colors.text} size={22} />}

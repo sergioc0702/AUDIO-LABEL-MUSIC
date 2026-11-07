@@ -106,10 +106,14 @@ export function LibraryScreen() {
     setPlaylistNameDialog,
     setPlaylistDialogError,
   } = music;
-  const sortedTracks = useMemo(() => sortTracks(tracks, sort), [sort, tracks]);
-  const albums = useMemo(() => groupAlbums(tracks), [tracks]);
-  const artists = useMemo(() => groupArtists(tracks), [tracks]);
-  const folders = useMemo(() => groupFolders(tracks), [tracks]);
+  const showSongs = filter === 'songs';
+  const sortedTracks = useMemo(
+    () => (showSongs ? sortTracks(tracks, sort) : []),
+    [showSongs, sort, tracks],
+  );
+  const albums = filter === 'albums' ? groupAlbums(tracks) : [];
+  const artists = filter === 'artists' ? groupArtists(tracks) : [];
+  const folders = filter === 'folders' ? groupFolders(tracks) : [];
   const albumSize = (width - screenPadding * 2 - spacing.md) / 2;
   const openGroup = (key: string, title: string) =>
     nav.push({ name: 'collection', ref: { kind: 'group', key, title } });

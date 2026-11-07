@@ -191,6 +191,30 @@ class QueuedAudioPlayer(
         queue.moveItem(fromIndex, toIndex)
     }
 
+    /** Apply a sequence of queue moves on the player thread as one native operation. */
+    fun moveItems(moves: List<Pair<Int, Int>>) {
+        val queueSize = queue.size
+        require(moves.all { (fromIndex, toIndex) ->
+            fromIndex in 0 until queueSize && toIndex in 0 until queueSize
+        }) { "One or more queue move indexes are out of bounds." }
+
+        val applied = mutableListOf<Pair<Int, Int>>()
+        try {
+            for ((fromIndex, toIndex) in moves) {
+                if (fromIndex == toIndex) continue
+                exoPlayer.moveMediaItem(fromIndex, toIndex)
+                queue.moveItem(fromIndex, toIndex)
+                applied.add(fromIndex to toIndex)
+            }
+        } catch (error: Exception) {
+            for ((fromIndex, toIndex) in applied.asReversed()) {
+                exoPlayer.moveMediaItem(toIndex, fromIndex)
+                queue.moveItem(toIndex, fromIndex)
+            }
+            throw error
+        }
+    }
+
     /**
      * Jump to an item in the queue.
      * @param index the index to jump to

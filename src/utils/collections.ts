@@ -9,6 +9,18 @@ export type TrackGroup = {
   tracks: Track[];
 };
 
+type GroupKind = 'albums' | 'artists' | 'folders' | 'genres';
+const groupCache = new WeakMap<Track[], Partial<Record<GroupKind, TrackGroup[]>>>();
+const compareGroupNames = new Intl.Collator('es', { sensitivity: 'base' }).compare;
+
+function cachedGroups(tracks: Track[], kind: GroupKind, build: () => TrackGroup[]) {
+  // Library updates replace the track array, invalidating all derived groups.
+  const cached = groupCache.get(tracks) ?? {};
+  const groups = (cached[kind] ??= build());
+  groupCache.set(tracks, cached);
+  return groups;
+}
+
 export function normalizeText(value: string) {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase();
 }
@@ -40,7 +52,7 @@ function groupTracks(
     }
   });
   return Array.from(groups.values()).sort((first, second) =>
-    first.name.localeCompare(second.name, 'es', { sensitivity: 'base' }),
+    compareGroupNames(first.name, second.name),
   );
 }
 
@@ -55,11 +67,15 @@ export function artistKey(track: Track) {
 }
 
 export function groupAlbums(tracks: Track[]) {
-  return groupTracks(tracks, albumKey, track => track.album);
+  return cachedGroups(tracks, 'albums', () =>
+    groupTracks(tracks, albumKey, track => track.album),
+  );
 }
 
 export function groupArtists(tracks: Track[]) {
-  return groupTracks(tracks, artistKey, track => track.artist);
+  return cachedGroups(tracks, 'artists', () =>
+    groupTracks(tracks, artistKey, track => track.artist),
+  );
 }
 
 export function folderName(path: string) {
@@ -67,20 +83,24 @@ export function folderName(path: string) {
 }
 
 export function groupFolders(tracks: Track[]) {
-  return groupTracks(
-    tracks,
-    track => `folder:${track.folder ?? ''}`,
-    track => folderName(track.folder ?? ''),
+  return cachedGroups(tracks, 'folders', () =>
+    groupTracks(
+      tracks,
+      track => `folder:${track.folder ?? ''}`,
+      track => folderName(track.folder ?? ''),
+    ),
   );
 }
 
 export function groupGenres(tracks: Track[]) {
-  const withGenre = tracks.filter(track => normalizeGenre(track.genre));
-  return groupTracks(
-    withGenre,
-    track => `genre:${normalizeGenre(track.genre)}`,
-    track => normalizeGenre(track.genre),
-  );
+  return cachedGroups(tracks, 'genres', () => {
+    const withGenre = tracks.filter(track => normalizeGenre(track.genre));
+    return groupTracks(
+      withGenre,
+      track => `genre:${normalizeGenre(track.genre)}`,
+      track => normalizeGenre(track.genre),
+    );
+  });
 }
 
 export type CollectionRef =

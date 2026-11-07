@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { Music2 } from 'lucide-react-native';
 import { radius, createStyles, useColors } from '../theme/theme';
 
-export function Cover({
+export const Cover = memo(function CoverImage({
   uri,
   size,
   round = false,
@@ -22,13 +23,18 @@ export function Cover({
   return (
     <View style={[styles.cover, shape]}>
       {uri ? (
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} />
+        <Image
+          fadeDuration={0}
+          resizeMethod="resize"
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+        />
       ) : (
         <Music2 color={colors.textSecondary} size={size * 0.4} />
       )}
     </View>
   );
-}
+});
 
 const useStyles = createStyles(colors => ({
   cover: {

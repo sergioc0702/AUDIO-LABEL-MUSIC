@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Shih tzu</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: {{size}}px; height: {{size}}px; font-family: Fredoka, sans-serif">
+  <svg width="{{size}}" height="{{size}}" viewBox="-14 -30 328 328" role="img" aria-label="{{label}}" style="display: block; overflow: visible">
+    <ellipse cx="150" cy="284" rx="{{shadowRx}}" ry="10" fill="#000000" opacity=".1"></ellipse>
+    <g transform="translate({{x}} {{y}})">
+      <g transform="translate(150 284) scale({{sx}} {{sy}}) translate(-150 -284)">
+        <g transform="rotate({{tail}} 212 236)">
+          <path d="M210 244 C 244 240 262 212 254 178 C 276 186 292 212 284 240 C 276 266 240 274 212 262 Z" fill="{{gold}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+          <path d="M256 196 C 270 206 276 224 268 240" fill="none" stroke="{{goldDark}}" stroke-width="3" stroke-linecap="round"></path>
+        </g>
+        <path d="M94 196 C 72 232 62 258 66 278 Q 82 268 94 282 Q 110 270 126 284 Q 150 272 174 284 Q 190 270 206 282 Q 218 268 234 278 C 238 258 228 232 206 196 Z" fill="{{fur}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+        <path d="M94 200 C 78 228 70 250 69 270 Q 84 262 96 270 C 100 244 106 222 118 204 Z" fill="{{gold}}"></path>
+        <path d="M206 200 C 222 228 230 250 231 270 Q 216 262 204 270 C 200 244 194 222 182 204 Z" fill="{{gold}}"></path>
+        <g transform="translate(0 {{pawL}})">
+          <ellipse cx="122" cy="272" rx="23" ry="15" fill="{{fur}}" stroke="{{line}}" stroke-width="3.5"></ellipse>
+          <path d="M114 268 v8 M124 267 v9 M133 268 v8" fill="none" stroke="{{line}}" stroke-width="2.6" stroke-linecap="round"></path>
+        </g>
+        <g transform="translate(0 {{pawR}})">
+          <ellipse cx="178" cy="272" rx="23" ry="15" fill="{{fur}}" stroke="{{line}}" stroke-width="3.5"></ellipse>
+          <path d="M169 268 v8 M178 267 v9 M188 268 v8" fill="none" stroke="{{line}}" stroke-width="2.6" stroke-linecap="round"></path>
+        </g>
+        <g transform="translate(0 {{headY}}) rotate({{tilt}} 150 200)">
+          <path d="M92 182 Q 98 232 122 220 Q 130 244 150 230 Q 170 244 178 220 Q 202 232 208 182 Z" fill="{{fur}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+          <g transform="rotate({{knot}} 150 52)">
+            <path d="M150 56 C 128 42 114 18 128 2 C 134 16 140 12 146 -2 C 150 12 156 12 164 -2 C 172 14 168 18 176 4 C 188 20 172 44 150 56 Z" fill="{{gold}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+          </g>
+          <path d="M150 40 C 214 40 246 88 244 132 C 242 178 200 204 150 204 C 100 204 58 178 56 132 C 54 88 86 40 150 40 Z" fill="{{fur}}" stroke="{{line}}" stroke-width="3.5"></path>
+          <path d="M70 124 C 72 90 104 72 130 84 C 142 92 140 132 128 152 C 110 168 76 158 70 124 Z" fill="{{gold}}"></path>
+          <path d="M230 124 C 228 90 196 72 170 84 C 158 92 160 132 172 152 C 190 168 224 158 230 124 Z" fill="{{gold}}"></path>
+          <ellipse cx="88" cy="166" rx="17" ry="10" fill="{{blush}}" opacity="{{blushOpacity}}"></ellipse>
+          <ellipse cx="212" cy="166" rx="17" ry="10" fill="{{blush}}" opacity="{{blushOpacity}}"></ellipse>
+          <g opacity="{{eyeOpacity}}">
+            <g transform="translate({{lookX}} {{lookY}})">
+              <ellipse cx="110" cy="128" rx="21" ry="{{eyeRy}}" fill="#2a1b1b"></ellipse>
+              <ellipse cx="190" cy="128" rx="21" ry="{{eyeRy}}" fill="#2a1b1b"></ellipse>
+              <circle cx="102" cy="{{shineY}}" r="{{shine}}" fill="#ffffff"></circle>
+              <circle cx="182" cy="{{shineY}}" r="{{shine}}" fill="#ffffff"></circle>
+              <circle cx="118" cy="136" r="3.8" fill="#ffffff"></circle>
+              <circle cx="198" cy="136" r="3.8" fill="#ffffff"></circle>
+            </g>
+            <rect x="84" y="{{lidY}}" width="52" height="24" fill="{{gold}}" opacity="{{lidOpacity}}" transform="rotate(-15 110 128)"></rect>
+            <rect x="164" y="{{lidY}}" width="52" height="24" fill="{{gold}}" opacity="{{lidOpacity}}" transform="rotate(15 190 128)"></rect>
+          </g>
+          <g opacity="{{joyOpacity}}" fill="none" stroke="#2a1b1b" stroke-width="7.5" stroke-linecap="round">
+            <path d="M90 136 Q 110 104 130 136"></path>
+            <path d="M170 136 Q 190 104 210 136"></path>
+          </g>
+          <path d="M92 94 Q 110 84 128 94" fill="none" stroke="{{fur}}" stroke-width="7" stroke-linecap="round" transform="rotate({{browL}} 110 90)"></path>
+          <path d="M172 94 Q 190 84 208 94" fill="none" stroke="{{fur}}" stroke-width="7" stroke-linecap="round" transform="rotate({{browR}} 190 90)"></path>
+          <ellipse cx="124" cy="166" rx="32" ry="25" fill="#ffffff"></ellipse>
+          <ellipse cx="176" cy="166" rx="32" ry="25" fill="#ffffff"></ellipse>
+          <ellipse cx="150" cy="184" rx="24" ry="16" fill="#ffffff"></ellipse>
+          <path d="M104 176 q 6 8 16 8 M196 176 q -6 8 -16 8" fill="none" stroke="{{shade}}" stroke-width="3" stroke-linecap="round"></path>
+          <ellipse cx="150" cy="180" rx="{{mouthRx}}" ry="{{mouthRy}}" fill="#8c3448"></ellipse>
+          <ellipse cx="150" cy="{{tongueY}}" rx="10" ry="{{tongueRy}}" fill="#ff8fa6"></ellipse>
+          <path d="{{mouthL}}" fill="none" stroke="{{line}}" stroke-width="3.6" stroke-linecap="round"></path>
+          <path d="{{mouthR}}" fill="none" stroke="{{line}}" stroke-width="3.6" stroke-linecap="round"></path>
+          <path d="M150 158 V 170" fill="none" stroke="{{line}}" stroke-width="3.6" stroke-linecap="round"></path>
+          <path d="M136 142 Q 150 134 164 142 Q 166 152 150 160 Q 134 152 136 142 Z" fill="#33211f"></path>
+          <ellipse cx="144" cy="143" rx="5" ry="2.6" fill="#ffffff" opacity=".75"></ellipse>
+          <g transform="rotate({{earL}} 66 86)">
+            <path d="M70 74 C 40 82 24 120 28 160 C 30 184 26 198 36 210 Q 46 200 54 212 Q 64 200 74 208 C 82 176 88 122 86 96 C 85 82 80 72 70 74 Z" fill="{{gold}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+            <path d="M50 112 C 44 136 44 164 50 190 M68 106 C 64 134 62 164 62 192" fill="none" stroke="{{goldDark}}" stroke-width="3" stroke-linecap="round"></path>
+          </g>
+          <g transform="translate(300 0) scale(-1 1)">
+            <g transform="rotate({{earR}} 66 86)">
+              <path d="M70 74 C 40 82 24 120 28 160 C 30 184 26 198 36 210 Q 46 200 54 212 Q 64 200 74 208 C 82 176 88 122 86 96 C 85 82 80 72 70 74 Z" fill="{{gold}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+              <path d="M50 112 C 44 136 44 164 50 190 M68 106 C 64 134 62 164 62 192" fill="none" stroke="{{goldDark}}" stroke-width="3" stroke-linecap="round"></path>
+            </g>
+          </g>
+          <path d="M150 54 C 130 38 108 40 110 56 C 108 72 130 74 150 58 Z" fill="{{lazo}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+          <path d="M150 54 C 170 38 192 40 190 56 C 192 72 170 74 150 58 Z" fill="{{lazo}}" stroke="{{line}}" stroke-width="3.5" stroke-linejoin="round"></path>
+          <circle cx="150" cy="56" r="8.5" fill="{{lazo}}" stroke="{{line}}" stroke-width="3.5"></circle>
+          <path transform="translate(102 {{tearY}}) scale(.8)" d="M0 -13 C 6 -4 10 1 10 6 A10 10 0 0 1 -10 6 C -10 1 -6 -4 0 -13 Z" fill="#8fd6ff" stroke="#3f9ccc" stroke-width="2" opacity="{{tearOpacity}}"></path>
+          <path transform="translate(198 {{tearY2}}) scale(.65)" d="M0 -13 C 6 -4 10 1 10 6 A10 10 0 0 1 -10 6 C -10 1 -6 -4 0 -13 Z" fill="#8fd6ff" stroke="#3f9ccc" stroke-width="2" opacity="{{tearOpacity2}}"></path>
+          <path transform="translate(244 {{sweatY}})" d="M0 -13 C 6 -4 10 1 10 6 A10 10 0 0 1 -10 6 C -10 1 -6 -4 0 -13 Z" fill="#8fd6ff" stroke="#3f9ccc" stroke-width="2" opacity="{{sweatOpacity}}"></path>
+        </g>
+      </g>
+    </g>
+    <path transform="translate(6 {{h1y}}) scale({{h1s}})" d="M0 8 C -12 -2 -10 -13 -3 -13 C 0 -13 0 -9 0 -9 C 0 -9 0 -13 3 -13 C 10 -13 12 -2 0 8 Z" fill="{{lazo}}" stroke="{{line}}" stroke-width="2.6" opacity="{{h1o}}"></path>
+    <path transform="translate(296 {{h2y}}) scale({{h2s}})" d="M0 8 C -12 -2 -10 -13 -3 -13 C 0 -13 0 -9 0 -9 C 0 -9 0 -13 3 -13 C 10 -13 12 -2 0 8 Z" fill="{{lazo}}" stroke="{{line}}" stroke-width="2.6" opacity="{{h2o}}"></path>
+    <path transform="translate(26 {{h3y}}) scale({{h3s}})" d="M0 8 C -12 -2 -10 -13 -3 -13 C 0 -13 0 -9 0 -9 C 0 -9 0 -13 3 -13 C 10 -13 12 -2 0 8 Z" fill="{{lazo}}" stroke="{{line}}" stroke-width="2.6" opacity="{{h3o}}"></path>
+    <path transform="translate(276 {{h4y}}) scale({{h4s}})" d="M0 8 C -12 -2 -10 -13 -3 -13 C 0 -13 0 -9 0 -9 C 0 -9 0 -13 3 -13 C 10 -13 12 -2 0 8 Z" fill="{{lazo}}" stroke="{{line}}" stroke-width="2.6" opacity="{{h4o}}"></path>
+    <g opacity="{{bubbleOpacity}}">
+      <rect x="-10" y="-26" width="134" height="40" rx="18" fill="#ffffff" stroke="{{line}}" stroke-width="3"></rect>
+      <path d="M84 12 L 100 34 L 104 12" fill="#ffffff" stroke="{{line}}" stroke-width="3" stroke-linejoin="round"></path>
+      <rect x="82" y="8" width="24" height="5" fill="#ffffff"></rect>
+      <text x="57" y="0" text-anchor="middle" font-family="Fredoka, sans-serif" font-size="19" font-weight="700" fill="{{line}}">{{bubble}}</text>
+    </g>
+  </svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mood":{"editor":"enum","options":["feliz","tranquilo","ansioso","triste"],"default":"tranquilo"},"size":{"editor":"int","default":320,"min":48,"max":480},"lazo":{"editor":"color","default":"#ff5d8f"},"quiet":{"editor":"boolean","default":false},"$preview":{"width":320,"height":320}}'>
+const TARGETS = {
+  triste: { bounce: 0, bob: 1.2, bobHz: 0.32, tail: 2, tailHz: 0.5, tailBase: 18, ear: 4, flap: 0, tilt: -5, sway: 0, drop: 15, joy: 0, lid: 1, lookX: 0, lookY: 6, brow: 20, smile: -1, mouth: 0, tongue: 0, tear: 1, sweat: 0, hearts: 0, paws: 0, jitter: 0, blush: 0.2, bubble: 1 },
+  ansioso: { bounce: 0, bob: 1.6, bobHz: 3.2, tail: 7, tailHz: 4.5, tailBase: 0, ear: -3, flap: 3, tilt: 7, sway: 0, drop: 3, joy: 0, lid: 0.42, lookX: 4, lookY: 7, brow: 15, smile: -0.35, mouth: 0.34, tongue: 0, tear: 0, sweat: 1, hearts: 0, paws: 1, jitter: 1.1, blush: 0.45, bubble: 1 },
+  tranquilo: { bounce: 0, bob: 3, bobHz: 1.1, tail: 16, tailHz: 1.8, tailBase: 0, ear: 0, flap: 1.2, tilt: 0, sway: 3, drop: 0, joy: 0, lid: 0, lookX: 0, lookY: 0, brow: 0, smile: 0.6, mouth: 0, tongue: 0, tear: 0, sweat: 0, hearts: 0, paws: 0, jitter: 0, blush: 0.55, bubble: 0 },
+  feliz: { bounce: 22, bob: 0, bobHz: 1.75, tail: 32, tailHz: 6, tailBase: 0, ear: -10, flap: 9, tilt: 0, sway: 5, drop: -2, joy: 1, lid: 0, lookX: 0, lookY: 0, brow: -6, smile: 1, mouth: 1, tongue: 1, tear: 0, sweat: 0, hearts: 1, paws: 0, jitter: 0, blush: 0.9, bubble: 1 },
+};
+const TEXTS = { triste: '¿Y la música?', ansioso: '¡Súbele!', feliz: '¡Guau, guau!' };
+const LABELS = {
+  triste: 'Shih tzu triste porque la música está en pausa',
+  ansioso: 'Shih tzu ansioso porque el volumen está bajo',
+  tranquilo: 'Shih tzu moviendo la cabeza con la música',
+  feliz: 'Shih tzu saltando de felicidad con el volumen alto',
+};
+const STEP = 0.033;
+const r2 = value => Math.round(value * 100) / 100;
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { frame: 0 };
+    this.t = 0;
+    this.bobPhase = 0;
+    this.tailPhase = 0;
+    this.v = { ...TARGETS.tranquilo };
+    this.text = TEXTS.feliz;
+  }
+  componentDidMount() {
+    this.timer = setInterval(() => this.tick(), 33);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  tick() {
+    const mood = this.props.mood ?? 'tranquilo';
+    const target = TARGETS[mood] ?? TARGETS.tranquilo;
+    if (TEXTS[mood]) this.text = TEXTS[mood];
+    Object.keys(target).forEach(key => {
+      this.v[key] += (target[key] - this.v[key]) * 0.13;
+    });
+    this.t += STEP;
+    this.bobPhase += this.v.bobHz * STEP * Math.PI * 2;
+    this.tailPhase += this.v.tailHz * STEP * Math.PI * 2;
+    this.setState({ frame: this.state.frame + 1 });
+  }
+  heart(offset, speed) {
+    const cycle = (this.t * speed + offset) % 1;
+    const fade = Math.sin(cycle * Math.PI);
+    return { y: r2(84 - cycle * 104), s: r2(0.7 + cycle * 0.7), o: r2(this.v.hearts * fade) };
+  }
+  renderVals() {
+    const v = this.v;
+    const t = this.t;
+    const size = Number(this.props.size ?? 320);
+    const hop = Math.abs(Math.sin(this.bobPhase));
+    const landing = Math.pow(1 - hop, 4) * (v.bounce / 22);
+    const breath = Math.sin(this.bobPhase);
+    const blink = t % 3.7 < 0.13 ? 0.08 : 1;
+    const wobble = v.mouth * (0.72 + 0.28 * Math.sin(t * 17));
+    const curve = v.smile;
+    const corner = 170 - curve * 5;
+    const control = 172 + curve * 13;
+    const tearCycle = (t * 0.55) % 1;
+    const tearCycle2 = (t * 0.55 + 0.5) % 1;
+    const sweatCycle = (t * 0.9) % 1;
+    const tap = Math.sin(t * 14);
+    const hearts = [this.heart(0, 0.42), this.heart(0.27, 0.36), this.heart(0.55, 0.48), this.heart(0.8, 0.4)];
+    const earFlap = Math.sin(t * 11) * v.flap;
+    return {
+      size,
+      label: LABELS[this.props.mood ?? 'tranquilo'] ?? LABELS.tranquilo,
+      fur: '#fff6ea', shade: '#e8d3bd', gold: '#dca566', goldDark: '#b57d42', line: '#6e4a3a', blush: '#ff9fb2',
+      lazo: this.props.lazo ?? '#ff5d8f',
+      x: r2(Math.sin(t * 31) * v.jitter),
+      y: r2(-hop * v.bounce),
+      sx: r2(1 + landing * 0.07), sy: r2(1 - landing * 0.09 + breath * 0.006),
+      shadowRx: r2(96 - hop * (v.bounce / 22) * 26),
+      tail: r2(v.tailBase + Math.sin(this.tailPhase) * v.tail),
+      pawL: r2(-Math.max(0, tap) * 9 * v.paws),
+      pawR: r2(-Math.max(0, -tap) * 9 * v.paws),
+      headY: r2(v.drop + breath * v.bob),
+      tilt: r2(v.tilt + Math.sin(this.bobPhase) * v.sway),
+      knot: r2(Math.sin(this.tailPhase * 0.5) * (2 + v.flap * 0.7)),
+      earL: r2(-v.ear + earFlap),
+      earR: r2(-v.ear + earFlap * 0.8),
+      eyeOpacity: r2(1 - v.joy),
+      joyOpacity: r2(v.joy),
+      eyeRy: r2(21 * blink * (1 + v.lid * 0.08)),
+      lookX: r2(v.lookX * (0.55 + 0.45 * Math.sin(t * 2.4))),
+      lookY: r2(v.lookY),
+      shine: r2(7.5 + v.lid * 2.5),
+      shineY: r2(120 - v.lid * 2),
+      lidY: r2(82 + v.lid * 10),
+      lidOpacity: r2(Math.min(1, v.lid * 4)),
+      browL: r2(-v.brow), browR: r2(v.brow),
+      blushOpacity: r2(v.blush),
+      mouthRx: r2(16 * Math.min(1, wobble * 1.5)),
+      mouthRy: r2(15 * wobble),
+      tongueY: r2(180 + v.tongue * 8),
+      tongueRy: r2(11 * v.tongue),
+      mouthL: 'M124 ' + r2(corner) + ' Q137 ' + r2(control) + ' 150 170',
+      mouthR: 'M150 170 Q163 ' + r2(control) + ' 176 ' + r2(corner),
+      tearY: r2(150 + tearCycle * 62),
+      tearOpacity: r2(v.tear * Math.sin(tearCycle * Math.PI)),
+      tearY2: r2(150 + tearCycle2 * 62),
+      tearOpacity2: r2(v.tear * Math.sin(tearCycle2 * Math.PI)),
+      sweatY: r2(70 + sweatCycle * 34),
+      sweatOpacity: r2(v.sweat * Math.sin(sweatCycle * Math.PI)),
+      h1y: hearts[0].y, h1s: hearts[0].s, h1o: hearts[0].o,
+      h2y: hearts[1].y, h2s: hearts[1].s, h2o: hearts[1].o,
+      h3y: hearts[2].y, h3s: hearts[2].s, h3o: hearts[2].o,
+      h4y: hearts[3].y, h4s: hearts[3].s, h4o: hearts[3].o,
+      bubble: this.text,
+      bubbleOpacity: this.props.quiet ? 0 : r2(v.bubble),
+    };
+  }
+}
+</script>
+</body>
+</html>

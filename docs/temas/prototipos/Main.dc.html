@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tema Brutalista: reproductor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Archivo:wght@700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;border-radius:0}
+button:focus-visible{outline:4px solid currentColor;outline-offset:-8px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: Archivo, sans-serif; font-weight: 800; background: {{bg}}; color: {{fg}}">
+  <div style="position: absolute; left: 0; right: 0; top: 0; height: 84px; box-sizing: border-box; padding-top: 28px; border-bottom: 5px solid {{fg}}; display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: stretch">
+    <button aria-label="Cerrar reproductor" style="display: flex; align-items: center; justify-content: center; border-right: 5px solid {{fg}}">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square" aria-hidden="true"><path d="m5 8 7 8 7-8"></path></svg>
+    </button>
+    <p style="margin: 0; display: flex; align-items: center; justify-content: center; font-family: Anton, sans-serif; font-weight: 400; font-size: 30px; font-variant-numeric: tabular-nums">{{now}} / {{total}}</p>
+    <button aria-label="Añadir a favoritas" aria-pressed="{{fav}}" onClick="{{toggleFav}}" style="display: flex; align-items: center; justify-content: center; border-left: 5px solid {{fg}}; background: {{favBg}}; color: {{favFg}}">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 4h7l2 3 2-3h7v8L12 22 3 12z"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 0; right: 0; top: 84px; height: 256px; overflow: hidden; background: {{fg}}">
+    <sc-for list="{{strips}}" as="strip" hint-placeholder-count="4">
+      <div style="position: relative; height: 64px; overflow: hidden">
+        <svg width="390" height="256" viewBox="0 0 390 256" aria-hidden="true" style="position: absolute; left: {{strip.x}}px; top: {{strip.y}}px">
+          <rect x="-80" width="550" height="256" fill="{{p.hot}}"></rect>
+          <circle cx="{{t.cx}}" cy="118" r="136" fill="{{p.ink}}"></circle>
+          <rect x="-80" y="176" width="550" height="34" fill="{{p.paper}}"></rect>
+          <rect x="{{t.bx}}" y="-10" width="60" height="290" fill="{{p.paper}}"></rect>
+        </svg>
+      </div>
+    </sc-for>
+    <div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 136px; display: flex; align-items: flex-end; gap: 6px; padding: 0 6px; box-sizing: border-box">
+      <sc-for list="{{hammers}}" as="h" hint-placeholder-count="12">
+        <span style="display: block; flex: 1; height: {{h.h}}px; background: {{fg}}"></span>
+      </sc-for>
+    </div>
+  </div>
+  <div style="position: absolute; left: 0; right: 0; top: 340px; height: 48px; overflow: hidden; background: {{fg}}; color: {{bg}}; font-family: Anton, sans-serif; font-weight: 400; font-size: 28px; line-height: 48px; white-space: nowrap; text-transform: uppercase">
+    <div style="display: inline-block; transform: translateX(-{{marquee}}%)">{{ticker}}{{ticker}}</div>
+  </div>
+  <h1 style="position: absolute; left: 12px; right: 12px; top: 396px; height: 168px; margin: 0; overflow: hidden; font-family: Anton, sans-serif; font-weight: 400; font-size: 84px; line-height: 84px; text-transform: uppercase; transform: translateY({{titleY}}px)">{{t.title}}</h1>
+  <button aria-label="Cambiar la posición de la canción" onClick="{{seek}}" style="position: absolute; left: 0; right: 0; top: 568px; height: 44px; box-sizing: border-box; border-top: 5px solid {{fg}}; border-bottom: 5px solid {{fg}}; display: flex">
+    <sc-for list="{{segments}}" as="s" hint-placeholder-count="26">
+      <span style="display: block; flex: 1; background: {{s.color}}; border-right: 2px solid {{bg}}"></span>
+    </sc-for>
+  </button>
+  <div style="position: absolute; left: 0; right: 0; top: 612px; height: 100px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); border-bottom: 5px solid {{fg}}">
+    <button aria-label="Canción anterior" onClick="{{prev}}" style="display: flex; align-items: center; justify-content: center; border-right: 5px solid {{fg}}">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h4v18H3zM21 3v18L8 12z"></path></svg>
+    </button>
+    <button aria-label="{{playLabel}}" onClick="{{toggle}}" style="display: flex; align-items: center; justify-content: center; background: {{p.hot}}; color: {{p.onHot}}; font-family: Anton, sans-serif; font-weight: 400; font-size: 58px; line-height: 1">{{playText}}</button>
+    <button aria-label="Canción siguiente" onClick="{{next}}" style="display: flex; align-items: center; justify-content: center; border-left: 5px solid {{fg}}">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 3h4v18h-4zM3 3l13 9-13 9z"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 0; right: 0; top: 712px; height: 132px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr))">
+    <sc-for list="{{tools}}" as="tool" hint-placeholder-count="6">
+      <button onClick="{{tool.press}}" aria-pressed="{{tool.on}}" style="font-size: 15px; background: {{tool.bg}}; color: {{tool.fg}}; border-right: 3px solid {{fg}}; border-bottom: 3px solid {{fg}}">{{tool.label}}</button>
+    </sc-for>
+  </div>
+  <sc-if value="{{queueOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; top: 340px; background: {{p.hot}}; color: {{p.onHot}}; border-top: 8px solid {{p.ink}}; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: stretch; justify-content: space-between; border-bottom: 5px solid {{p.onHot}}">
+        <h2 style="margin: 0; padding: 12px 16px; font-family: Anton, sans-serif; font-weight: 400; font-size: 48px; line-height: 1; text-transform: uppercase">Cola</h2>
+        <button aria-label="Cerrar cola" onClick="{{closeQueue}}" style="width: 76px; display: flex; align-items: center; justify-content: center; border-left: 5px solid {{p.onHot}}">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="square" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"></path></svg>
+        </button>
+      </div>
+      <sc-for list="{{list}}" as="item" hint-placeholder-count="4">
+        <button onClick="{{item.pick}}" style="display: flex; align-items: center; justify-content: space-between; min-height: 76px; padding: 0 16px; text-align: left; border-bottom: 3px solid {{p.onHot}}; background: {{item.bg}}; color: {{item.fg}}">
+          <span style="font-family: Anton, sans-serif; font-weight: 400; font-size: 30px; text-transform: uppercase">{{item.title}}</span>
+          <span style="font-size: 14px">{{item.artist}}</span>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"paleta":{"editor":"enum","options":["Concreto","Papel","Ácido","Noche","Ladrillo","Plano"],"default":"Ácido"},"$preview":{"width":390,"height":844}}'>
+const TRACKS = [
+  { title: 'Luz de agosto', artist: 'Marea Alta', dur: 214, cx: 262, bx: 54 },
+  { title: 'Sal y cobre', artist: 'Los Faros', dur: 188, cx: 108, bx: 300 },
+  { title: 'Última línea', artist: 'Noa Reyes', dur: 241, cx: 196, bx: 18 },
+  { title: 'Ruta once', artist: 'Marea Alta', dur: 203, cx: 318, bx: 150 },
+];
+const PALETTES = {
+  'Concreto': { bg: '#bdbab2', ink: '#000000', hot: '#ff3b00', onHot: '#000000', paper: '#ece9e2' },
+  'Papel': { bg: '#ffffff', ink: '#000000', hot: '#0000ff', onHot: '#ffffff', paper: '#ffffff' },
+  'Ácido': { bg: '#e6ff1a', ink: '#000000', hot: '#ff00a8', onHot: '#000000', paper: '#ffffff' },
+  'Noche': { bg: '#111111', ink: '#f2f2f2', hot: '#ff3b00', onHot: '#000000', paper: '#3a3a3a' },
+  'Ladrillo': { bg: '#d4502f', ink: '#000000', hot: '#ffe9c7', onHot: '#000000', paper: '#f4d9b8' },
+  'Plano': { bg: '#1f45e8', ink: '#ffffff', hot: '#ffe600', onHot: '#000000', paper: '#0b1f7a' },
+};
+const SLEEP = ['DORMIR', '15 MIN', '30 MIN', '60 MIN'];
+const RATES = [1, 1.25, 1.5, 2, 0.75];
+const SEGMENTS = 26;
+const HAMMERS = 12;
+const STRIPS = 4;
+const SLAM = 5;
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+const noise = seed => {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+};
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { i: 0, pos: 71, playing: true, tick: 0, slam: 0, shuffle: false, repeat: false, fav: false, queue: false, sleep: 0, rate: 0, eq: true };
+  }
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      const s = this.state;
+      const next = { tick: s.tick + 1, slam: Math.max(0, s.slam - 1) };
+      if (s.playing) {
+        const pos = s.pos + 0.1 * RATES[s.rate];
+        if (pos >= TRACKS[s.i].dur) {
+          this.go(1);
+          return;
+        }
+        next.pos = pos;
+      }
+      this.setState(next);
+    }, 100);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  go(step) {
+    this.setState({ i: (this.state.i + step + TRACKS.length) % TRACKS.length, pos: 0, slam: SLAM });
+  }
+  renderVals() {
+    const s = this.state;
+    const t = TRACKS[s.i];
+    const p = PALETTES[this.props.paleta ?? 'Concreto'] ?? PALETTES['Concreto'];
+    const flash = s.slam >= SLAM - 1;
+    const bg = flash ? p.ink : p.bg;
+    const fg = flash ? p.bg : p.ink;
+    const beat = Math.floor(s.tick / 2);
+    const copy = (t.title + ' / ' + t.artist + ' / ').repeat(3);
+    const played = (s.pos / t.dur) * SEGMENTS;
+    const tool = (label, on, press) => ({ label, on, press, bg: on ? fg : bg, fg: on ? bg : fg });
+    return {
+      t, p, bg, fg,
+      now: fmt(s.pos), total: fmt(t.dur),
+      ticker: copy,
+      marquee: s.playing ? (s.tick * 0.4) % 50 : (Math.floor(s.pos * 4) * 0.4) % 50,
+      titleY: -s.slam * 12,
+      strips: Array.from({ length: STRIPS }, (_, row) => ({
+        y: -row * 64,
+        x: s.slam ? Math.round((noise(row * 3 + s.slam) - 0.5) * 150) : 0,
+      })),
+      hammers: Array.from({ length: HAMMERS }, (_, index) => ({
+        h: s.playing ? 16 + Math.floor(noise(index * 7 + beat) * 6) * 20 : 8,
+      })),
+      segments: Array.from({ length: SEGMENTS }, (_, index) => ({ color: index < played ? fg : bg })),
+      playText: s.playing ? 'PAUSA' : 'PLAY',
+      playLabel: s.playing ? 'Pausar' : 'Reproducir',
+      fav: s.fav, favBg: s.fav ? fg : bg, favFg: s.fav ? bg : fg,
+      queueOpen: s.queue,
+      tools: [
+        tool('COLA · 31', false, () => this.setState({ queue: true })),
+        tool('MEZCLA', s.shuffle, () => this.setState({ shuffle: !s.shuffle })),
+        tool('REPETIR', s.repeat, () => this.setState({ repeat: !s.repeat })),
+        tool(SLEEP[s.sleep], s.sleep > 0, () => this.setState({ sleep: (s.sleep + 1) % SLEEP.length })),
+        tool(RATES[s.rate] + '×', s.rate > 0, () => this.setState({ rate: (s.rate + 1) % RATES.length })),
+        tool('ECUALIZADOR', s.eq, () => this.setState({ eq: !s.eq })),
+      ],
+      list: TRACKS.map((x, i) => ({
+        ...x,
+        bg: i === s.i ? p.onHot : p.hot,
+        fg: i === s.i ? p.hot : p.onHot,
+        pick: () => this.setState({ i, pos: 0, queue: false, slam: SLAM }),
+      })),
+      toggle: () => this.setState({ playing: !s.playing, slam: SLAM }),
+      next: () => this.go(1),
+      prev: () => (s.pos > 3 ? this.setState({ pos: 0, slam: SLAM }) : this.go(-1)),
+      toggleFav: () => this.setState({ fav: !s.fav }),
+      closeQueue: () => this.setState({ queue: false }),
+      seek: e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        this.setState({ pos: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * t.dur, slam: 2 });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

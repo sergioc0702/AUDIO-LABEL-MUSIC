@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tema Mixtape: Inicio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Reenie+Beanie&amp;family=Barlow+Condensed:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'Barlow Condensed', sans-serif; background: {{p.bg}}; color: {{p.fg}}">
+  <svg width="390" height="140" viewBox="0 0 390 140" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+    <path d="M226 30 q 10 -22 20 0 t 20 0 t 20 0" fill="none" stroke="{{p.m1}}" stroke-width="7" stroke-linecap="round"></path>
+    <path d="M300 92 L 322 128 L 278 128 Z" fill="{{p.m2}}"></path>
+    <circle cx="318" cy="30" r="13" fill="none" stroke="{{p.m3}}" stroke-width="7"></circle>
+  </svg>
+  <div style="position: absolute; left: 20px; right: 8px; top: 44px; display: flex; align-items: center; justify-content: space-between">
+    <h1 style="margin: 0; font-family: 'Reenie Beanie', cursive; font-weight: 400; font-size: 56px; line-height: 1">Buenos días</h1>
+    <button aria-label="Ajustes" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 14px; right: 14px; top: 132px; display: flex; flex-direction: column; gap: 6px">
+    <sc-for list="{{tapes}}" as="tape" hint-placeholder-count="7">
+      <button style="height: 62px; border-radius: 4px; display: grid; grid-template-columns: 24px minmax(0, 1fr) 64px; align-items: stretch; text-align: left; overflow: hidden; background: {{p.shell}}">
+        <span style="display: block; background: {{tape.stripe}}"></span>
+        <span style="margin: 8px 0; padding: 0 12px; display: flex; align-items: center; font-family: 'Reenie Beanie', cursive; font-size: 32px; line-height: 1; background: {{p.label}}; color: {{p.ink}}">{{tape.label}}</span>
+        <span style="display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: {{p.shellInk}}">{{tape.count}}</span>
+      </button>
+    </sc-for>
+  </div>
+  <div style="position: absolute; left: 14px; right: 14px; top: 612px; height: 104px; border-radius: 10px; box-sizing: border-box; padding: 10px; display: grid; grid-template-columns: minmax(0, 1fr) 76px; gap: 10px; background: {{p.shell}}">
+    <div style="border-radius: 4px; padding: 6px 10px; background: {{p.label}}; color: {{p.ink}}; min-width: 0">
+      <p style="margin: 0; font-family: 'Reenie Beanie', cursive; font-size: 32px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Luz de agosto</p>
+      <svg width="150" height="36" viewBox="0 0 150 36" aria-hidden="true" style="display: block; margin-top: 4px">
+        <circle cx="30" cy="18" r="16" fill="#2a1a12"></circle>
+        <circle cx="30" cy="18" r="8" fill="#f2efe8"></circle>
+        <circle cx="120" cy="18" r="12" fill="#2a1a12"></circle>
+        <circle cx="120" cy="18" r="8" fill="#f2efe8"></circle>
+      </svg>
+    </div>
+    <button aria-label="Pausar" style="border-radius: 4px; display: flex; align-items: center; justify-content: center; background: {{p.on}}; color: {{p.onInk}}">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+    </button>
+  </div>
+  <div style="position: absolute; left: 12px; right: 12px; top: 730px; height: 72px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+    <sc-for list="{{tabs}}" as="tab" hint-placeholder-count="3">
+      <button style="font-size: 20px; font-weight: 700; text-decoration: {{tab.line}}; text-underline-offset: 6px; text-decoration-thickness: 3px">{{tab.label}}</button>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"paleta":{"editor":"enum","options":["Ahumado","Naranja","Cinta azul","Menta","Chicle","Uva"],"default":"Naranja"},"$preview":{"width":390,"height":844}}'>
+const PALETTES = {
+  'Ahumado': { bg: '#1b1a1d', shell: '#3a383e', shellInk: '#f3f0ea', label: '#ece6d6', ink: '#1d1a15', fg: '#f3f0ea', on: '#e9542f', onInk: '#1b0a05', m1: '#e9542f', m2: '#3fbac2', m3: '#f4c542' },
+  'Naranja': { bg: '#ee7a23', shell: '#2a2320', shellInk: '#fbf1dc', label: '#fbf1dc', ink: '#2a1a10', fg: '#1f1208', on: '#14a3a8', onInk: '#04191a', m1: '#1f1208', m2: '#fbf1dc', m3: '#14a3a8' },
+  'Cinta azul': { bg: '#16307a', shell: '#e9e7e1', shellInk: '#131c3a', label: '#ffffff', ink: '#131c3a', fg: '#f2f4fb', on: '#ffd23f', onInk: '#131c3a', m1: '#ffd23f', m2: '#ff6f91', m3: '#6fe3d0' },
+  'Menta': { bg: '#2fb9a6', shell: '#21312f', shellInk: '#f6f1e3', label: '#f6f1e3', ink: '#1d2a28', stripe: '#ff6f59', window: '#cfd8cf', edge: '#162220', fg: '#0d2320', sub: '#123a35', ac: '#0d2320', line: '#1f9485', counter: '#0d2320', counterInk: '#f6f1e3', deck: '#0d2320', key: '#f6f1e3', keyInk: '#0d2320', on: '#ff6f59', onInk: '#2a0a05', m1: '#0d2320', m2: '#ff6f59', m3: '#fff1a8' },
+  'Chicle': { bg: '#ff7fb0', shell: '#fff7ec', shellInk: '#3a1030', label: '#ffffff', ink: '#3a1030', stripe: '#ff3d81', window: '#f0dfe4', edge: '#ead9cf', fg: '#3a0f2c', sub: '#541a40', ac: '#3a0f2c', line: '#e55f95', counter: '#3a0f2c', counterInk: '#ffe3ef', deck: '#3a0f2c', key: '#fff7ec', keyInk: '#3a0f2c', on: '#ffe14d', onInk: '#3a0f2c', m1: '#3a0f2c', m2: '#ffe14d', m3: '#2fd0c4' },
+  'Uva': { bg: '#3c1a6e', shell: '#241043', shellInk: '#f3ecff', label: '#f3ecff', ink: '#241043', stripe: '#ffb400', window: '#d6cbe8', edge: '#170a2c', fg: '#f3ecff', sub: '#cfc0ea', ac: '#ffb400', line: '#5a3796', counter: '#170a2c', counterInk: '#ffb400', deck: '#170a2c', key: '#f3ecff', keyInk: '#241043', on: '#ffb400', onInk: '#241043', m1: '#ffb400', m2: '#ff5fa2', m3: '#54e0d0' },
+};
+const TAPES = [
+  ['Favoritas', '12'],
+  ['Mezclar todo', '37'],
+  ['Más escuchadas', '20'],
+  ['Recientes', '8'],
+  ['Añadidas', '37'],
+  ['Tus listas', '3'],
+  ['Sal y cobre', '3:08'],
+];
+class Component extends DCLogic {
+  renderVals() {
+    const p = PALETTES[this.props.paleta ?? 'Naranja'] ?? PALETTES['Naranja'];
+    const stripes = [p.m1, p.m3, p.m2];
+    return {
+      p,
+      tapes: TAPES.map(([label, count], index) => ({ label, count, stripe: stripes[index % stripes.length] })),
+      tabs: ['Inicio', 'Buscar', 'Biblioteca'].map((label, index) => ({ label, line: index === 0 ? 'underline' : 'none' })),
+    };
+  }
+}
+</script>
+</body>
+</html>

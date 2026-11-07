@@ -23,7 +23,9 @@ const playlists: Playlist[] = [
 test('saves favorites and lists by song name, in order', () => {
   const backup = buildBackup(tracks, new Set(['1']), playlists);
 
-  expect(backup.favorites).toEqual([{ title: 'Canción', artist: 'Artista' }]);
+  expect(backup.favorites).toEqual([
+    { title: 'Canción', artist: 'Artista', album: 'Álbum' },
+  ]);
   expect(backup.playlists[0].tracks.map(track => track.title)).toEqual([
     'Otra',
     'Canción',
@@ -39,6 +41,40 @@ test('finds the songs on a phone where their ids are different', () => {
   expect(result.favoriteIds).toEqual(['50']);
   expect(result.playlists).toEqual([{ name: 'Gym', trackIds: ['60', '50'] }]);
   expect(result.missingCount).toBe(0);
+});
+
+test('uses album metadata to disambiguate duplicate titles and artists', () => {
+  const backup = buildBackup(
+    [
+      { ...makeTrack('1', 'Remix'), album: 'Versiones' },
+      { ...makeTrack('2', 'Remix'), album: 'Colaboraciones' },
+    ],
+    new Set(['2']),
+    [],
+  );
+  const otherPhone = [
+    { ...makeTrack('50', 'Remix'), album: 'Versiones' },
+    { ...makeTrack('60', 'Remix'), album: 'Colaboraciones' },
+  ];
+
+  expect(matchBackup(backup, otherPhone).favoriteIds).toEqual(['60']);
+});
+
+test('does not guess when an older backup matches multiple local tracks', () => {
+  const backup = {
+    version: 1 as const,
+    favorites: [{ title: 'Remix', artist: 'Artista' }],
+    playlists: [],
+  };
+  const duplicates = [
+    { ...makeTrack('1', 'Remix'), album: 'Versiones' },
+    { ...makeTrack('2', 'Remix'), album: 'Colaboraciones' },
+  ];
+
+  const result = matchBackup(backup, duplicates);
+
+  expect(result.favoriteIds).toEqual([]);
+  expect(result.missingCount).toBe(1);
 });
 
 test('counts each song missing from this phone once', () => {

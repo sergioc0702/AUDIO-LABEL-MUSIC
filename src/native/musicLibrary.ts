@@ -28,6 +28,12 @@ type MusicLibraryModule = {
   shareTrack(trackId: string, title: string): Promise<void>;
   exportBackup(fileName: string, contents: string): Promise<boolean>;
   importBackup(): Promise<string | null>;
+  exportPlaylistFile(fileName: string, contents: string): Promise<boolean>;
+  importPlaylistFile(): Promise<string | null>;
+  importLyricsFile(): Promise<string | null>;
+  getLyrics(trackId: string): Promise<string | null>;
+  saveLyrics(trackId: string, contents: string): Promise<void>;
+  deleteLyrics(trackId: string): Promise<void>;
   saveAppearance(appearance: string): Promise<void>;
   getAppearance(): Promise<string | null>;
   getPlaybackRate(): Promise<number>;
@@ -200,6 +206,48 @@ export function importBackupFile(): Promise<string | null> {
     throw new Error('El módulo nativo de música no está disponible.');
   }
   return musicLibrary.importBackup();
+}
+
+export function exportM3uFile(fileName: string, contents: string): Promise<boolean> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.exportPlaylistFile(fileName, contents);
+}
+
+export function importM3uFile(): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.importPlaylistFile();
+}
+
+export function importLrcFile(): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.importLyricsFile();
+}
+
+export function getStoredLyrics(trackId: string): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.getLyrics(trackId);
+}
+
+export function storeLyrics(trackId: string, contents: string): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.saveLyrics(trackId, contents);
+}
+
+export function removeStoredLyrics(trackId: string): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.deleteLyrics(trackId);
 }
 
 export function storeAppearance(appearance: Appearance): Promise<void> {

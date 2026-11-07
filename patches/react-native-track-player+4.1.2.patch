@@ -12,7 +12,7 @@ index ac33473..dac55da 100644
  //    implementation "com.github.doublesymmetry:kotlin-audio:2.1.0"
  
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
-index b2409a0..f4e3202 100644
+index b2409a0..1a8a6c3 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
 @@ -19,6 +19,7 @@ import com.facebook.react.bridge.*
@@ -61,7 +61,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
          if (data == null) {
              callback.resolve(null)
-@@ -301,14 +306,14 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -301,14 +306,42 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -74,11 +74,39 @@ index b2409a0..f4e3202 100644
  
      @ReactMethod
 -    fun remove(data: ReadableArray?, callback: Promise) = scope.launch {
++    fun moveTracks(
++        data: ReadableArray?,
++        expectedQueueIds: ReadableArray?,
++        expectedActiveTrackId: String?,
++        callback: Promise
++    ): Unit = launch {
++        if (verifyServiceBoundOrReject(callback)) return@launch
++        try {
++            requireNotNull(data) { "Queue moves are required." }
++            requireNotNull(expectedQueueIds) { "Expected queue IDs are required." }
++            requireNotNull(expectedActiveTrackId) { "Expected active track ID is required." }
++
++            val moves = (0 until data.size()).map { index ->
++                val move = requireNotNull(data.getArray(index)) { "Invalid queue move." }
++                require(move.size() == 2) { "Each queue move must have two indexes." }
++                move.getInt(0) to move.getInt(1)
++            }
++            val expectedIds = (0 until expectedQueueIds.size()).map { index ->
++                requireNotNull(expectedQueueIds.getString(index)) { "Invalid queue track ID." }
++            }
++            musicService.moveTracks(moves, expectedIds, expectedActiveTrackId)
++            callback.resolve(null)
++        } catch (exception: Exception) {
++            rejectWithException(callback, exception)
++        }
++    }
++
++    @ReactMethod
 +    fun remove(data: ReadableArray?, callback: Promise): Unit = launch {
          if (verifyServiceBoundOrReject(callback)) return@launch
          val inputIndexes = Arguments.toList(data)
          if (inputIndexes != null) {
-@@ -331,8 +336,8 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -331,8 +364,8 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -89,7 +117,7 @@ index b2409a0..f4e3202 100644
              if (verifyServiceBoundOrReject(callback)) return@launch
  
              if (index < 0 || index >= musicService.tracks.size) {
-@@ -348,7 +353,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -348,7 +381,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          }
  
      @ReactMethod
@@ -98,7 +126,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          if (musicService.tracks.isEmpty())
-@@ -364,7 +369,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -364,7 +397,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -107,7 +135,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          if (musicService.tracks.isEmpty())
-@@ -375,7 +380,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -375,7 +408,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -116,7 +144,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.removeUpcomingTracks()
-@@ -383,7 +388,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -383,7 +416,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -125,7 +153,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.skip(index)
-@@ -396,7 +401,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -396,7 +429,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -134,7 +162,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.skipToNext()
-@@ -409,7 +414,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -409,7 +442,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -143,7 +171,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.skipToPrevious()
-@@ -422,7 +427,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -422,7 +455,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -152,7 +180,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.stop()
-@@ -433,7 +438,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -433,7 +466,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -161,7 +189,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.play()
-@@ -441,7 +446,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -441,7 +474,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -170,7 +198,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.pause()
-@@ -449,7 +454,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -449,7 +482,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -179,7 +207,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.stop()
-@@ -457,7 +462,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -457,7 +490,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -188,7 +216,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.seekTo(seconds)
-@@ -465,7 +470,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -465,7 +498,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -197,7 +225,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.seekBy(offset)
-@@ -473,7 +478,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -473,7 +506,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -206,7 +234,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.retry()
-@@ -481,7 +486,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -481,7 +514,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -215,7 +243,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.setVolume(volume)
-@@ -489,14 +494,14 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -489,14 +522,14 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -232,7 +260,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.setRate(rate)
-@@ -504,14 +509,14 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -504,14 +537,14 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -249,7 +277,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.setRepeatMode(RepeatMode.fromOrdinal(mode))
-@@ -519,14 +524,14 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -519,14 +552,14 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -266,7 +294,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          musicService.playWhenReady = playWhenReady
-@@ -534,32 +539,32 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -534,32 +567,32 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -304,7 +332,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          try {
-@@ -572,7 +577,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -572,7 +605,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -313,7 +341,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
          callback.resolve(
              if (musicService.tracks.isEmpty()) null else musicService.getCurrentTrackIndex()
-@@ -580,39 +585,38 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -580,39 +613,38 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -360,7 +388,7 @@ index b2409a0..f4e3202 100644
          if (verifyServiceBoundOrReject(callback)) return@launch
          var bundle = Bundle()
          bundle.putDouble("duration", musicService.getDurationInSeconds());
-@@ -622,7 +626,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -622,7 +654,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      }
  
      @ReactMethod
@@ -370,10 +398,112 @@ index b2409a0..f4e3202 100644
          callback.resolve(Arguments.fromBundle(musicService.getPlayerStateBundle(musicService.state)))
      }
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
-index afa6b0f..58d5e18 100644
+index afa6b0f..74a435e 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
-@@ -741,7 +741,7 @@ class MusicService : HeadlessJsTaskService() {
+@@ -46,6 +46,13 @@ class MusicService : HeadlessJsTaskService() {
+     private val binder = MusicBinder()
+     private val scope = MainScope()
+     private var progressUpdateJob: Job? = null
++    private var androidAutoResolver: ((String?, String?) -> List<Track>?)? = null
++
++    val playerInitialized: Boolean
++        get() = this::player.isInitialized
++
++    val externalMediaSession
++        get() = if (this::player.isInitialized) player.externalMediaSession else null
+ 
+     /**
+      * Use [appKilledPlaybackBehavior] instead.
+@@ -160,6 +167,7 @@ class MusicService : HeadlessJsTaskService() {
+         player.automaticallyUpdateNotificationMetadata = automaticallyUpdateNotificationMetadata
+         observeEvents()
+         setupForegrounding()
++        sendBroadcast(Intent("com.mymusicapp.player.TRACK_PLAYER_READY").setPackage(packageName))
+     }
+ 
+     @MainThread
+@@ -310,6 +318,24 @@ class MusicService : HeadlessJsTaskService() {
+         player.move(fromIndex, toIndex);
+     }
+ 
++    @MainThread
++    fun moveTracks(
++        moves: List<Pair<Int, Int>>,
++        expectedQueueIds: List<String>,
++        expectedActiveTrackId: String
++    ) {
++        val currentQueueIds = tracks.map { it.originalItem?.getString("id") }
++        if (currentQueueIds.any { it == null } || currentQueueIds.filterNotNull() != expectedQueueIds) {
++            throw IllegalStateException("La cola cambió antes de aplicar el orden aleatorio.")
++        }
++        val activeTrackId = (player.currentItem as? TrackAudioItem)
++            ?.track?.originalItem?.getString("id")
++        if (activeTrackId != expectedActiveTrackId) {
++            throw IllegalStateException("La canción activa cambió antes de aplicar el orden aleatorio.")
++        }
++        player.moveItems(moves)
++    }
++
+     @MainThread
+     fun remove(index: Int) {
+         remove(listOf(index))
+@@ -330,6 +356,54 @@ class MusicService : HeadlessJsTaskService() {
+         player.play()
+     }
+ 
++    @MainThread
++    fun setAndroidAutoResolver(resolver: ((String?, String?) -> List<Track>?)?) {
++        androidAutoResolver = resolver
++        val session = externalMediaSession ?: return
++        session.setCallback(object : android.support.v4.media.session.MediaSessionCompat.Callback() {
++            override fun onPlay() = play()
++            override fun onPause() = pause()
++            override fun onStop() = stop()
++            override fun onSkipToNext() = skipToNext()
++            override fun onSkipToPrevious() {
++                if (getPositionInSeconds() > 3.0) seekTo(0f) else skipToPrevious()
++            }
++            override fun onSeekTo(pos: Long) = seekTo(pos / 1000f)
++            override fun onSkipToQueueItem(id: Long) {
++                val index = id.toInt()
++                if (index in tracks.indices) skip(index)
++            }
++            override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
++                val resolved = mediaId?.let { androidAutoResolver?.invoke(it, null) }
++                playResolvedTracks(resolved)
++            }
++            override fun onPlayFromSearch(query: String?, extras: Bundle?) {
++                val resolved = androidAutoResolver?.invoke(null, query)
++                playResolvedTracks(resolved)
++            }
++        })
++    }
++
++    @MainThread
++    private fun playResolvedTracks(resolved: List<Track>?) {
++        val items = resolved.orEmpty()
++        if (items.isEmpty()) return
++        if (items.size == 1) {
++            val id = items.first().originalItem?.getString("id")
++            val existingIndex = tracks.indexOfFirst {
++                it.originalItem?.getString("id") == id
++            }
++            if (existingIndex >= 0) {
++                skip(existingIndex)
++                play()
++                return
++            }
++        }
++        clear()
++        add(items)
++        play()
++    }
++
+     @MainThread
+     fun pause() {
+         player.pause()
+@@ -741,9 +815,15 @@ class MusicService : HeadlessJsTaskService() {
  
      @MainThread
      private fun emit(event: String, data: Bundle? = null) {
@@ -381,8 +511,16 @@ index afa6b0f..58d5e18 100644
 +        reactHost?.currentReactContext
              ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
              ?.emit(event, data?.let { Arguments.fromBundle(it) })
++        if (event == MusicEvents.PLAYBACK_STATE ||
++            event == MusicEvents.PLAYBACK_ACTIVE_TRACK_CHANGED ||
++            event == MusicEvents.PLAYBACK_METADATA
++        ) {
++            sendBroadcast(Intent("com.mymusicapp.player.WIDGET_REFRESH").setPackage(packageName))
++        }
      }
-@@ -751,7 +751,7 @@ class MusicService : HeadlessJsTaskService() {
+ 
+     @MainThread
+@@ -751,7 +831,7 @@ class MusicService : HeadlessJsTaskService() {
          val payload = Arguments.createArray()
          data.forEach { payload.pushMap(Arguments.fromBundle(it)) }
  
@@ -391,3 +529,67 @@ index afa6b0f..58d5e18 100644
              ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
              ?.emit(event, payload)
      }
+diff --git a/node_modules/react-native-track-player/lib/src/trackPlayer.d.ts b/node_modules/react-native-track-player/lib/src/trackPlayer.d.ts
+index 8a6d0a9..10481b9 100644
+--- a/node_modules/react-native-track-player/lib/src/trackPlayer.d.ts
++++ b/node_modules/react-native-track-player/lib/src/trackPlayer.d.ts
+@@ -51,6 +51,8 @@ export declare function load(track: Track): Promise<number | void>;
+  * the size of the queue, then the track is moved to the end of the queue.
+  */
+ export declare function move(fromIndex: number, toIndex: number): Promise<void>;
++/** Apply queue moves in a single native call after validating the queue snapshot. */
++export declare function moveTracks(moves: Array<{ from: number; to: number; }>, expectedQueueIds: string[], expectedActiveTrackId: string): Promise<void>;
+ /**
+  * Removes multiple tracks from the queue by their indexes.
+  *
+diff --git a/node_modules/react-native-track-player/lib/src/trackPlayer.js b/node_modules/react-native-track-player/lib/src/trackPlayer.js
+index 191e5de..795de70 100644
+--- a/node_modules/react-native-track-player/lib/src/trackPlayer.js
++++ b/node_modules/react-native-track-player/lib/src/trackPlayer.js
+@@ -85,6 +85,16 @@ export async function load(track) {
+ export async function move(fromIndex, toIndex) {
+     return TrackPlayer.move(fromIndex, toIndex);
+ }
++/** Apply queue moves in a single native call after validating the queue snapshot. */
++export async function moveTracks(moves, expectedQueueIds, expectedActiveTrackId) {
++    if (Platform.OS !== 'android') {
++        for (const { from, to } of moves) {
++            await TrackPlayer.move(from, to);
++        }
++        return;
++    }
++    return TrackPlayer.moveTracks(moves.map(({ from, to }) => [from, to]), expectedQueueIds, expectedActiveTrackId);
++}
+ export async function remove(indexOrIndexes) {
+     return TrackPlayer.remove(Array.isArray(indexOrIndexes) ? indexOrIndexes : [indexOrIndexes]);
+ }
+diff --git a/node_modules/react-native-track-player/src/trackPlayer.ts b/node_modules/react-native-track-player/src/trackPlayer.ts
+index 6f6d723..2683b6c 100644
+--- a/node_modules/react-native-track-player/src/trackPlayer.ts
++++ b/node_modules/react-native-track-player/src/trackPlayer.ts
+@@ -150,6 +150,25 @@ export async function move(fromIndex: number, toIndex: number): Promise<void> {
+   return TrackPlayer.move(fromIndex, toIndex);
+ }
+ 
++/** Apply queue moves in a single native call after validating the queue snapshot. */
++export async function moveTracks(
++  moves: Array<{ from: number; to: number }>,
++  expectedQueueIds: string[],
++  expectedActiveTrackId: string
++): Promise<void> {
++  if (Platform.OS !== 'android') {
++    for (const { from, to } of moves) {
++      await TrackPlayer.move(from, to);
++    }
++    return;
++  }
++  return TrackPlayer.moveTracks(
++    moves.map(({ from, to }) => [from, to]),
++    expectedQueueIds,
++    expectedActiveTrackId
++  );
++}
++
+ /**
+  * Removes multiple tracks from the queue by their indexes.
+  *

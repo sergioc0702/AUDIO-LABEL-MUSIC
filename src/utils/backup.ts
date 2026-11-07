@@ -1,7 +1,7 @@
 import type { Playlist, Track } from '../types/Track';
 import { normalizeText } from './collections';
 
-type BackupTrack = { title: string; artist: string };
+type BackupTrack = { title: string; artist: string; album?: string };
 
 export type LibraryBackup = {
   version: 1;
@@ -9,11 +9,15 @@ export type LibraryBackup = {
   playlists: { name: string; tracks: BackupTrack[] }[];
 };
 
-function toBackupTrack({ title, artist }: Track): BackupTrack {
-  return { title, artist };
+function toBackupTrack({ title, artist, album }: Track): BackupTrack {
+  return { title, artist, album };
 }
 
-function trackKey({ title, artist }: BackupTrack) {
+function trackKey({ title, artist, album }: BackupTrack) {
+  return `${normalizeText(title)}|${normalizeText(artist)}|${normalizeText(album ?? '')}`;
+}
+
+function legacyTrackKey({ title, artist }: BackupTrack) {
   return `${normalizeText(title)}|${normalizeText(artist)}`;
 }
 
@@ -41,7 +45,11 @@ export function buildBackup(
 
 function isBackupTrack(value: unknown): value is BackupTrack {
   const track = value as BackupTrack | null;
-  return typeof track?.title === 'string' && typeof track?.artist === 'string';
+  return (
+    typeof track?.title === 'string' &&
+    typeof track?.artist === 'string' &&
+    (track.album === undefined || typeof track.album === 'string')
+  );
 }
 
 export function readBackup(text: string): LibraryBackup | null {
@@ -68,18 +76,30 @@ export function readBackup(text: string): LibraryBackup | null {
 
 /** Finds the saved songs in this library. Those not on this phone are counted. */
 export function matchBackup(backup: LibraryBackup, tracks: Track[]) {
-  const idsByKey = new Map(
-    tracks.map(track => [trackKey(track), track.id] as const),
-  );
+  const idsByKey = new Map<string, string[]>();
+  const idsByLegacyKey = new Map<string, string[]>();
+  tracks.forEach(track => {
+    const fullKey = trackKey(track);
+    const legacyKey = legacyTrackKey(track);
+    idsByKey.set(fullKey, [...(idsByKey.get(fullKey) ?? []), track.id]);
+    idsByLegacyKey.set(legacyKey, [
+      ...(idsByLegacyKey.get(legacyKey) ?? []),
+      track.id,
+    ]);
+  });
   const missing = new Set<string>();
   const findIds = (saved: BackupTrack[]) =>
     saved.flatMap(track => {
-      const id = idsByKey.get(trackKey(track));
-      if (id === undefined) {
-        missing.add(trackKey(track));
+      const key = track.album === undefined ? legacyTrackKey(track) : trackKey(track);
+      const ids =
+        track.album === undefined
+          ? idsByLegacyKey.get(key)
+          : idsByKey.get(key);
+      if (ids?.length !== 1) {
+        missing.add(key);
         return [];
       }
-      return [id];
+      return ids;
     });
 
   return {
