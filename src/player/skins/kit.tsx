@@ -124,7 +124,7 @@ export function playerTools(kit: PlayerKit) {
   return [
     {
       key: 'queue',
-      caption: `Cola · ${kit.queueCount}`,
+      caption: 'Cola',
       label: `Abrir cola de reproducción con ${kit.queueCount} canciones`,
       active: false,
       onPress: kit.openQueue,
