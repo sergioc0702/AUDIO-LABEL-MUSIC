@@ -66,6 +66,13 @@ data class TrackMetadataEntity(
   val year: Int?,
 )
 
+@Entity(tableName = "track_lyrics")
+data class TrackLyricsEntity(
+  @PrimaryKey val trackId: String,
+  val contents: String,
+  val updatedAt: Long,
+)
+
 @Dao
 interface PlaylistDao {
   @Query("SELECT * FROM playlists ORDER BY createdAt, name COLLATE NOCASE")
@@ -136,6 +143,18 @@ interface PlaylistDao {
 
   @Query("DELETE FROM track_metadata WHERE trackId IN (:trackIds)")
   suspend fun deleteTrackMetadata(trackIds: List<String>)
+
+  @Query("SELECT contents FROM track_lyrics WHERE trackId = :trackId LIMIT 1")
+  suspend fun getLyrics(trackId: String): String?
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun saveLyrics(lyrics: TrackLyricsEntity)
+
+  @Query("DELETE FROM track_lyrics WHERE trackId = :trackId")
+  suspend fun deleteLyrics(trackId: String)
+
+  @Query("UPDATE track_lyrics SET trackId = :newId WHERE trackId = :oldId")
+  suspend fun remapLyrics(oldId: String, newId: String)
 }
 
 data class TopPlayedEntry(
@@ -154,8 +173,9 @@ data class RecentPlaybackEntry(
     PlaylistTrackEntity::class,
     PlaybackHistoryEntity::class,
     TrackMetadataEntity::class,
+    TrackLyricsEntity::class,
   ],
-  version = 3,
+  version = 4,
   exportSchema = false,
 )
 abstract class PlaylistDatabase : RoomDatabase() {
@@ -192,6 +212,16 @@ abstract class PlaylistDatabase : RoomDatabase() {
       }
     }
 
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          "CREATE TABLE IF NOT EXISTS `track_lyrics` " +
+            "(`trackId` TEXT NOT NULL, `contents` TEXT NOT NULL, " +
+            "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`trackId`))",
+        )
+      }
+    }
+
     @Volatile
     private var instance: PlaylistDatabase? = null
 
@@ -201,7 +231,7 @@ abstract class PlaylistDatabase : RoomDatabase() {
           context.applicationContext,
           PlaylistDatabase::class.java,
           "playlists.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
       }
   }
 }

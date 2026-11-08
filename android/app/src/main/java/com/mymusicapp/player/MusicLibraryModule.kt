@@ -3,14 +3,17 @@ package com.mymusicapp.player
 import android.Manifest
 import android.app.Activity
 import android.app.RecoverableSecurityException
+import android.content.BroadcastReceiver
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.IntentSender
 import android.database.ContentObserver
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -18,12 +21,14 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.BaseActivityEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.WritableArray
+import com.facebook.react.bridge.WritableMap
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -70,6 +75,10 @@ class MusicLibraryModule(
         finishBackupRequest(requestCode, resultCode, data?.data)
         return
       }
+      if (requestCode in PLAYLIST_EXPORT_REQUEST_CODE..LYRICS_IMPORT_REQUEST_CODE) {
+        finishDocumentRequest(resultCode, data?.data)
+        return
+      }
       if (requestCode != DELETE_REQUEST_CODE) {
         return
       }
@@ -110,6 +119,8 @@ class MusicLibraryModule(
   private var pendingDeletion: PendingDeletion? = null
   @Volatile
   private var pendingBackup: PendingBackup? = null
+  @Volatile
+  private var pendingDocument: PendingDocument? = null
 
   init {
     val preferences = context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
@@ -129,7 +140,94 @@ class MusicLibraryModule(
 
   override fun getName(): String = "MusicLibrary"
 
+  private val audioManager by lazy {
+    context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+  }
+  private var volumeReceiver: BroadcastReceiver? = null
+
+  /** Media volume from 0 to 1, read from the system every time. */
+  private fun mediaVolume(): WritableMap {
+    val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+    val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      audioManager.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+    } else {
+      0
+    }
+    val now = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+    return Arguments.createMap().apply {
+      putDouble("level", if (max > min) (now - min).toDouble() / (max - min) else 0.0)
+      putBoolean("fixed", audioManager.isVolumeFixed)
+    }
+  }
+
+  @ReactMethod
+  fun getMediaVolume(promise: Promise) {
+    try {
+      promise.resolve(mediaVolume())
+    } catch (error: RuntimeException) {
+      promise.reject("E_VOLUME", "No se pudo leer el volumen.", error)
+    }
+  }
+
+  @ReactMethod
+  fun setMediaVolume(level: Double, promise: Promise) {
+    try {
+      if (!audioManager.isVolumeFixed && level.isFinite()) {
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          audioManager.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        } else {
+          0
+        }
+        val index = min + Math.round(level.coerceIn(0.0, 1.0) * (max - min)).toInt()
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
+      }
+      promise.resolve(mediaVolume())
+    } catch (error: RuntimeException) {
+      promise.reject("E_VOLUME", "No se pudo cambiar el volumen.", error)
+    }
+  }
+
+  /**
+   * Android has no public listener for volume changes. This undocumented
+   * broadcast only tells the app to read the volume again; JavaScript also
+   * polls while the screen that needs it is open, in case it stops arriving.
+   */
+  @ReactMethod
+  fun startVolumeUpdates() {
+    if (volumeReceiver != null) {
+      return
+    }
+    val receiver = object : BroadcastReceiver() {
+      override fun onReceive(receiverContext: Context?, intent: Intent?) {
+        if (context.hasActiveReactInstance()) {
+          context.emitDeviceEvent("mediaVolumeChanged", mediaVolume())
+        }
+      }
+    }
+    ContextCompat.registerReceiver(
+      context,
+      receiver,
+      IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
+      ContextCompat.RECEIVER_NOT_EXPORTED,
+    )
+    volumeReceiver = receiver
+  }
+
+  @ReactMethod
+  fun stopVolumeUpdates() {
+    volumeReceiver?.let { receiver ->
+      try {
+        context.unregisterReceiver(receiver)
+      } catch (_: IllegalArgumentException) {
+        // Already unregistered.
+      }
+    }
+    volumeReceiver = null
+  }
+
   override fun invalidate() {
+    stopVolumeUpdates()
     context.contentResolver.unregisterContentObserver(audioObserver)
     observerRefresh?.let(observerHandler::removeCallbacks)
     context.removeActivityEventListener(activityEventListener)
@@ -143,6 +241,11 @@ class MusicLibraryModule(
       "La copia se canceló porque la aplicación se reinició.",
     )
     pendingBackup = null
+    pendingDocument?.promise?.reject(
+      "E_DOCUMENT",
+      "La operación con el archivo se canceló porque la aplicación se reinició.",
+    )
+    pendingDocument = null
     playlistScope.cancel()
     super.invalidate()
   }
@@ -260,6 +363,42 @@ class MusicLibraryModule(
   }
 
   @ReactMethod
+  fun getLyrics(trackId: String, promise: Promise) {
+    if (trackId.isBlank()) {
+      promise.reject("E_LYRICS_TRACK", "La canción seleccionada no es válida.")
+      return
+    }
+    runPlaylistOperation(promise, "E_LYRICS_READ", "No se pudieron leer las letras.") {
+      playlistDatabase.playlistDao().getLyrics(trackId)
+    }
+  }
+
+  @ReactMethod
+  fun saveLyrics(trackId: String, contents: String, promise: Promise) {
+    if (
+      trackId.isBlank() || contents.isBlank() ||
+      contents.toByteArray(Charsets.UTF_8).size > MAX_LYRICS_FILE_BYTES
+    ) {
+      promise.reject("E_LYRICS_INVALID", "El archivo de letras está vacío o supera el tamaño permitido.")
+      return
+    }
+    runPlaylistOperation(promise, "E_LYRICS_WRITE", "No se pudieron guardar las letras.") {
+      playlistDatabase.playlistDao().saveLyrics(
+        TrackLyricsEntity(trackId, contents, System.currentTimeMillis()),
+      )
+      null
+    }
+  }
+
+  @ReactMethod
+  fun deleteLyrics(trackId: String, promise: Promise) {
+    runPlaylistOperation(promise, "E_LYRICS_DELETE", "No se pudieron eliminar las letras.") {
+      playlistDatabase.playlistDao().deleteLyrics(trackId)
+      null
+    }
+  }
+
+  @ReactMethod
   fun recordPlaybackHistory(trackId: String, promise: Promise) {
     if (trackId.isBlank()) {
       promise.reject("E_HISTORY_TRACK", "No se puede guardar una canción no válida.")
@@ -357,6 +496,10 @@ class MusicLibraryModule(
 
   @ReactMethod
   fun exportBackup(fileName: String, contents: String, promise: Promise) {
+    if (contents.toByteArray(Charsets.UTF_8).size > MAX_BACKUP_FILE_BYTES) {
+      promise.reject("E_BACKUP_SIZE", "La copia supera el tamaño máximo permitido.")
+      return
+    }
     val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
       addCategory(Intent.CATEGORY_OPENABLE)
       type = "application/json"
@@ -379,7 +522,7 @@ class MusicLibraryModule(
   }
 
   private fun startBackupRequest(intent: Intent, requestCode: Int, backup: PendingBackup) {
-    if (pendingBackup != null) {
+    if (pendingBackup != null || pendingDocument != null) {
       backup.promise.reject("E_BACKUP", "Ya hay una copia en curso.")
       return
     }
@@ -409,12 +552,12 @@ class MusicLibraryModule(
         if (exporting) {
           val output = context.contentResolver.openOutputStream(uri)
             ?: throw IOException("Android no pudo abrir el archivo.")
-          output.use { it.write(backup.contents.orEmpty().toByteArray()) }
+          output.use { it.write(backup.contents.orEmpty().toByteArray(Charsets.UTF_8)) }
           backup.promise.resolve(true)
         } else {
           val input = context.contentResolver.openInputStream(uri)
             ?: throw IOException("Android no pudo abrir el archivo.")
-          backup.promise.resolve(input.bufferedReader().use { it.readText() })
+          backup.promise.resolve(readUtf8WithLimit(input, MAX_BACKUP_FILE_BYTES))
         }
       } catch (error: Exception) {
         backup.promise.reject("E_BACKUP", "No se pudo leer o escribir el archivo.", error)
@@ -423,6 +566,103 @@ class MusicLibraryModule(
   }
 
   private class PendingBackup(val promise: Promise, val contents: String?)
+
+  @ReactMethod
+  fun exportPlaylistFile(fileName: String, contents: String, promise: Promise) {
+    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "audio/x-mpegurl"
+      putExtra(Intent.EXTRA_TITLE, fileName)
+      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "text/plain"))
+    }
+    startDocumentRequest(
+      intent,
+      PLAYLIST_EXPORT_REQUEST_CODE,
+      PendingDocument(promise, contents, exporting = true, maxBytes = MAX_PLAYLIST_FILE_BYTES),
+    )
+  }
+
+  @ReactMethod
+  fun importPlaylistFile(promise: Promise) {
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "*/*"
+      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "text/plain", "application/octet-stream"))
+    }
+    startDocumentRequest(
+      intent,
+      PLAYLIST_IMPORT_REQUEST_CODE,
+      PendingDocument(promise, null, exporting = false, maxBytes = MAX_PLAYLIST_FILE_BYTES),
+    )
+  }
+
+  @ReactMethod
+  fun importLyricsFile(promise: Promise) {
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "text/plain"
+      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "application/x-lrc"))
+    }
+    startDocumentRequest(
+      intent,
+      LYRICS_IMPORT_REQUEST_CODE,
+      PendingDocument(promise, null, exporting = false, maxBytes = MAX_LYRICS_FILE_BYTES),
+    )
+  }
+
+  private fun startDocumentRequest(intent: Intent, requestCode: Int, document: PendingDocument) {
+    if (pendingDocument != null || pendingBackup != null) {
+      document.promise.reject("E_DOCUMENT", "Ya hay una operación con archivos en curso.")
+      return
+    }
+    pendingDocument = document
+    context.runOnUiQueueThread {
+      try {
+        val activity = context.currentActivity
+          ?: throw IllegalStateException("No hay una pantalla activa para elegir el archivo.")
+        activity.startActivityForResult(intent, requestCode)
+      } catch (error: Exception) {
+        pendingDocument = null
+        document.promise.reject("E_DOCUMENT", "No se pudo abrir el selector de archivos.", error)
+      }
+    }
+  }
+
+  private fun finishDocumentRequest(resultCode: Int, uri: Uri?) {
+    val document = pendingDocument ?: return
+    pendingDocument = null
+    if (resultCode != Activity.RESULT_OK || uri == null) {
+      document.promise.resolve(if (document.exporting) false else null)
+      return
+    }
+    playlistScope.launch {
+      try {
+        if (document.exporting) {
+          val contents = document.contents.orEmpty().toByteArray(Charsets.UTF_8)
+          if (contents.size > document.maxBytes) {
+            throw IOException("El archivo supera el tamaño permitido.")
+          }
+          val output = context.contentResolver.openOutputStream(uri)
+            ?: throw IOException("Android no pudo abrir el archivo.")
+          output.use { it.write(contents) }
+          document.promise.resolve(true)
+        } else {
+          val input = context.contentResolver.openInputStream(uri)
+            ?: throw IOException("Android no pudo abrir el archivo.")
+          document.promise.resolve(readUtf8WithLimit(input, document.maxBytes))
+        }
+      } catch (error: Exception) {
+        document.promise.reject("E_DOCUMENT", "No se pudo leer o escribir el archivo.", error)
+      }
+    }
+  }
+
+  private class PendingDocument(
+    val promise: Promise,
+    val contents: String?,
+    val exporting: Boolean,
+    val maxBytes: Int,
+  )
 
   @ReactMethod
   fun saveAppearance(appearance: String, promise: Promise) {
@@ -745,6 +985,7 @@ class MusicLibraryModule(
         playlistDatabase.withTransaction {
           dao.deletePlaylistTrackReferences(deletion.trackId)
           dao.deletePlaybackHistoryForTrack(deletion.trackId)
+          dao.deleteLyrics(deletion.trackId)
         }
         val preferences =
           context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
@@ -796,7 +1037,7 @@ class MusicLibraryModule(
   }
 
   private suspend fun scanTracks(): WritableArray {
-    val projection = arrayOf(
+    val projection = listOf(
       MediaStore.Audio.Media._ID,
       MediaStore.Audio.Media.TITLE,
       MediaStore.Audio.Media.ARTIST,
@@ -807,8 +1048,9 @@ class MusicLibraryModule(
       MediaStore.Audio.Media.DATE_ADDED,
       MediaStore.Audio.Media.DATE_MODIFIED,
       MediaStore.Audio.Media.SIZE,
+      MediaStore.Audio.Media.DATA,
       folderColumn(),
-    )
+    ).distinct().toTypedArray()
     val dao = playlistDatabase.playlistDao()
     val cachedMetadata = dao.getTrackMetadata().associateBy { it.trackId }
     val updatedMetadata = mutableListOf<TrackMetadataEntity>()
@@ -842,6 +1084,7 @@ class MusicLibraryModule(
       val dateAddedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
       val dateModifiedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
       val sizeColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+      val filePathColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
       val folderIndex = it.getColumnIndexOrThrow(folderColumn())
 
       while (it.moveToNext()) {
@@ -899,6 +1142,7 @@ class MusicLibraryModule(
         val track = Arguments.createMap().apply {
           putString("id", trackId)
           putString("uri", uri.toString())
+          it.getString(filePathColumn)?.let { path -> putString("filePath", path) }
           putString("title", title.trim())
           putString("artist", artist.trim())
           putString("album", album.trim())
@@ -961,6 +1205,8 @@ class MusicLibraryModule(
       moved.forEach { (oldId, newId) ->
         dao.remapPlaylistTrack(oldId, newId)
         dao.remapPlaybackHistory(oldId, newId)
+        dao.deleteLyrics(newId)
+        dao.remapLyrics(oldId, newId)
       }
     }
     val preferences = context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
@@ -1113,6 +1359,12 @@ class MusicLibraryModule(
     const val DELETE_REQUEST_CODE = 7412
     const val BACKUP_EXPORT_REQUEST_CODE = 7413
     const val BACKUP_IMPORT_REQUEST_CODE = 7414
+    const val PLAYLIST_EXPORT_REQUEST_CODE = 7415
+    const val PLAYLIST_IMPORT_REQUEST_CODE = 7416
+    const val LYRICS_IMPORT_REQUEST_CODE = 7417
+    const val MAX_PLAYLIST_FILE_BYTES = 10 * 1024 * 1024
+    const val MAX_BACKUP_FILE_BYTES = 10 * 1024 * 1024
+    const val MAX_LYRICS_FILE_BYTES = 1024 * 1024
     const val LIBRARY_CHANGE_DEBOUNCE_MS = 700L
     const val METADATA_DELETE_BATCH_SIZE = 500
   }

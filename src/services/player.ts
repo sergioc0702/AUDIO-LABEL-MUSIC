@@ -134,6 +134,14 @@ export async function movePlayerTrack(
   await TrackPlayer.move(fromIndex, toIndex);
 }
 
+export async function movePlayerTracks(
+  moves: Array<{ from: number; to: number }>,
+  expectedQueueIds: string[],
+  expectedActiveTrackId: string,
+): Promise<void> {
+  await TrackPlayer.moveTracks(moves, expectedQueueIds, expectedActiveTrackId);
+}
+
 export async function removePlayerTrack(index: number): Promise<void> {
   await TrackPlayer.remove(index);
 }

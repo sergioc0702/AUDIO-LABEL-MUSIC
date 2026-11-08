@@ -1,6 +1,7 @@
 package com.doublesymmetry.kotlinaudio.players
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.media.AudioManager.AUDIOFOCUS_LOSS
 import android.net.Uri
@@ -214,6 +215,10 @@ abstract class BaseAudioPlayer internal constructor(
 
     private val mediaSession = MediaSessionCompat(context, "KotlinAudioPlayer")
     private val mediaSessionConnector = MediaSessionConnector(mediaSession)
+
+    /** Exposes the existing playback session to Android Auto without creating another player. */
+    val externalMediaSession: MediaSessionCompat
+        get() = mediaSession
 
     init {
         if (cacheConfig != null) {
@@ -697,6 +702,7 @@ abstract class BaseAudioPlayer internal constructor(
         override fun onEvents(player: Player, events: Player.Events) {
             // Note that it is necessary to set `playerState` in order, since each mutation fires an
             // event.
+            var refreshPlaybackWidget = false
             for (i in 0 until events.size()) {
                 when (events[i]) {
                     Player.EVENT_PLAYBACK_STATE_CHANGED -> {
@@ -722,6 +728,7 @@ abstract class BaseAudioPlayer internal constructor(
                         }
                     }
                     Player.EVENT_MEDIA_ITEM_TRANSITION -> {
+                        refreshPlaybackWidget = true
                         playbackError = null
                         if (currentItem != null) {
                             playerState = AudioPlayerState.LOADING
@@ -732,6 +739,7 @@ abstract class BaseAudioPlayer internal constructor(
                         }
                     }
                     Player.EVENT_PLAY_WHEN_READY_CHANGED -> {
+                        refreshPlaybackWidget = true
                         if (!player.playWhenReady && playerState != AudioPlayerState.STOPPED) {
                             playerState = AudioPlayerState.PAUSED
                         }
@@ -742,6 +750,14 @@ abstract class BaseAudioPlayer internal constructor(
                         }
                     }
                 }
+            }
+            if (refreshPlaybackWidget) {
+                context.sendBroadcast(
+                    Intent("com.mymusicapp.player.WIDGET_REFRESH").setClassName(
+                        context,
+                        "${context.packageName}.PlaybackWidgetProvider"
+                    )
+                )
             }
         }
 

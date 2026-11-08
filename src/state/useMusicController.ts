@@ -19,6 +19,7 @@ import {
   getPlayerQueue,
   getPlayerRepeatMode,
   movePlayerTrack,
+  movePlayerTracks,
   onPlayerError,
   pausePlayer,
   playPlayer,
@@ -49,17 +50,22 @@ import {
   getDeviceTracks,
   getEqualizerSettings,
   getFavoriteTrackIds,
+  getStoredLyrics,
   getPlaybackRate,
   getPlaylists,
   getRecentPlayback,
   getStoredPreference,
   getTopPlayed,
   importBackupFile,
+  importLrcFile,
+  importM3uFile,
   recordPlaybackHistory,
   renamePlaylist,
   setEqualizerSettings as persistEqualizerSettings,
   setPlaybackRate as persistPlaybackRate,
   setPlaylistTracks,
+  storeLyrics,
+  removeStoredLyrics,
   setTrackFavorite,
   shareTrackFile,
   storePreference,
@@ -74,7 +80,12 @@ import type {
 } from '../types/Track';
 import { buildBackup, matchBackup, readBackup } from '../utils/backup';
 import { formatTrackCount } from '../utils/formatTrackCount';
+import { buildM3u, resolveM3u } from '../utils/m3u';
+import { parseLrc } from '../utils/lyrics';
+import { exportM3uFile } from '../native/musicLibrary';
 import {
+  buildQueueMoves,
+  resolveActiveQueueIndex,
   restoreUpcomingTrackOrder,
   shuffleTracks,
   shuffleUpcomingTracks,
@@ -168,13 +179,14 @@ export function useMusicController({
     null,
   );
   const [shuffleEnabled, setShuffleEnabled] = useState(false);
+  const shuffleEnabledRef = useRef(false);
   const [repeatMode, setRepeatMode] = useState(RepeatMode.Off);
   const queueOperationInProgress = useRef(false);
   const libraryLoadInProgress = useRef(false);
   const libraryRefreshPending = useRef(false);
   const hasLibraryPermission = useRef(false);
   const libraryAccessDenied = useRef(false);
-  const originalQueueOrder = useRef<Track[]>([]);
+  const originalQueueOrder = useRef<Array<{ id: string }>>([]);
   const sessionChecked = useRef(false);
   const restoringSession = useRef(false);
   const undoTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -250,6 +262,7 @@ export function useMusicController({
       setPlaybackQueue(restored);
       setPlaybackSourceLabel(session.sourceLabel);
       setShuffleEnabled(session.shuffle);
+      shuffleEnabledRef.current = session.shuffle;
       setRepeatMode(session.repeatMode ?? RepeatMode.Off);
     })().catch(() => undefined);
   }, [playerReady, tracks]);
@@ -739,12 +752,14 @@ export function useMusicController({
     try {
       await seekPlayerTo(position);
       setErrorMessage(null);
+      return true;
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? `No se pudo cambiar la posición: ${error.message}`
           : 'No se pudo cambiar la posición.',
       );
+      return false;
     }
   }
 
@@ -1237,28 +1252,32 @@ export function useMusicController({
   }
 
   async function applyUpcomingQueueOrder(
-    targetQueue: Track[],
-    firstMovableIndex: number,
+    targetIds: string[],
+    currentIds: string[],
+    activeIndex: number,
   ) {
-    const updatedQueue = [...playbackQueue];
-    for (
-      let targetIndex = firstMovableIndex;
-      targetIndex < targetQueue.length;
-      targetIndex += 1
-    ) {
-      const currentIndex = updatedQueue.findIndex(
-        (track, index) =>
-          index >= targetIndex && track.id === targetQueue[targetIndex].id,
-      );
-      if (currentIndex < 0) {
-        throw new Error('No se pudo encontrar una canción en la cola.');
-      }
-      if (currentIndex !== targetIndex) {
-        await movePlayerTrack(currentIndex, targetIndex);
-        const [movedTrack] = updatedQueue.splice(currentIndex, 1);
-        updatedQueue.splice(targetIndex, 0, movedTrack);
-      }
+    if (activeIndex < 0 || activeIndex >= currentIds.length) {
+      throw new Error('No se pudo identificar la canción que está sonando.');
     }
+    const activeId = currentIds[activeIndex];
+    const start = activeIndex + 1;
+    const currentUpcoming = currentIds.slice(start);
+    const currentUpcomingSet = new Set(currentUpcoming);
+    const desiredUpcoming = targetIds.filter(id => currentUpcomingSet.has(id));
+    const desiredUpcomingSet = new Set(desiredUpcoming);
+    const desiredIds = [
+      ...currentIds.slice(0, start),
+      ...desiredUpcoming,
+      ...currentUpcoming.filter(id => !desiredUpcomingSet.has(id)),
+    ];
+    const moves = buildQueueMoves(currentIds, desiredIds, start);
+    if (moves.length === 0) {
+      return;
+    }
+
+    // The native player validates this exact snapshot and applies the whole
+    // move list in one main-thread call, so playback cannot advance between moves.
+    await movePlayerTracks(moves, currentIds, activeId);
   }
 
   async function toggleShuffle() {
@@ -1266,40 +1285,91 @@ export function useMusicController({
       return;
     }
 
-    const nextEnabled = !shuffleEnabled;
-    const activeIndex = activeTrack
-      ? playbackQueue.findIndex(track => track.id === activeTrack.id)
-      : -1;
-    const firstMovableIndex = Math.max(0, activeIndex + 1);
-    const targetQueue = nextEnabled
-      ? shuffleUpcomingTracks(playbackQueue, activeTrack?.id ?? '')
-      : restoreUpcomingTrackOrder(
-          playbackQueue,
-          originalQueueOrder.current,
-          activeTrack?.id ?? '',
-        );
-
-    if (nextEnabled) {
-      originalQueueOrder.current = [...playbackQueue];
-    }
+    const previousEnabled = shuffleEnabledRef.current;
+    const nextEnabled = !previousEnabled;
 
     queueOperationInProgress.current = true;
     setQueueUpdating(true);
+    setShuffleEnabled(nextEnabled);
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const previousOriginalOrder = [...originalQueueOrder.current];
+    let startingQueue: Array<{ id: string }> = [];
     try {
-      await applyUpcomingQueueOrder(targetQueue, firstMovableIndex);
+      const nativeQueue = await getPlayerQueue();
+      const liveQueue = nativeQueue.map(item => ({ id: String(item.id) }));
+      startingQueue = [...liveQueue];
+      const nativeActiveIndex = await getActivePlayerTrackIndex();
+      const safeActiveIndex = resolveActiveQueueIndex(
+        liveQueue.map(item => item.id),
+        nativeActiveIndex,
+        currentTrack?.id,
+      );
+      const liveActiveId = liveQueue[safeActiveIndex]?.id ?? null;
+      if (liveQueue.length === 0) {
+        setShuffleEnabled(previousEnabled);
+        return;
+      }
+      if (safeActiveIndex < 0 || !liveActiveId) {
+        throw new Error('No se pudo identificar la canción que está sonando.');
+      }
+
+      if (nextEnabled) {
+        originalQueueOrder.current = liveQueue;
+      }
+      const targetQueue = nextEnabled
+        ? shuffleUpcomingTracks(liveQueue, liveActiveId ?? '')
+        : restoreUpcomingTrackOrder(
+            liveQueue,
+            originalQueueOrder.current,
+            liveActiveId ?? '',
+          );
+      await applyUpcomingQueueOrder(
+        targetQueue.map(item => item.id),
+        liveQueue.map(item => item.id),
+        safeActiveIndex,
+      );
       await refreshPlaybackQueue();
-      setShuffleEnabled(nextEnabled);
+      shuffleEnabledRef.current = nextEnabled;
+      if (!nextEnabled) {
+        originalQueueOrder.current = [];
+      }
       rememberSessionDetails({
         shuffle: nextEnabled,
         originalTrackIds: originalQueueOrder.current.map(track => track.id),
       });
       setErrorMessage(null);
     } catch (error) {
+      setShuffleEnabled(previousEnabled);
       let message =
         error instanceof Error
           ? `No se pudo cambiar la mezcla: ${error.message}`
           : 'No se pudo cambiar el orden aleatorio de la cola.';
       try {
+        const latestQueue = (await getPlayerQueue()).map(item => ({
+          id: String(item.id),
+        }));
+        const latestActiveIndex = await getActivePlayerTrackIndex();
+        const latestSafeIndex = resolveActiveQueueIndex(
+          latestQueue.map(item => item.id),
+          latestActiveIndex,
+          currentTrack?.id,
+        );
+        const latestActiveId = latestQueue[latestSafeIndex]?.id ?? null;
+        if (latestSafeIndex < 0 || !latestActiveId) {
+          throw new Error(
+            'No se pudo identificar la canción activa para recuperar la cola.',
+          );
+        }
+        const rollbackTarget = restoreUpcomingTrackOrder(
+          latestQueue,
+          startingQueue.length > 0 ? startingQueue : latestQueue,
+          latestActiveId ?? '',
+        );
+        await applyUpcomingQueueOrder(
+          rollbackTarget.map(item => item.id),
+          latestQueue.map(item => item.id),
+          latestSafeIndex,
+        );
         await refreshPlaybackQueue();
       } catch (refreshError) {
         const detail =
@@ -1308,6 +1378,7 @@ export function useMusicController({
             : 'No se pudo recuperar el estado de la cola.';
         message = `${message} ${detail}`;
       }
+      originalQueueOrder.current = previousOriginalOrder;
       setErrorMessage(message);
     } finally {
       queueOperationInProgress.current = false;
@@ -1644,6 +1715,122 @@ export function useMusicController({
     }
   }
 
+  async function importPlaylistFile(playlist: Playlist) {
+    try {
+      const contents = await importM3uFile();
+      if (contents === null) {
+        return;
+      }
+      const imported = resolveM3u(contents, tracks);
+      const existingIds = new Set(playlist.trackIds);
+      const newIds = imported.trackIds.filter(id => !existingIds.has(id));
+      const trackIds = [...playlist.trackIds, ...newIds];
+      if (
+        trackIds.length === playlist.trackIds.length &&
+        imported.missing.length === 0
+      ) {
+        Alert.alert(
+          'Lista vacía',
+          'El archivo no contiene canciones nuevas para esta lista.',
+        );
+        return;
+      }
+      await setPlaylistTracks(playlist.id, trackIds);
+      setPlaylists(current =>
+        current.map(item =>
+          item.id === playlist.id ? { ...item, trackIds } : item,
+        ),
+      );
+      const skipped =
+        imported.duplicates.length + imported.trackIds.length - newIds.length;
+      Alert.alert(
+        'Importación completada',
+        `Añadidas: ${newIds.length}. No encontradas: ${imported.missing.length}. ` +
+          `Duplicadas: ${skipped}. Entradas malformadas: ${imported.malformedLines}.`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo importar la lista: ${error.message}`
+          : 'No se pudo importar el archivo M3U.',
+      );
+    }
+  }
+
+  async function exportPlaylistM3u(playlist: Playlist) {
+    try {
+      const playlistTracks = playlist.trackIds
+        .map(id => tracksById.get(id))
+        .filter((track): track is Track => track !== undefined);
+      const safeName =
+        playlist.name
+          .replace(/[<>:"/\\|?*]/g, '-')
+          .split('')
+          .map(character => (character.charCodeAt(0) < 32 ? '-' : character))
+          .join('')
+          .trim() || 'lista';
+      const saved = await exportM3uFile(
+        `${safeName}.m3u8`,
+        buildM3u(playlistTracks),
+      );
+      if (saved) {
+        showQueueNotice('Lista M3U guardada.');
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo exportar la lista: ${error.message}`
+          : 'No se pudo exportar el archivo M3U.',
+      );
+    }
+  }
+
+  async function importTrackLyrics(track: Track): Promise<boolean> {
+    try {
+      const contents = await importLrcFile();
+      if (contents === null) {
+        return false;
+      }
+      if (parseLrc(contents).length === 0) {
+        Alert.alert(
+          'Archivo LRC no válido',
+          'El archivo no contiene líneas con marcas de tiempo reconocibles.',
+        );
+        return false;
+      }
+      await storeLyrics(track.id, contents);
+      showQueueNotice(`Letras guardadas para ${track.title}.`);
+      return true;
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudieron guardar las letras: ${error.message}`
+          : 'No se pudieron guardar las letras locales.',
+      );
+      return false;
+    }
+  }
+
+  const getTrackLyrics = useCallback(
+    (trackId: string): Promise<string | null> => getStoredLyrics(trackId),
+    [],
+  );
+
+  async function deleteTrackLyrics(trackId: string): Promise<boolean> {
+    try {
+      await removeStoredLyrics(trackId);
+      showQueueNotice('Letras eliminadas.');
+      return true;
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudieron eliminar las letras: ${error.message}`
+          : 'No se pudieron eliminar las letras.',
+      );
+      return false;
+    }
+  }
+
   function requestLibraryAccess() {
     if (permissionBlocked) {
       Linking.openSettings().catch(() => undefined);
@@ -1823,6 +2010,11 @@ export function useMusicController({
     toggleShuffle,
     addTrackToQueue,
     addTrackToPlaylist,
+    importPlaylistFile,
+    exportPlaylistM3u,
+    importTrackLyrics,
+    getTrackLyrics,
+    deleteTrackLyrics,
     playQueueTrack,
     moveQueueTrack,
     removeQueueTrack,

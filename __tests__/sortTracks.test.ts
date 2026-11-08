@@ -5,6 +5,7 @@ import {
   sortTracks,
 } from '../src/utils/sortTracks';
 import {
+  buildQueueMoves,
   restoreUpcomingTrackOrder,
   shuffleUpcomingTracks,
 } from '../src/utils/shuffleQueue';
@@ -125,4 +126,16 @@ test('shuffles only upcoming tracks and restores their original order', () => {
   const restored = restoreUpcomingTrackOrder(shuffled, queue, '1');
 
   expect(restored.map(track => track.id)).toEqual(['1', '2', '3']);
+});
+
+test('builds moves from the current native order while protecting the active item', () => {
+  expect(buildQueueMoves(['1', '3', '2'], ['1', '2', '3'], 1)).toEqual([
+    { from: 2, to: 1 },
+  ]);
+});
+
+test('rejects queue snapshots that changed during an ordering operation', () => {
+  expect(() => buildQueueMoves(['1', '2'], ['1', '3'], 1)).toThrow(
+    'La cola cambió mientras se reordenaba.',
+  );
 });

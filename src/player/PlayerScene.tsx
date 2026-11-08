@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useRef, type ComponentType } from 'react';
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from 'react';
 import {
   Animated,
+  AppState,
   Easing,
   Image,
   StyleSheet,
@@ -43,27 +51,22 @@ function useLoop(
       toValue: 1,
       duration,
       easing: reverse ? motionEasing.loop : Easing.linear,
+      isInteraction: false,
       useNativeDriver: true,
     });
-    const steps = reverse
-      ? [
+    const movement = reverse
+      ? Animated.sequence([
           forward,
           Animated.timing(value, {
             toValue: 0,
             duration,
             easing: motionEasing.loop,
+            isInteraction: false,
             useNativeDriver: true,
           }),
-        ]
-      : [
-          forward,
-          Animated.timing(value, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ];
-    const loop = Animated.loop(Animated.sequence(steps));
+        ])
+      : forward;
+    const loop = Animated.loop(movement);
     const start = setTimeout(() => loop.start(), delay);
     return () => {
       clearTimeout(start);
@@ -111,7 +114,7 @@ function AuroraLight({
 
   return (
     <Animated.View
-      renderToHardwareTextureAndroid
+      renderToHardwareTextureAndroid={active}
       style={[
         styles.absolute,
         {
@@ -366,7 +369,7 @@ function SunsetScene({ colors, background, active }: SceneProps) {
         <Rect fill="url(#sky)" height="100%" width="100%" />
       </Svg>
       <Animated.View
-        renderToHardwareTextureAndroid
+        renderToHardwareTextureAndroid={active}
         style={[
           styles.sun,
           {
@@ -402,7 +405,7 @@ const scenes: Record<
   waves: WavesScene,
 };
 
-export function PlayerScene({
+export const PlayerScene = memo(function PlayerSceneContent({
   palette,
   artwork,
   active,
@@ -412,16 +415,31 @@ export function PlayerScene({
   active: boolean;
 }) {
   const reducedMotion = useReducedMotion();
+  const [appState, setAppState] = useState(AppState.currentState);
+  const animateScene =
+    active && !reducedMotion && (appState === 'active' || appState === null);
   const energy = useRef(new Animated.Value(active ? 1 : 0.5)).current;
 
   useEffect(() => {
-    Animated.timing(energy, {
+    const subscription = AppState.addEventListener('change', setAppState);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (palette.scene === 'none') {
+      return;
+    }
+    const animation = Animated.timing(energy, {
       toValue: active ? 1 : 0.5,
-      duration: reducedMotion ? 0 : motionDuration.enter * 2,
+      duration:
+        reducedMotion || appState === 'background' ? 0 : motionDuration.state,
       easing: motionEasing.enter,
+      isInteraction: false,
       useNativeDriver: true,
-    }).start();
-  }, [active, energy, reducedMotion]);
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [active, appState, energy, palette.scene, reducedMotion]);
 
   if (palette.scene === 'none') {
     return null;
@@ -434,7 +452,7 @@ export function PlayerScene({
       style={[StyleSheet.absoluteFill, { opacity: energy }]}
     >
       <Scene
-        active={active && !reducedMotion}
+        active={animateScene}
         artwork={artwork}
         background={palette.background}
         colors={palette.sceneColors}
@@ -456,7 +474,7 @@ export function PlayerScene({
       </View>
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   absolute: { position: 'absolute' },

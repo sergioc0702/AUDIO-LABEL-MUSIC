@@ -11,4 +11,6 @@ export const motionDuration = {
   state: 200,
   exit: 200,
   enter: 320,
+  sheetEnter: 240,
+  sheetExit: 160,
 };

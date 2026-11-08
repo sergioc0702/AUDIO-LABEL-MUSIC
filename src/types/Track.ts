@@ -11,6 +11,7 @@ export type Track = {
   dateAdded: number;
   artwork: string | null;
   folder?: string | null;
+  filePath?: string | null;
 };
 
 export type Playlist = {

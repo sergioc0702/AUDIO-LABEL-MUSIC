@@ -18,10 +18,13 @@ vuelve a abrir si cambia.
   2× y ecualizador de cinco bandas con perfiles. Se abre deslizando hacia arriba
   el mini-reproductor, se cierra deslizando hacia abajo y la carátula cambia de
   canción al deslizarla a los lados.
-- **Temas y paletas de colores:** en Ajustes se elige el tema, que es el diseño de toda
-  la app, y una de sus paletas. El tema Estándar trae Clásico, Portada, Aurora, Ondas,
-  Brasas y Atardecer: cada paleta colorea toda la interfaz y le da al reproductor su
-  animación, que se detiene al pausar o al cerrar el reproductor.
+- **Temas y paletas de colores:** hay 26 temas, elegibles en Ajustes: Estándar,
+  Kawaii, Brutalista, Terminal, Tornamesa, Mixtape, Taquilla, Acuario, Radio de
+  bulbos, Pixel, Acuarela, Neón de bar, Constelación, Jardín, Origami, Cyberpunk,
+  Vaporwave, Manga, Steampunk, Nave espacial, Y2K, Western, Fantasía medieval,
+  Lo-fi, Terror gótico y Playa. Cada tema ofrece seis paletas; una paleta colorea
+  toda la app y conserva la identidad visual del reproductor. Los controles y
+  funciones de reproducción se comparten entre temas.
 - **La sesión se recuerda:** al reabrir la app vuelven la cola, la canción, la
   posición, la mezcla y la repetición, sin que empiece a sonar sola.
 - **Temporizador:** 15 a 90 minutos o al terminar la canción. Funciona en segundo
@@ -51,8 +54,9 @@ Para uso personal, sin firma propia:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-apk.ps1 -UseDebugSigningForPersonalRelease
 ```
 
-El resultado queda en `MiMusica.apk`. Esa firma usa la clave pública de depuración
-de Android. Para firmar con una clave propia, define estas variables y ejecuta
+El resultado queda en `MiMusica.apk`. La versión con 26 temas pesa 47,645,335 bytes
+(45.44 MiB), 3,408,690 bytes (3.25 MiB) más que el APK anterior a estos temas.
+Esa firma usa la clave pública de depuración de Android. Para firmar con una clave propia, define estas variables y ejecuta
 `npm run build:apk`; guarda el keystore fuera del repositorio:
 
 - `MYMUSICAPP_RELEASE_STORE_FILE` (ruta absoluta)

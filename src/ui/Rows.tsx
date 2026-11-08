@@ -3,11 +3,11 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Animated, Text, View } from 'react-native';
 import { ChevronRight, MoreVertical } from 'lucide-react-native';
 import {
-  radius,
   screenPadding,
   spacing,
   createStyles,
   useColors,
+  strongFont,
 } from '../theme/theme';
 import type { Track } from '../types/Track';
 import { IconButton } from './Buttons';
@@ -37,11 +37,13 @@ export function NowPlayingBars({ isPlaying }: { isPlaying: boolean }) {
           Animated.timing(bar, {
             toValue: 1,
             duration: 320 + index * 90,
+            isInteraction: false,
             useNativeDriver: true,
           }),
           Animated.timing(bar, {
             toValue: 0.3,
             duration: 300 + index * 70,
+            isInteraction: false,
             useNativeDriver: true,
           }),
         ]),
@@ -101,7 +103,6 @@ export const TrackRow = memo(function TrackRowContent({
         android_ripple={{ color: colors.ripple }}
         onLongPress={onMore}
         onPress={onPress}
-        pressedScale={0.985}
         style={styles.rowMain}
       >
         <Cover uri={track.artwork} size={48} />
@@ -154,7 +155,6 @@ export function ListRow({
         accessibilityLabel={accessibilityLabel ?? title}
         android_ripple={{ color: colors.ripple }}
         onPress={onPress}
-        pressedScale={0.985}
         style={styles.rowMain}
       >
         {leading}
@@ -228,7 +228,7 @@ const useStyles = createStyles(colors => ({
     paddingRight: spacing.sm,
   },
   rowText: { flex: 1, gap: 2, minWidth: 0 },
-  current: { color: colors.accent, fontWeight: '600' },
+  current: { color: colors.accent, ...strongFont(colors) },
   bars: {
     alignItems: 'flex-end',
     flexDirection: 'row',
@@ -247,7 +247,7 @@ const useStyles = createStyles(colors => ({
   squareIcon: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.sm,
+    borderRadius: colors.design.radius.sm,
     height: 48,
     justifyContent: 'center',
     width: 48,

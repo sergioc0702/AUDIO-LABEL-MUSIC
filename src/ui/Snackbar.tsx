@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import { useApp } from '../state/AppContext';
-import { radius, spacing, createStyles, useColors } from '../theme/theme';
+import { spacing, createStyles, useColors, strongFont } from '../theme/theme';
 import { Tap } from './Tap';
 
 type Placement = 'app' | 'player' | 'queue';
@@ -98,7 +98,7 @@ const useStyles = createStyles(colors => ({
   snackbar: {
     alignItems: 'center',
     backgroundColor: colors.text,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     elevation: 6,
     flexDirection: 'row',
     gap: spacing.sm,
@@ -116,5 +116,5 @@ const useStyles = createStyles(colors => ({
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
   },
-  actionText: { color: colors.background, fontSize: 14, fontWeight: '700' },
+  actionText: { color: colors.background, fontSize: 14, ...strongFont(colors) },
 }));

@@ -28,6 +28,16 @@ type MusicLibraryModule = {
   shareTrack(trackId: string, title: string): Promise<void>;
   exportBackup(fileName: string, contents: string): Promise<boolean>;
   importBackup(): Promise<string | null>;
+  exportPlaylistFile(fileName: string, contents: string): Promise<boolean>;
+  importPlaylistFile(): Promise<string | null>;
+  importLyricsFile(): Promise<string | null>;
+  getLyrics(trackId: string): Promise<string | null>;
+  saveLyrics(trackId: string, contents: string): Promise<void>;
+  deleteLyrics(trackId: string): Promise<void>;
+  getMediaVolume(): Promise<MediaVolume>;
+  setMediaVolume(level: number): Promise<MediaVolume>;
+  startVolumeUpdates(): void;
+  stopVolumeUpdates(): void;
   saveAppearance(appearance: string): Promise<void>;
   getAppearance(): Promise<string | null>;
   getPlaybackRate(): Promise<number>;
@@ -35,6 +45,31 @@ type MusicLibraryModule = {
   getEqualizerSettings(): Promise<EqualizerSettings>;
   setEqualizerSettings(enabled: boolean, bandGainsDb: number[]): Promise<void>;
 };
+
+/** Media volume from 0 to 1. Fixed-volume devices cannot change it. */
+export type MediaVolume = { level: number; fixed: boolean };
+
+export function getMediaVolume(): Promise<MediaVolume> {
+  return (
+    musicLibrary?.getMediaVolume() ??
+    Promise.resolve({ level: 0.5, fixed: true })
+  );
+}
+
+export function setMediaVolume(level: number): Promise<MediaVolume> {
+  return (
+    musicLibrary?.setMediaVolume(level) ??
+    Promise.resolve({ level, fixed: true })
+  );
+}
+
+export function startVolumeUpdates() {
+  musicLibrary?.startVolumeUpdates();
+}
+
+export function stopVolumeUpdates() {
+  musicLibrary?.stopVolumeUpdates();
+}
 
 export type EqualizerSettings = {
   enabled: boolean;
@@ -200,6 +235,51 @@ export function importBackupFile(): Promise<string | null> {
     throw new Error('El módulo nativo de música no está disponible.');
   }
   return musicLibrary.importBackup();
+}
+
+export function exportM3uFile(
+  fileName: string,
+  contents: string,
+): Promise<boolean> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.exportPlaylistFile(fileName, contents);
+}
+
+export function importM3uFile(): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.importPlaylistFile();
+}
+
+export function importLrcFile(): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.importLyricsFile();
+}
+
+export function getStoredLyrics(trackId: string): Promise<string | null> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.getLyrics(trackId);
+}
+
+export function storeLyrics(trackId: string, contents: string): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.saveLyrics(trackId, contents);
+}
+
+export function removeStoredLyrics(trackId: string): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.deleteLyrics(trackId);
 }
 
 export function storeAppearance(appearance: Appearance): Promise<void> {

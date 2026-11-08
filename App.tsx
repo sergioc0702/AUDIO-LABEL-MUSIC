@@ -1,21 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StatusBar, Text, View } from 'react-native';
+import { Pressable, StatusBar, Text, View } from 'react-native';
 import { Home, Library, Search } from 'lucide-react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useReducedMotion } from './src/hooks/useReducedMotion';
 import { MiniPlayer } from './src/player/MiniPlayer';
-import { NowPlaying } from './src/player/NowPlaying';
-import {
-  EqualizerSheet,
-  QueueSheet,
-  SleepTimerSheet,
-  SpeedSheet,
-  PaletteSheet,
-  ThemeSheet,
-} from './src/player/Sheets';
+import { PlaybackProgressProvider } from './src/player/PlaybackProgress';
+import { PlaybackWindow } from './src/player/PlaybackWindow';
+import { PaletteSheet, ThemeSheet } from './src/player/Sheets';
 import {
   AddToPlaylistSheet,
   PlaylistDialogs,
@@ -28,8 +21,12 @@ import { LibraryScreen } from './src/screens/LibraryScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AppProvider, useApp, type Tab } from './src/state/AppContext';
-import { motionDuration, motionEasing } from './src/theme/motion';
-import { spacing, createStyles, useColors } from './src/theme/theme';
+import {
+  spacing,
+  createStyles,
+  useColors,
+  strongFont,
+} from './src/theme/theme';
 import { Snackbar } from './src/ui/Snackbar';
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -43,6 +40,71 @@ function TabBar() {
   const styles = useStyles();
   const { nav } = useApp();
   const insets = useSafeAreaInsets();
+  const variant = colors.design.tabs;
+
+  if (variant !== 'pill') {
+    return (
+      <View
+        accessibilityRole="tablist"
+        style={[
+          styles.tabBar,
+          variant === 'blocks' && styles.blockBar,
+          { paddingBottom: insets.bottom },
+        ]}
+      >
+        {tabs.map((tab, index) => {
+          const selected = nav.tab === tab.id;
+          const inverted = variant === 'blocks' && selected;
+          return (
+            <Pressable
+              key={tab.id}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected }}
+              android_ripple={{ color: colors.ripple }}
+              onPress={() => nav.selectTab(tab.id)}
+              style={[
+                styles.tab,
+                variant === 'blocks' && styles.blockTab,
+                variant === 'blocks' && index > 0 && styles.blockDivider,
+                inverted && styles.blockSelected,
+              ]}
+            >
+              {variant === 'brackets' ? null : (
+                <tab.icon
+                  color={
+                    inverted
+                      ? colors.background
+                      : selected
+                      ? colors.accent
+                      : colors.textSecondary
+                  }
+                  size={22}
+                />
+              )}
+              <Text
+                style={[
+                  type.label,
+                  { color: selected ? colors.text : colors.textSecondary },
+                  selected && variant === 'brackets' && styles.bracketSelected,
+                  inverted && styles.blockLabelSelected,
+                ]}
+              >
+                {variant === 'brackets' && selected
+                  ? `[${tab.label}]`
+                  : tab.label}
+              </Text>
+              {variant === 'underline' ? (
+                <View
+                  style={[styles.underline, selected && styles.underlineOn]}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
 
   return (
     <View
@@ -70,7 +132,13 @@ function TabBar() {
               style={[styles.tabIcon, selected && styles.tabIconSelected]}
             >
               <tab.icon
-                color={selected ? colors.text : colors.textSecondary}
+                color={
+                  !selected
+                    ? colors.textSecondary
+                    : colors.design.player === 'kawaii'
+                    ? colors.onAccent
+                    : colors.text
+                }
                 size={22}
               />
             </View>
@@ -87,25 +155,8 @@ function TabBar() {
 function Screens() {
   const styles = useStyles();
   const { nav } = useApp();
-  const reducedMotion = useReducedMotion();
-  const reveal = useRef(new Animated.Value(1)).current;
-  const routeKey = `${nav.tab}:${JSON.stringify(nav.route)}`;
-
-  useEffect(() => {
-    if (reducedMotion) {
-      return;
-    }
-    reveal.setValue(0);
-    Animated.timing(reveal, {
-      toValue: 1,
-      duration: motionDuration.state,
-      easing: motionEasing.enter,
-      useNativeDriver: true,
-    }).start();
-  }, [reducedMotion, reveal, routeKey]);
-
   return (
-    <Animated.View style={[styles.screens, { opacity: reveal }]}>
+    <View style={styles.screens}>
       {nav.route?.name === 'collection' ? (
         <CollectionScreen collection={nav.route.ref} />
       ) : nav.route?.name === 'settings' ? (
@@ -117,18 +168,19 @@ function Screens() {
       ) : (
         <LibraryScreen />
       )}
-    </Animated.View>
+    </View>
   );
 }
 
 function AppContent() {
   const styles = useStyles();
+  const { colors } = useColors();
   const { music } = useApp();
   const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.app}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={colors.isLight ? 'dark-content' : 'light-content'} />
       <Screens />
       <View style={[styles.statusBar, { height: insets.top }]} />
       <MiniPlayer />
@@ -137,11 +189,7 @@ function AppContent() {
         bottom={insets.bottom + (music.currentTrack ? 140 : 76)}
         placement="app"
       />
-      <NowPlaying />
-      <QueueSheet />
-      <SleepTimerSheet />
-      <SpeedSheet />
-      <EqualizerSheet />
+      <PlaybackWindow />
       <ThemeSheet />
       <PaletteSheet />
       <TrackMenu />
@@ -158,11 +206,15 @@ export default function App({
   initialScreen?: Tab;
 }) {
   return (
-    <SafeAreaProvider>
-      <AppProvider initialTab={initialScreen}>
-        <AppContent />
-      </AppProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView>
+      <SafeAreaProvider>
+        <AppProvider initialTab={initialScreen}>
+          <PlaybackProgressProvider>
+            <AppContent />
+          </PlaybackProgressProvider>
+        </AppProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -196,6 +248,25 @@ const useStyles = createStyles(colors => ({
     justifyContent: 'center',
     width: 64,
   },
-  tabIconSelected: { backgroundColor: colors.surfaceHigh },
-  tabLabelSelected: { color: colors.text, fontWeight: '600' },
+  tabIconSelected: {
+    backgroundColor:
+      colors.design.player === 'kawaii' ? colors.accent : colors.surfaceHigh,
+  },
+  blockBar: {
+    marginTop: 0,
+    paddingTop: 0,
+    borderTopWidth: colors.design.line,
+    borderColor: colors.text,
+  },
+  blockTab: { justifyContent: 'center', minHeight: 64 },
+  blockDivider: {
+    borderLeftWidth: colors.design.line,
+    borderColor: colors.text,
+  },
+  blockSelected: { backgroundColor: colors.text },
+  blockLabelSelected: { color: colors.background },
+  bracketSelected: { color: colors.accent },
+  underline: { height: 3, width: 28, borderRadius: 2 },
+  underlineOn: { backgroundColor: colors.accent },
+  tabLabelSelected: { color: colors.text, ...strongFont(colors) },
 }));

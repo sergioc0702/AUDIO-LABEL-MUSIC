@@ -10,12 +10,10 @@ export type TrackFilterOptions = {
   genre?: string | null;
 };
 
-function compareText(first: string, second: string): number {
-  return first.localeCompare(second, 'es', {
-    numeric: true,
-    sensitivity: 'base',
-  });
-}
+const compareText = new Intl.Collator('es', {
+  numeric: true,
+  sensitivity: 'base',
+}).compare;
 
 const spanishGenres: Record<string, string> = {
   ambient: 'Ambiental',

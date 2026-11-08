@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, PanResponder, View } from 'react-native';
 import { GripVertical } from 'lucide-react-native';
-import { radius, createStyles, useColors } from '../theme/theme';
+import { createStyles, useColors } from '../theme/theme';
 import { trackRowHeight } from './Rows';
 
 export function ReorderRow({
@@ -104,7 +104,7 @@ const useStyles = createStyles(colors => ({
   row: { alignItems: 'center', flexDirection: 'row' },
   dragging: {
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     elevation: 6,
     zIndex: 2,
   },

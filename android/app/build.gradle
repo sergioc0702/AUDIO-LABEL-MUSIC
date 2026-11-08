@@ -90,6 +90,15 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // Keep Fabric's generated C++ object paths within Ninja's Windows limit.
+    if (System.getProperty("os.name").startsWith("Windows")) {
+        externalNativeBuild {
+            cmake {
+                buildStagingDirectory file("../../.cxx")
+            }
+        }
+    }
+
     namespace "com.mymusicapp.player"
     defaultConfig {
         applicationId "com.mymusicapp.player"
@@ -97,6 +106,13 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            externalNativeBuild {
+                cmake {
+                    arguments "-DCMAKE_OBJECT_PATH_MAX=250"
+                }
+            }
+        }
     }
     signingConfigs {
         debug {
@@ -150,7 +166,9 @@ dependencies {
     def roomVersion = "2.8.5"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
+    implementation("androidx.media:media:1.6.0")
     ksp("androidx.room:room-compiler:$roomVersion")
+    testImplementation("junit:junit:4.13.2")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

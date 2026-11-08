@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import {
   FlatList,
   ScrollView,
@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListMusic, Search, X } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
 import {
-  radius,
   screenPadding,
   spacing,
   createStyles,
@@ -26,7 +25,7 @@ import {
   groupAlbums,
   groupArtists,
   groupGenres,
-  matchesQuery,
+  normalizeText,
   type TrackGroup,
 } from '../utils/collections';
 
@@ -34,6 +33,10 @@ type Result =
   | { type: 'track'; key: string; track: Track }
   | { type: 'album' | 'artist'; key: string; group: TrackGroup }
   | { type: 'playlist'; key: string; playlist: Playlist };
+
+function indexSearchText<T>(items: T[], textFor: (item: T) => string) {
+  return items.map(item => ({ item, text: normalizeText(textFor(item)) }));
+}
 
 export function SearchScreen() {
   const { colors, type } = useColors();
@@ -51,25 +54,39 @@ export function SearchScreen() {
     setQueueTrackDialog,
   } = music;
   const hasQuery = query.trim().length > 0;
+  const deferredQuery = useDeferredValue(query).trim();
+  const searchTerm = normalizeText(deferredQuery);
+  const isSearching = deferredQuery.length > 0;
   const genres = useMemo(() => groupGenres(tracks), [tracks]);
   const artists = useMemo(() => groupArtists(tracks), [tracks]);
+  const libraryIndex = useMemo(() => {
+    if (!isSearching) return null;
+    return {
+      tracks: indexSearchText(
+        tracks,
+        track => `${track.title} ${track.artist} ${track.album}`,
+      ),
+      artists: indexSearchText(artists, group => group.name),
+      albums: indexSearchText(groupAlbums(tracks), group => group.name),
+    };
+  }, [artists, isSearching, tracks]);
+  const playlistIndex = useMemo(
+    () => indexSearchText(playlists, playlist => playlist.name),
+    [playlists],
+  );
 
   const { matchedTracks, sections } = useMemo(() => {
-    if (!hasQuery) {
+    if (!libraryIndex) {
       return { matchedTracks: [] as Track[], sections: [] };
     }
-    const songs = tracks.filter(track =>
-      matchesQuery(`${track.title} ${track.artist} ${track.album}`, query),
-    );
-    const matchedArtists = artists.filter(group =>
-      matchesQuery(group.name, query),
-    );
-    const albums = groupAlbums(tracks).filter(group =>
-      matchesQuery(group.name, query),
-    );
-    const lists = playlists.filter(playlist =>
-      matchesQuery(playlist.name, query),
-    );
+    const matching = <T,>(entries: { item: T; text: string }[]) =>
+      entries
+        .filter(entry => entry.text.includes(searchTerm))
+        .map(entry => entry.item);
+    const songs = matching(libraryIndex.tracks);
+    const matchedArtists = matching(libraryIndex.artists);
+    const albums = matching(libraryIndex.albums);
+    const lists = matching(playlistIndex);
     const all: { title: string; data: Result[] }[] = [
       {
         title: 'Canciones',
@@ -100,7 +117,7 @@ export function SearchScreen() {
       matchedTracks: songs,
       sections: all.filter(section => section.data.length > 0),
     };
-  }, [artists, hasQuery, playlists, query, tracks]);
+  }, [libraryIndex, playlistIndex, searchTerm]);
 
   const renderResult = ({ item }: { item: Result }) => {
     if (item.type === 'track') {
@@ -168,9 +185,9 @@ export function SearchScreen() {
       <View style={styles.searchBox}>
         <Search color={colors.textSecondary} size={20} />
         <TextInput
-          accessibilityLabel="Buscar canciones, artistas o álbumes"
+          accessibilityLabel="Buscar canciones, artistas, álbumes o listas"
           onChangeText={setQuery}
-          placeholder="Canciones, artistas, álbumes"
+          placeholder="Canciones, artistas, álbumes, listas"
           placeholderTextColor={colors.textSecondary}
           returnKeyType="search"
           selectionColor={colors.accent}
@@ -198,88 +215,88 @@ export function SearchScreen() {
             showsVerticalScrollIndicator={false}
             stickySectionHeadersEnabled={false}
           />
-        ) : (
+        ) : isSearching ? (
           <View style={styles.empty}>
             <Text style={type.title}>Sin resultados</Text>
             <Text style={type.secondary}>
               Prueba con otro título, artista o álbum.
             </Text>
           </View>
-        )
+        ) : null
       ) : (
-        <ScrollView
+        <FlatList
+          columnWrapperStyle={styles.genreRow}
+          data={genres}
           keyboardShouldPersistTaps="handled"
+          keyExtractor={genre => genre.key}
+          numColumns={2}
           showsVerticalScrollIndicator={false}
-        >
-          {artists.length > 0 ? (
+          ListHeaderComponent={
             <>
-              <SectionHeader title="Artistas" />
-              <ScrollView
-                contentContainerStyle={styles.artists}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-              >
-                {artists.slice(0, 16).map(artist => (
-                  <Tap
-                    key={artist.key}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Abrir artista ${artist.name}`}
-                    onPress={() =>
-                      nav.push({
-                        name: 'collection',
-                        ref: {
-                          kind: 'group',
-                          key: artist.key,
-                          title: artist.name,
-                        },
-                      })
-                    }
-                    style={styles.artist}
+              {artists.length > 0 ? (
+                <>
+                  <SectionHeader title="Artistas" />
+                  <ScrollView
+                    contentContainerStyle={styles.artists}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
                   >
-                    <Cover round size={88} uri={artist.artwork} />
-                    <Text
-                      numberOfLines={1}
-                      style={[type.caption, styles.artistName]}
-                    >
-                      {artist.name}
-                    </Text>
-                  </Tap>
-                ))}
-              </ScrollView>
+                    {artists.slice(0, 16).map(artist => (
+                      <Tap
+                        key={artist.key}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Abrir artista ${artist.name}`}
+                        onPress={() =>
+                          nav.push({
+                            name: 'collection',
+                            ref: {
+                              kind: 'group',
+                              key: artist.key,
+                              title: artist.name,
+                            },
+                          })
+                        }
+                        style={styles.artist}
+                      >
+                        <Cover round size={88} uri={artist.artwork} />
+                        <Text
+                          numberOfLines={1}
+                          style={[type.caption, styles.artistName]}
+                        >
+                          {artist.name}
+                        </Text>
+                      </Tap>
+                    ))}
+                  </ScrollView>
+                </>
+              ) : null}
+              {genres.length > 0 ? (
+                <SectionHeader title="Explorar por género" />
+              ) : null}
             </>
-          ) : null}
-          {genres.length > 0 ? (
-            <SectionHeader title="Explorar por género" />
-          ) : null}
-          <FlatList
-            columnWrapperStyle={styles.genreRow}
-            data={genres}
-            keyExtractor={genre => genre.key}
-            numColumns={2}
-            renderItem={({ item }) => (
-              <Tap
-                accessibilityRole="button"
-                accessibilityLabel={`Abrir género ${item.name}`}
-                onPress={() =>
-                  nav.push({
-                    name: 'collection',
-                    ref: { kind: 'group', key: item.key, title: item.name },
-                  })
-                }
-                style={styles.genre}
-              >
-                <Text numberOfLines={2} style={type.title}>
-                  {item.name}
-                </Text>
-                <Text style={type.caption}>
-                  {item.tracks.length}{' '}
-                  {item.tracks.length === 1 ? 'canción' : 'canciones'}
-                </Text>
-              </Tap>
-            )}
-            scrollEnabled={false}
-          />
-        </ScrollView>
+          }
+          renderItem={({ item }) => (
+            <Tap
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir género ${item.name}`}
+              onPress={() =>
+                nav.push({
+                  name: 'collection',
+                  ref: { kind: 'group', key: item.key, title: item.name },
+                })
+              }
+              style={styles.genre}
+            >
+              <Text numberOfLines={2} style={type.title}>
+                {item.name}
+              </Text>
+              <Text style={type.caption}>
+                {item.tracks.length}{' '}
+                {item.tracks.length === 1 ? 'canción' : 'canciones'}
+              </Text>
+            </Tap>
+          )}
+        />
       )}
     </View>
   );
@@ -296,7 +313,7 @@ const useStyles = createStyles(colors => ({
   searchBox: {
     alignItems: 'center',
     backgroundColor: colors.surfaceHigh,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     flexDirection: 'row',
     gap: spacing.sm,
     height: 48,
@@ -319,7 +336,7 @@ const useStyles = createStyles(colors => ({
   },
   genre: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: colors.design.radius.md,
     flex: 1,
     gap: spacing.xs,
     justifyContent: 'flex-end',

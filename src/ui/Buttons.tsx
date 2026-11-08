@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { Text } from 'react-native';
-import { radius, spacing, createStyles, useColors } from '../theme/theme';
+import { spacing, createStyles, useColors } from '../theme/theme';
 import { Tap } from './Tap';
 
 type TapProps = ComponentProps<typeof Tap>;
@@ -21,7 +21,6 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       android_ripple={{ color: colors.ripple, borderless: true, radius: 24 }}
-      pressedScale={0.9}
       style={[styles.icon, style]}
       {...props}
     >
@@ -34,12 +33,14 @@ export function Button({
   label,
   accessibilityLabel,
   icon,
+  multiline = false,
   variant = 'filled',
   style,
   ...props
 }: Omit<TapProps, 'children'> & {
   label: string;
   icon?: ReactNode;
+  multiline?: boolean;
   variant?: 'filled' | 'tonal';
 }) {
   const { type } = useColors();
@@ -50,6 +51,7 @@ export function Button({
       accessibilityLabel={accessibilityLabel ?? label}
       style={[
         styles.button,
+        multiline && styles.multilineButton,
         variant === 'filled' ? styles.filled : styles.tonal,
         props.disabled && styles.disabled,
         style,
@@ -58,8 +60,12 @@ export function Button({
     >
       {icon}
       <Text
-        numberOfLines={1}
-        style={[type.bodyStrong, variant === 'filled' && styles.filledText]}
+        numberOfLines={multiline ? undefined : 1}
+        style={[
+          type.bodyStrong,
+          multiline && styles.multilineText,
+          variant === 'filled' && styles.filledText,
+        ]}
       >
         {label}
       </Text>
@@ -76,13 +82,19 @@ const useStyles = createStyles(colors => ({
   },
   button: {
     alignItems: 'center',
-    borderRadius: radius.full,
+    borderRadius: colors.design.radius.full,
     flexDirection: 'row',
     gap: spacing.sm,
     height: 48,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
+  multilineButton: {
+    height: 'auto',
+    minHeight: 48,
+    paddingVertical: spacing.sm,
+  },
+  multilineText: { flexShrink: 1, textAlign: 'center' },
   filled: { backgroundColor: colors.accent },
   tonal: { backgroundColor: colors.surfaceHigh },
   filledText: { color: colors.onAccent },

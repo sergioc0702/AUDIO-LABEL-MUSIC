@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { Pause, Play } from 'lucide-react-native';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { motionDuration, motionEasing } from '../theme/motion';
 
 export function PlayPauseIcon({
@@ -12,16 +13,20 @@ export function PlayPauseIcon({
   color: string;
   size: number;
 }) {
+  const reducedMotion = useReducedMotion();
   const progress = useRef(new Animated.Value(isPlaying ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(progress, {
+    const animation = Animated.timing(progress, {
       toValue: isPlaying ? 1 : 0,
-      duration: motionDuration.state,
+      duration: reducedMotion ? 0 : motionDuration.feedback,
       easing: motionEasing.enter,
+      isInteraction: false,
       useNativeDriver: true,
-    }).start();
-  }, [isPlaying, progress]);
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [isPlaying, progress, reducedMotion]);
 
   return (
     <View style={{ height: size, width: size }}>

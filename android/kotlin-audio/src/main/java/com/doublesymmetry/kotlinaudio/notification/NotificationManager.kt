@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
@@ -70,29 +69,7 @@ class NotificationManager internal constructor(
         override fun getCurrentLargeIcon(
             player: Player,
             callback: PlayerNotificationManager.BitmapCallback,
-        ): Bitmap? {
-            val bitmap = getCachedArtworkBitmap()
-            if (bitmap != null) {
-                return bitmap
-            }
-            val artwork = getMediaItemArtworkUrl()
-            val headers = getNetworkHeaders()
-            val holder = player.currentMediaItem?.getAudioItemHolder()
-            if (artwork != null && holder?.artworkBitmap == null) {
-                context.imageLoader.enqueue(
-                    ImageRequest.Builder(context)
-                        .data(artwork)
-                        .headers(headers)
-                        .target { result ->
-                            val resultBitmap = (result as BitmapDrawable).bitmap
-                            holder?.artworkBitmap = resultBitmap
-                            invalidate()
-                        }
-                        .build()
-                )
-            }
-            return iconPlaceholder
-        }
+        ): Bitmap = getCachedArtworkBitmap() ?: iconPlaceholder
     }
 
     private var internalNotificationManager: PlayerNotificationManager? = null
@@ -101,8 +78,11 @@ class NotificationManager internal constructor(
     private var invalidateThrottleCount = 0
     private var iconPlaceholder = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
 
-    private var notificationMetadataBitmap: Bitmap? = null
-    private var notificationMetadataArtworkDisposable: Disposable? = null
+    private data class Artwork(val embedded: ByteArray?, val uri: String?, val headers: Headers)
+
+    private var requestedArtwork: Artwork? = null
+    private var artworkBitmap: Bitmap? = null
+    private var artworkRequest: Disposable? = null
 
     /**
      * The item that should be used for the notification
@@ -113,25 +93,6 @@ class NotificationManager internal constructor(
      */
     internal var overrideAudioItem: AudioItem? = null
         set(value) {
-            notificationMetadataBitmap = null
-            val headers = getNetworkHeaders()
-
-            if (field != value) {
-                if (value?.artwork != null) {
-                    notificationMetadataArtworkDisposable?.dispose()
-                    notificationMetadataArtworkDisposable = context.imageLoader.enqueue(
-                        ImageRequest.Builder(context)
-                            .data(value.artwork)
-                            .headers(headers)
-                            .target { result ->
-                                notificationMetadataBitmap = (result as BitmapDrawable).bitmap
-                                invalidate()
-                            }
-                            .build()
-                    )
-                }
-            }
-
             field = value
             invalidate()
         }
@@ -182,23 +143,45 @@ class NotificationManager internal constructor(
         return player.currentMediaItem?.getAudioItemHolder()?.audioItem?.options?.headers?.toHeaders() ?: Headers.Builder().build()
     }
 
-    /**
-     * Returns the cached artwork bitmap for the current media item.
-     * Bitmap might be cached if the media item has extracted one from the media file
-     * or if a user is setting custom data for the notification.
-     */
-    private fun getCachedArtworkBitmap(index: Int? = null): Bitmap? {
-        val mediaItem = if (index == null) player.currentMediaItem else player.getMediaItemAt(index)
-        val isCurrent = index == null || index == player.currentMediaItemIndex
-        val artworkData = player.mediaMetadata.artworkData
+    private fun getCachedArtworkBitmap(): Bitmap? {
+        val embedded = if (overrideAudioItem == null) player.mediaMetadata.artworkData else null
+        val uri = if (overrideAudioItem != null) overrideAudioItem?.artwork else getMediaItemArtworkUrl()
+        val artwork = Artwork(embedded, uri, getNetworkHeaders())
+        if (artwork == requestedArtwork) return artworkBitmap
 
-        return if (isCurrent && overrideAudioItem != null) {
-            notificationMetadataBitmap
-        } else if (isCurrent && artworkData != null) {
-            BitmapFactory.decodeByteArray(artworkData, 0, artworkData.size)
-        } else {
-            mediaItem?.getAudioItemHolder()?.artworkBitmap
-        }
+        artworkRequest?.dispose()
+        requestedArtwork = artwork
+        artworkBitmap = null
+        val data: Any = embedded ?: uri ?: return null
+        loadArtwork(artwork, data)
+        return null
+    }
+
+    private fun loadArtwork(artwork: Artwork, data: Any) {
+        artworkRequest = context.imageLoader.enqueue(
+            ImageRequest.Builder(context)
+                .data(data)
+                .headers(artwork.headers)
+                .size(512)
+                // MediaSession parcels the bitmap. Use a software bitmap to avoid a GPU readback.
+                .allowHardware(false)
+                .target(
+                    onSuccess = { result ->
+                        if (requestedArtwork === artwork) {
+                            artworkBitmap = (result as? BitmapDrawable)?.bitmap
+                            internalNotificationManager?.invalidate()
+                            mediaSessionConnector.invalidateMediaSessionMetadata()
+                        }
+                    },
+                    onError = {
+                        val fallback = artwork.uri
+                        if (requestedArtwork === artwork && data is ByteArray && fallback != null) {
+                            loadArtwork(artwork, fallback)
+                        }
+                    }
+                )
+                .build()
+        )
     }
 
     private fun getDuration(index: Int? = null): Long? {
@@ -772,6 +755,9 @@ class NotificationManager internal constructor(
     }
 
     internal fun destroy() = scope.launch {
+        artworkRequest?.dispose()
+        requestedArtwork = null
+        artworkBitmap = null
         internalNotificationManager?.setPlayer(null)
     }
 

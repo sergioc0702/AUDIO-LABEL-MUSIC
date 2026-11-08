@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Mi Música</string>
+    <string name="widget_description">Controles de reproducción y canción actual</string>
 </resources>

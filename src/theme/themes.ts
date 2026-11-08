@@ -1,3 +1,5 @@
+import { themePalettes } from './themePalettes';
+
 export type PlayerSceneId =
   | 'none'
   | 'cover'
@@ -6,8 +8,64 @@ export type PlayerSceneId =
   | 'embers'
   | 'sunset';
 
-/** The colors of the whole app, plus the moving background of the player. */
-export type Palette = {
+export type PlayerStyle =
+  | 'estandar'
+  | 'kawaii'
+  | 'brutalista'
+  | 'terminal'
+  | 'tornamesa'
+  | 'mixtape'
+  | 'taquilla'
+  | 'acuario'
+  | 'radiobulbos'
+  | 'pixel'
+  | 'acuarela'
+  | 'neonbar'
+  | 'constelacion'
+  | 'jardin'
+  | 'origami'
+  | 'cyberpunk'
+  | 'vaporwave'
+  | 'manga'
+  | 'steampunk'
+  | 'naveespacial'
+  | 'y2k'
+  | 'western'
+  | 'fantasiamedieval'
+  | 'lofi'
+  | 'terrorgotico'
+  | 'playa';
+
+/** Extra colors that only one theme's own pieces use. */
+export type SkinColors = Record<string, string>;
+
+export type TextRole =
+  | 'display'
+  | 'headline'
+  | 'title'
+  | 'body'
+  | 'bodyStrong'
+  | 'secondary'
+  | 'label'
+  | 'caption';
+
+/** Everything a theme changes besides colors. */
+export type ThemeDesign = {
+  player: PlayerStyle;
+  /** Font file per text role; missing roles use the system font. */
+  fonts: Partial<Record<TextRole, string>>;
+  /** Size multiplier per text role, for faces that run small or large. */
+  scale: Partial<Record<TextRole, number>>;
+  upper: TextRole[];
+  radius: { sm: number; md: number; lg: number; sheet: number; full: number };
+  /** Border width of blocks, 0 for none. */
+  line: number;
+  home: 'tiles' | 'pills' | 'rows' | 'listing' | 'keys' | 'tapes' | 'tickets';
+  tabs: 'pill' | 'blocks' | 'brackets' | 'underline';
+  mini: 'card' | 'dog' | 'block' | 'band' | 'vinyl' | 'cassette' | 'ticket';
+};
+
+type PaletteColors = {
   id: string;
   name: string;
   background: string;
@@ -31,6 +89,14 @@ export type Palette = {
   sceneColors: string[];
 };
 
+/** The colors of the whole app, plus the design of the theme they belong to. */
+export type Palette = PaletteColors & {
+  /** Light backgrounds need dark status bar icons. */
+  isLight: boolean;
+  skin: SkinColors;
+  design: ThemeDesign;
+};
+
 /**
  * A theme is the design of the whole app: its look and its own set of palettes.
  * A palette only changes colors.
@@ -38,8 +104,275 @@ export type Palette = {
 export type AppTheme = {
   id: string;
   name: string;
+  description: string;
   palettes: Palette[];
 };
+
+const baseRadius = { sm: 6, md: 10, lg: 16, sheet: 20, full: 999 };
+
+const fontSet = (display: string, body = display) => ({
+  display,
+  headline: display,
+  title: body,
+  body,
+  bodyStrong: body,
+  secondary: body,
+  label: body,
+  caption: body,
+});
+
+const themedDesign = (
+  player: PlayerStyle,
+  display: string,
+  body: string,
+  options: Partial<ThemeDesign> = {},
+): ThemeDesign => ({
+  player,
+  fonts: fontSet(display, body),
+  scale: {},
+  upper: [],
+  radius: baseRadius,
+  line: 0,
+  home: 'tiles',
+  tabs: 'pill',
+  mini: 'card',
+  ...options,
+});
+
+const designs: Record<PlayerStyle, ThemeDesign> = {
+  estandar: {
+    player: 'estandar',
+    fonts: {},
+    scale: {},
+    upper: [],
+    radius: baseRadius,
+    line: 0,
+    home: 'tiles',
+    tabs: 'pill',
+    mini: 'card',
+  },
+  kawaii: {
+    player: 'kawaii',
+    fonts: {
+      display: 'Fredoka-Bold',
+      headline: 'Fredoka-Bold',
+      title: 'Fredoka-SemiBold',
+      body: 'Fredoka-Medium',
+      bodyStrong: 'Fredoka-SemiBold',
+      secondary: 'Fredoka-Medium',
+      label: 'Fredoka-SemiBold',
+      caption: 'Fredoka-Medium',
+    },
+    scale: {},
+    upper: [],
+    radius: { sm: 14, md: 20, lg: 26, sheet: 32, full: 999 },
+    line: 0,
+    home: 'pills',
+    tabs: 'pill',
+    mini: 'dog',
+  },
+  brutalista: {
+    player: 'brutalista',
+    fonts: {
+      display: 'Anton-Regular',
+      headline: 'Anton-Regular',
+      title: 'Archivo-ExtraBold',
+      body: 'Archivo-SemiBold',
+      bodyStrong: 'Archivo-ExtraBold',
+      secondary: 'Archivo-SemiBold',
+      label: 'Archivo-ExtraBold',
+      caption: 'Archivo-SemiBold',
+    },
+    scale: { display: 1.6, headline: 1.35 },
+    upper: ['display', 'headline', 'label'],
+    radius: { sm: 0, md: 0, lg: 0, sheet: 0, full: 0 },
+    line: 3,
+    home: 'rows',
+    tabs: 'blocks',
+    mini: 'block',
+  },
+  terminal: {
+    player: 'terminal',
+    fonts: {
+      display: 'JetBrainsMono-Bold',
+      headline: 'JetBrainsMono-Bold',
+      title: 'JetBrainsMono-Bold',
+      body: 'JetBrainsMono-Regular',
+      bodyStrong: 'JetBrainsMono-Bold',
+      secondary: 'JetBrainsMono-Regular',
+      label: 'JetBrainsMono-Bold',
+      caption: 'JetBrainsMono-Regular',
+    },
+    scale: { display: 0.8, headline: 0.85, body: 0.93, bodyStrong: 0.93 },
+    upper: [],
+    radius: { sm: 0, md: 0, lg: 0, sheet: 0, full: 0 },
+    line: 1,
+    home: 'listing',
+    tabs: 'brackets',
+    mini: 'band',
+  },
+  tornamesa: {
+    player: 'tornamesa',
+    fonts: {
+      display: 'BricolageGrotesque-Bold',
+      headline: 'BricolageGrotesque-Bold',
+      title: 'BricolageGrotesque-Bold',
+      body: 'BricolageGrotesque-Medium',
+      bodyStrong: 'BricolageGrotesque-Bold',
+      secondary: 'BricolageGrotesque-Medium',
+      label: 'BricolageGrotesque-Bold',
+      caption: 'BricolageGrotesque-Medium',
+    },
+    scale: {},
+    upper: [],
+    radius: { sm: 6, md: 8, lg: 10, sheet: 18, full: 999 },
+    line: 0,
+    home: 'keys',
+    tabs: 'underline',
+    mini: 'vinyl',
+  },
+  mixtape: {
+    player: 'mixtape',
+    fonts: {
+      display: 'ReenieBeanie-Regular',
+      headline: 'ReenieBeanie-Regular',
+      title: 'BarlowCondensed-Bold',
+      body: 'BarlowCondensed-Medium',
+      bodyStrong: 'BarlowCondensed-SemiBold',
+      secondary: 'BarlowCondensed-Medium',
+      label: 'BarlowCondensed-SemiBold',
+      caption: 'BarlowCondensed-Medium',
+    },
+    scale: {
+      display: 1.7,
+      headline: 1.6,
+      title: 1.1,
+      body: 1.12,
+      bodyStrong: 1.12,
+      secondary: 1.12,
+      label: 1.12,
+      caption: 1.1,
+    },
+    upper: [],
+    radius: { sm: 4, md: 6, lg: 10, sheet: 14, full: 999 },
+    line: 0,
+    home: 'tapes',
+    tabs: 'underline',
+    mini: 'cassette',
+  },
+  taquilla: {
+    player: 'taquilla',
+    fonts: {
+      display: 'AlfaSlabOne-Regular',
+      headline: 'AlfaSlabOne-Regular',
+      title: 'AlfaSlabOne-Regular',
+      body: 'CourierPrime-Regular',
+      bodyStrong: 'CourierPrime-Bold',
+      secondary: 'CourierPrime-Regular',
+      label: 'CourierPrime-Bold',
+      caption: 'CourierPrime-Regular',
+    },
+    scale: { display: 0.95 },
+    upper: ['display', 'headline'],
+    radius: { sm: 6, md: 8, lg: 10, sheet: 16, full: 999 },
+    line: 0,
+    home: 'tickets',
+    tabs: 'underline',
+    mini: 'ticket',
+  },
+  acuario: themedDesign('acuario', 'Quicksand', 'Quicksand', {
+    radius: { sm: 12, md: 18, lg: 24, sheet: 30, full: 999 },
+    home: 'tiles', mini: 'card',
+  }),
+  radiobulbos: themedDesign('radiobulbos', 'Limelight-Regular', 'JosefinSans', {
+    radius: { sm: 4, md: 8, lg: 12, sheet: 20, full: 999 },
+    home: 'rows', tabs: 'underline', mini: 'band',
+  }),
+  pixel: themedDesign('pixel', 'PressStart2P-Regular', 'VT323-Regular', {
+    scale: { display: 0.58, headline: 0.62, title: 0.82, body: 1.2, bodyStrong: 1.2, secondary: 1.2, label: 1.05, caption: 1.1 },
+    radius: { sm: 0, md: 0, lg: 0, sheet: 0, full: 0 }, line: 2,
+    home: 'keys', tabs: 'blocks', mini: 'block',
+  }),
+  acuarela: themedDesign('acuarela', 'CormorantGaramond-Italic', 'Karla'),
+  neonbar: themedDesign('neonbar', 'TiltNeon', 'BarlowSemiCondensed', {
+    radius: { sm: 2, md: 4, lg: 8, sheet: 12, full: 999 },
+    home: 'listing', tabs: 'brackets', mini: 'band',
+  }),
+  constelacion: themedDesign('constelacion', 'Marcellus-Regular', 'Outfit', {
+    radius: { sm: 8, md: 12, lg: 18, sheet: 24, full: 999 },
+  }),
+  jardin: themedDesign('jardin', 'YoungSerif-Regular', 'DMSans'),
+  origami: themedDesign('origami', 'ShipporiMincho-Regular', 'ZenKakuGothicNew-Regular', {
+    radius: { sm: 2, md: 4, lg: 8, sheet: 12, full: 999 }, line: 1,
+    home: 'rows', tabs: 'underline',
+  }),
+  cyberpunk: themedDesign('cyberpunk', 'Rajdhani-SemiBold', 'ShareTechMono-Regular', {
+    scale: { display: 1.12, headline: 1.08 },
+    radius: { sm: 0, md: 0, lg: 2, sheet: 4, full: 0 }, line: 1,
+    upper: ['display', 'headline', 'label'], home: 'listing', tabs: 'brackets', mini: 'band',
+  }),
+  vaporwave: themedDesign('vaporwave', 'SpaceGrotesk', 'VT323-Regular', {
+    scale: { body: 1.12, bodyStrong: 1.12, secondary: 1.12, caption: 1.1 },
+    radius: { sm: 6, md: 10, lg: 16, sheet: 22, full: 999 },
+    home: 'keys', tabs: 'underline', mini: 'cassette',
+  }),
+  manga: themedDesign('manga', 'Bangers-Regular', 'ComicNeue-Regular', {
+    radius: { sm: 2, md: 4, lg: 8, sheet: 12, full: 999 }, line: 2,
+    home: 'tiles', tabs: 'blocks',
+  }),
+  steampunk: themedDesign('steampunk', 'Cinzel', 'LibreBaskerville', {
+    radius: { sm: 4, md: 8, lg: 12, sheet: 18, full: 999 }, line: 1,
+    home: 'rows', tabs: 'blocks', mini: 'vinyl',
+  }),
+  naveespacial: themedDesign('naveespacial', 'Orbitron', 'Exo2', {
+    scale: { display: 0.82, headline: 0.86 },
+    radius: { sm: 4, md: 8, lg: 12, sheet: 18, full: 999 }, line: 1,
+    home: 'listing', tabs: 'blocks', mini: 'band',
+  }),
+  y2k: themedDesign('y2k', 'KronaOne-Regular', 'Manrope', {
+    scale: { display: 0.72, headline: 0.82 },
+    radius: { sm: 10, md: 16, lg: 24, sheet: 30, full: 999 }, home: 'pills',
+  }),
+  western: themedDesign('western', 'Rye-Regular', 'Bitter', {
+    radius: { sm: 2, md: 4, lg: 6, sheet: 10, full: 999 }, line: 1,
+    home: 'tickets', tabs: 'underline', mini: 'ticket',
+  }),
+  fantasiamedieval: themedDesign('fantasiamedieval', 'UncialAntiqua-Regular', 'Alegreya', {
+    radius: { sm: 4, md: 8, lg: 14, sheet: 20, full: 999 }, line: 1,
+    tabs: 'blocks',
+  }),
+  lofi: themedDesign('lofi', 'Caveat', 'Lexend', {
+    radius: { sm: 8, md: 12, lg: 18, sheet: 24, full: 999 },
+    home: 'pills', tabs: 'underline', mini: 'band',
+  }),
+  terrorgotico: themedDesign('terrorgotico', 'PirataOne-Regular', 'CrimsonPro', {
+    radius: { sm: 2, md: 4, lg: 8, sheet: 12, full: 999 }, line: 1,
+    home: 'rows', tabs: 'brackets', mini: 'ticket',
+  }),
+  playa: themedDesign('playa', 'Pacifico-Regular', 'NunitoSans', {
+    radius: { sm: 12, md: 18, lg: 26, sheet: 32, full: 999 },
+    home: 'pills',
+  }),
+};
+
+const designed = (design: ThemeDesign, palettes: PaletteColors[]): Palette[] =>
+  palettes.map(palette => ({ isLight: false, skin: {}, ...palette, design }));
+
+const newTheme = (
+  id: Exclude<PlayerStyle, 'estandar'>,
+  name: string,
+  description: string,
+): AppTheme => ({
+  id,
+  name,
+  description,
+  palettes: themePalettes[id].map(palette => ({
+    ...palette,
+    scene: 'none',
+    sceneColors: [],
+    design: designs[id],
+  })),
+});
 
 const shared = {
   danger: '#ff9c9c',
@@ -51,7 +384,8 @@ export const appThemes: AppTheme[] = [
   {
     id: 'estandar',
     name: 'Estándar',
-    palettes: [
+    description: 'El reproductor clásico, con escenas animadas',
+    palettes: designed(designs.estandar, [
       {
         ...shared,
         id: 'clasico',
@@ -160,8 +494,33 @@ export const appThemes: AppTheme[] = [
         scene: 'sunset',
         sceneColors: ['#ff5e7e', '#ff9a5a', '#ffd166'],
       },
-    ],
+    ]),
   },
+  newTheme('kawaii', 'Kawaii', 'Un shih tzu que reacciona a la música'),
+  newTheme('brutalista', 'Brutalista', 'Bloques, letras enormes y golpes'),
+  newTheme('terminal', 'Terminal', 'Una consola que escribe cada acción'),
+  newTheme('tornamesa', 'Tornamesa', 'Un tocadiscos con aguja y medidor'),
+  newTheme('mixtape', 'Mixtape', 'Un casete que rebobina'),
+  newTheme('taquilla', 'Taquilla', 'Cada canción es una boleta'),
+  newTheme('acuario', 'Acuario', 'Una pecera que acompaña la música'),
+  newTheme('radiobulbos', 'Radio de bulbos', 'Una radio clásica que sintoniza tus canciones'),
+  newTheme('pixel', 'Pixel', 'Un mundo de píxeles que avanza con cada canción'),
+  newTheme('acuarela', 'Acuarela', 'Manchas de color que respiran al ritmo'),
+  newTheme('neonbar', 'Neón de bar', 'Un letrero de neón que reacciona al volumen'),
+  newTheme('constelacion', 'Constelación', 'Tu cola de reproducción convertida en estrellas'),
+  newTheme('jardin', 'Jardín', 'Una planta que crece mientras escuchas'),
+  newTheme('origami', 'Origami', 'Papel que se pliega al cambiar de canción'),
+  newTheme('cyberpunk', 'Cyberpunk', 'Una ciudad nocturna con lluvia y neón'),
+  newTheme('vaporwave', 'Vaporwave', 'Un atardecer retro en movimiento'),
+  newTheme('manga', 'Manga', 'Viñetas y acción al ritmo de tu música'),
+  newTheme('steampunk', 'Steampunk', 'Engranajes, latón y vapor'),
+  newTheme('naveespacial', 'Nave espacial', 'Una cabina que viaja entre canciones'),
+  newTheme('y2k', 'Y2K', 'Cromo iridiscente y estética del milenio'),
+  newTheme('western', 'Western', 'Un cartel del oeste que sigue la música'),
+  newTheme('fantasiamedieval', 'Fantasía medieval', 'Runas y un orbe encantado'),
+  newTheme('lofi', 'Lo-fi', 'Un cuarto lluvioso para escuchar con calma'),
+  newTheme('terrorgotico', 'Terror gótico', 'Un castillo bajo la luna'),
+  newTheme('playa', 'Playa', 'Olas, velero y brisa tropical'),
 ];
 
 export const defaultAppearance = { themeId: 'estandar', paletteId: 'clasico' };

@@ -30,6 +30,7 @@ export type PlayerSheet =
   | 'sleep'
   | 'speed'
   | 'equalizer'
+  | 'lyrics'
   | 'theme'
   | 'palette'
   | null;

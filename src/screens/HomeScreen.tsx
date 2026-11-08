@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -12,7 +12,6 @@ import {
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
 import {
-  radius,
   screenPadding,
   spacing,
   createStyles,
@@ -24,6 +23,7 @@ import { SectionHeader } from '../ui/Rows';
 import { Tap } from '../ui/Tap';
 import { groupAlbums, groupArtists } from '../utils/collections';
 import { shuffleTracks } from '../utils/shuffleQueue';
+import { ThemeHomeArt } from './ThemeHomeArt';
 
 function greeting() {
   const hour = new Date().getHours();
@@ -36,23 +36,113 @@ function greeting() {
 
 function Shortcut({
   label,
-  icon,
+  icon: Icon,
+  index,
   onPress,
 }: {
   label: string;
-  icon: ReactNode;
+  icon: typeof Heart;
+  index: number;
   onPress: () => void;
 }) {
-  const { type } = useColors();
+  const { colors, type } = useColors();
   const styles = useStyles();
+  const variant = colors.design.home;
+  const press = {
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: label,
+    onPress,
+  };
+
+  if (variant === 'rows') {
+    const hot = index === 1;
+    return (
+      <Tap
+        {...press}
+        style={[styles.rowShortcut, hot && styles.rowShortcutHot]}
+      >
+        <Text
+          numberOfLines={1}
+          style={[type.headline, hot && { color: colors.control }]}
+        >
+          {label}
+        </Text>
+        <Icon color={hot ? colors.control : colors.text} size={26} />
+      </Tap>
+    );
+  }
+  if (variant === 'listing') {
+    return (
+      <Tap {...press} style={styles.listingShortcut}>
+        <Text numberOfLines={1} style={[type.body, styles.listingMode]}>
+          {index === 1 ? '-a---' : 'd----'}
+        </Text>
+        <Text numberOfLines={1} style={[type.body, styles.listingName]}>
+          {label.replace(/ /g, '-')}
+        </Text>
+      </Tap>
+    );
+  }
+  if (variant === 'tapes') {
+    const stripes = [colors.skin.m1, colors.skin.m3, colors.skin.m2];
+    return (
+      <Tap {...press} style={styles.tapeShortcut}>
+        <View
+          style={[
+            styles.tapeStripe,
+            { backgroundColor: stripes[index % stripes.length] },
+          ]}
+        />
+        <View style={styles.tapeLabel}>
+          <Text numberOfLines={1} style={[type.headline, styles.tapeText]}>
+            {label}
+          </Text>
+        </View>
+        <Icon color={colors.skin.shellInk} size={20} />
+      </Tap>
+    );
+  }
+  if (variant === 'tickets') {
+    return (
+      <Tap {...press} style={styles.ticketShortcut}>
+        <Text numberOfLines={1} style={[type.title, styles.ticketText]}>
+          {label.toUpperCase()}
+        </Text>
+        <View style={styles.ticketStub}>
+          <Icon color={colors.skin.ink} size={20} />
+        </View>
+        <View style={[styles.ticketNotch, styles.ticketNotchTop]} />
+        <View style={[styles.ticketNotch, styles.ticketNotchBottom]} />
+      </Tap>
+    );
+  }
+  if (variant === 'keys') {
+    return (
+      <Tap {...press} style={styles.keyShortcut}>
+        <Icon color={colors.accent} size={20} />
+        <Text numberOfLines={2} style={type.label}>
+          {label}
+        </Text>
+      </Tap>
+    );
+  }
+  if (variant === 'pills') {
+    return (
+      <Tap {...press} pressedScale={0.96} style={styles.pillShortcut}>
+        <View style={styles.pillIcon}>
+          <Icon color={colors.accent} size={20} />
+        </View>
+        <Text numberOfLines={2} style={[type.label, styles.shortcutLabel]}>
+          {label}
+        </Text>
+      </Tap>
+    );
+  }
   return (
-    <Tap
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={styles.shortcut}
-    >
-      <View style={styles.shortcutIcon}>{icon}</View>
+    <Tap {...press} style={styles.shortcut}>
+      <View style={styles.shortcutIcon}>
+        <Icon color={colors.text} size={20} />
+      </View>
       <Text numberOfLines={2} style={[type.label, styles.shortcutLabel]}>
         {label}
       </Text>
@@ -126,7 +216,32 @@ export function HomeScreen() {
   const artists = useMemo(() => groupArtists(tracks).slice(0, 12), [tracks]);
   const open = (kind: 'favorites' | 'recent' | 'top' | 'added') =>
     nav.push({ name: 'collection', ref: { kind } });
-  const iconSize = 20;
+  const listing = colors.design.home === 'listing';
+  const roundCovers = colors.design.player === 'kawaii';
+  const shortcuts = [
+    { icon: Heart, label: 'Favoritas', onPress: () => open('favorites') },
+    {
+      icon: Shuffle,
+      label: 'Mezclar todo',
+      onPress: () => {
+        const shuffled = shuffleTracks(tracks);
+        if (shuffled[0]) {
+          playTracks(shuffled, shuffled[0], 'Mezcla de tu biblioteca');
+        }
+      },
+    },
+    { icon: TrendingUp, label: 'Más escuchadas', onPress: () => open('top') },
+    { icon: Clock3, label: 'Recientes', onPress: () => open('recent') },
+    { icon: Plus, label: 'Añadidas', onPress: () => open('added') },
+    {
+      icon: ListMusic,
+      label: 'Tus listas',
+      onPress: () => {
+        setLibraryFilter('playlists');
+        nav.selectTab('library');
+      },
+    },
+  ];
 
   return (
     <ScrollView
@@ -154,6 +269,8 @@ export function HomeScreen() {
         </IconButton>
       </View>
 
+      <ThemeHomeArt />
+
       {permissionDenied ? (
         <View style={styles.notice}>
           <Text style={type.title}>Permite el acceso a tu música</Text>
@@ -178,44 +295,15 @@ export function HomeScreen() {
         </View>
       ) : (
         <View style={styles.shortcuts}>
-          <Shortcut
-            icon={<Heart color={colors.text} size={iconSize} />}
-            label="Favoritas"
-            onPress={() => open('favorites')}
-          />
-          <Shortcut
-            icon={<Shuffle color={colors.text} size={iconSize} />}
-            label="Mezclar todo"
-            onPress={() => {
-              const shuffled = shuffleTracks(tracks);
-              if (shuffled[0]) {
-                playTracks(shuffled, shuffled[0], 'Mezcla de tu biblioteca');
-              }
-            }}
-          />
-          <Shortcut
-            icon={<TrendingUp color={colors.text} size={iconSize} />}
-            label="Más escuchadas"
-            onPress={() => open('top')}
-          />
-          <Shortcut
-            icon={<Clock3 color={colors.text} size={iconSize} />}
-            label="Recientes"
-            onPress={() => open('recent')}
-          />
-          <Shortcut
-            icon={<Plus color={colors.text} size={iconSize} />}
-            label="Añadidas"
-            onPress={() => open('added')}
-          />
-          <Shortcut
-            icon={<ListMusic color={colors.text} size={iconSize} />}
-            label="Tus listas"
-            onPress={() => {
-              setLibraryFilter('playlists');
-              nav.selectTab('library');
-            }}
-          />
+          {listing ? (
+            <Text style={[type.body, styles.prompt]}>
+              PS C:\Música&gt;{' '}
+              <Text style={{ color: colors.accent }}>Get-Biblioteca</Text>
+            </Text>
+          ) : null}
+          {shortcuts.map((shortcut, index) => (
+            <Shortcut key={shortcut.label} index={index} {...shortcut} />
+          ))}
         </View>
       )}
 
@@ -237,6 +325,7 @@ export function HomeScreen() {
                 accessibilityLabel={`Reproducir ${track.title} de ${track.artist}`}
                 artwork={track.artwork}
                 onPress={() => playTracks(recentTracks, track, 'Recientes')}
+                round={roundCovers}
                 subtitle={track.artist}
                 title={track.title}
               />
@@ -361,16 +450,127 @@ const useStyles = createStyles(colors => ({
     paddingHorizontal: screenPadding,
     paddingTop: spacing.xl,
   },
-  shortcuts: {
+  shortcuts: ['rows', 'listing', 'tapes', 'tickets'].includes(
+    colors.design.home,
+  )
+    ? {
+        gap: colors.design.home === 'rows' ? 0 : spacing.sm,
+        paddingHorizontal: colors.design.home === 'rows' ? 0 : screenPadding,
+        borderTopWidth: colors.design.home === 'rows' ? colors.design.line : 0,
+        borderColor: colors.text,
+      }
+    : {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        paddingHorizontal: screenPadding,
+      },
+  prompt: { paddingBottom: spacing.xs },
+  rowShortcut: {
+    alignItems: 'center',
+    borderBottomWidth: colors.design.line,
+    borderColor: colors.text,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    minHeight: 60,
     paddingHorizontal: screenPadding,
+  },
+  rowShortcutHot: { backgroundColor: colors.skin.hot ?? colors.accent },
+  listingShortcut: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    minHeight: 44,
+    alignItems: 'center',
+  },
+  listingMode: { color: colors.textSecondary },
+  listingName: { flex: 1 },
+  tapeShortcut: {
+    alignItems: 'center',
+    backgroundColor: colors.skin.shell ?? colors.surfaceHigh,
+    borderRadius: colors.design.radius.sm,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 62,
+    overflow: 'hidden',
+    paddingRight: spacing.md,
+  },
+  tapeStripe: { alignSelf: 'stretch', width: 22 },
+  tapeLabel: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.skin.label ?? colors.surface,
+    flex: 1,
+    justifyContent: 'center',
+    marginVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  tapeText: { color: colors.skin.ink ?? colors.text, fontSize: 30 },
+  ticketShortcut: {
+    alignItems: 'center',
+    backgroundColor: colors.skin.paper ?? colors.surface,
+    borderRadius: colors.design.radius.md,
+    flexDirection: 'row',
+    minHeight: 64,
+    overflow: 'hidden',
+  },
+  ticketText: {
+    color: colors.skin.ink ?? colors.text,
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  ticketStub: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    borderColor: colors.skin.perf ?? colors.outline,
+    borderLeftWidth: 3,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    width: 72,
+  },
+  ticketNotch: {
+    backgroundColor: colors.background,
+    borderRadius: 11,
+    height: 22,
+    position: 'absolute',
+    right: 61,
+    width: 22,
+  },
+  ticketNotchTop: { top: -11 },
+  ticketNotchBottom: { bottom: -11 },
+  keyShortcut: {
+    backgroundColor: colors.surfaceHigh,
+    borderBottomWidth: 4,
+    borderColor: colors.skin.keyEdge ?? colors.outline,
+    borderRadius: colors.design.radius.md,
+    flexBasis: '48%',
+    flexGrow: 1,
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
+    minHeight: 72,
+    padding: spacing.md,
+  },
+  pillShortcut: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: colors.design.radius.lg,
+    flexBasis: '48%',
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: spacing.sm,
+    minHeight: 60,
+    paddingHorizontal: spacing.sm,
+  },
+  pillIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceHigh,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   shortcut: {
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.sm,
+    borderRadius: colors.design.radius.sm,
     flexBasis: '48%',
     flexDirection: 'row',
     flexGrow: 1,

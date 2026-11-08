@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { motionDuration, motionEasing } from '../theme/motion';
-import { radius, spacing, createStyles, useColors } from '../theme/theme';
+import { spacing, createStyles, useColors, strongFont } from '../theme/theme';
 import { Tap } from './Tap';
 
 /** Bottom sheet. Android Back, the scrim and dragging the handle all close it. */
@@ -52,39 +52,40 @@ export function Sheet({
   useEffect(() => {
     if (visible) {
       setMounted(true);
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: reducedMotion ? 0 : motionDuration.enter,
-          easing: motionEasing.enter,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrim, {
-          toValue: 1,
-          duration: motionDuration.state,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!mounted) {
       return;
     }
-    Animated.parallel([
+    const duration = reducedMotion
+      ? 0
+      : visible
+      ? motionDuration.sheetEnter
+      : motionDuration.sheetExit;
+    const animation = Animated.parallel([
       Animated.timing(translateY, {
-        toValue: height,
-        duration: reducedMotion ? 0 : motionDuration.exit,
-        easing: motionEasing.exit,
+        toValue: visible ? 0 : height,
+        duration,
+        easing: visible ? motionEasing.enter : motionEasing.exit,
+        isInteraction: false,
         useNativeDriver: true,
       }),
       Animated.timing(scrim, {
-        toValue: 0,
-        duration: motionDuration.exit,
+        toValue: visible ? 1 : 0,
+        duration: Math.min(duration, motionDuration.state),
+        isInteraction: false,
         useNativeDriver: true,
       }),
-    ]).start(({ finished }) => {
-      if (finished) {
+    ]);
+    animation.start(({ finished }) => {
+      if (finished && !visible) {
         setMounted(false);
       }
     });
-  }, [height, reducedMotion, scrim, translateY, visible]);
+    return () => animation.stop();
+  }, [height, mounted, reducedMotion, scrim, translateY, visible]);
 
   const drag = useMemo(
     () =>
@@ -96,11 +97,14 @@ export function Sheet({
         onPanResponderRelease: (_, gesture) => {
           if (gesture.dy > 90 || gesture.vy > 0.8) {
             onCloseRef.current();
+          } else if (reducedMotion) {
+            translateY.setValue(0);
           } else {
             Animated.spring(translateY, {
               toValue: 0,
               speed: 24,
               bounciness: 0,
+              isInteraction: false,
               useNativeDriver: true,
             }).start();
           }
@@ -109,8 +113,12 @@ export function Sheet({
           translateY.setValue(0);
         },
       }),
-    [translateY],
+    [reducedMotion, translateY],
   );
+
+  if (!visible && !mounted) {
+    return null;
+  }
 
   return (
     <Modal
@@ -119,7 +127,7 @@ export function Sheet({
       statusBarTranslucent
       navigationBarTranslucent
       transparent
-      visible={mounted}
+      visible={visible || mounted}
     >
       <View style={styles.overlay}>
         <Animated.View
@@ -218,8 +226,8 @@ const useStyles = createStyles(colors => ({
   fill: { flex: 1 },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    borderTopLeftRadius: colors.design.radius.sheet,
+    borderTopRightRadius: colors.design.radius.sheet,
     maxHeight: '88%',
   },
   handleArea: { alignItems: 'center', paddingVertical: spacing.md },
@@ -243,5 +251,5 @@ const useStyles = createStyles(colors => ({
   },
   actionLabel: { flex: 1 },
   danger: { color: colors.danger },
-  selected: { fontWeight: '700' },
+  selected: strongFont(colors),
 }));
