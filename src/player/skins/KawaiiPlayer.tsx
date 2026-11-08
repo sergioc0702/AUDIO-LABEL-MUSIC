@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -193,6 +193,43 @@ export function KawaiiPlayer({ covered, headerGesture, onClose }: SkinProps) {
   const stage = Math.max(220, Math.min(width - 40, height * 0.42, 400));
   const radius = stage / 2 - 14;
   const length = 2 * Math.PI * radius;
+  const seekingRing = useSharedValue(false);
+  const progressAt = (x: number, y: number) => {
+    'worklet';
+    const dx = x - stage / 2;
+    const dy = y - stage / 2;
+    return (
+      (Math.atan2(dy, dx) + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2)
+    ) / (Math.PI * 2);
+  };
+  const seekRing = (x: number, y: number) => {
+    'worklet';
+    scheduleOnRN(kit.seekTo, progressAt(x, y));
+  };
+  const ringPan = Gesture.Pan()
+    .enabled(kit.ready && kit.duration > 0)
+    .minDistance(6)
+    .onBegin(event => {
+      const dx = event.x - stage / 2;
+      const dy = event.y - stage / 2;
+      seekingRing.value = Math.hypot(dx, dy) >= radius * 0.74;
+    })
+    .onEnd((event, success) => {
+      if (success && seekingRing.value) seekRing(event.x, event.y);
+    })
+    .onFinalize(() => {
+      seekingRing.value = false;
+    });
+  const ringTap = Gesture.Tap().onEnd((event, success) => {
+    if (!success) return;
+    const dx = event.x - stage / 2;
+    const dy = event.y - stage / 2;
+    if (Math.hypot(dx, dy) < radius * 0.74) {
+      scheduleOnRN(setPetted, true);
+    } else if (kit.ready && kit.duration > 0) {
+      seekRing(event.x, event.y);
+    }
+  });
   const angle = kit.progress * Math.PI * 2 - Math.PI / 2;
   const mood = dogMood(
     kit.isPlaying,
@@ -242,60 +279,71 @@ export function KawaiiPlayer({ covered, headerGesture, onClose }: SkinProps) {
 
       <View style={styles.middle}>
         <View style={{ width: stage, height: stage }}>
-          <Pressable
-            accessibilityHint="Toca el borde para cambiar la posición, o al perrito para acariciarlo"
-            accessibilityLabel="Avance de la canción"
-            onPress={event => {
-              const x = event.nativeEvent.locationX - stage / 2;
-              const y = event.nativeEvent.locationY - stage / 2;
-              if (Math.hypot(x, y) < radius * 0.74) {
-                setPetted(true);
-                return;
-              }
-              const turn =
-                (Math.atan2(y, x) + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2);
-              kit.seekTo(turn / (Math.PI * 2));
-            }}
-            style={StyleSheetFill}
-          >
-            <Svg height={stage} width={stage}>
-              <Circle
-                cx={stage / 2}
-                cy={stage / 2}
-                fill={colors.skin.disc}
-                r={radius}
-              />
-              <Circle
-                cx={stage / 2}
-                cy={stage / 2}
-                fill="none"
-                r={radius}
-                stroke={colors.skin.ring}
-                strokeWidth={16}
-              />
-              <Circle
-                cx={stage / 2}
-                cy={stage / 2}
-                fill="none"
-                r={radius}
-                stroke={colors.accent}
-                strokeDasharray={`${kit.progress * length} ${length}`}
-                strokeLinecap="round"
-                strokeWidth={16}
-                transform={`rotate(-90 ${stage / 2} ${stage / 2})`}
-              />
-              <Path
-                d={HEART}
-                fill="#ffffff"
-                stroke={colors.accent}
-                strokeLinejoin="round"
-                strokeWidth={2.6}
-                transform={`translate(${stage / 2 + Math.cos(angle) * radius} ${
-                  stage / 2 + Math.sin(angle) * radius
-                }) scale(1.4)`}
-              />
-            </Svg>
-          </Pressable>
+          <GestureDetector gesture={Gesture.Exclusive(ringPan, ringTap)}>
+            <View
+              accessible
+              accessibilityActions={[
+                { name: 'increment', label: 'Avanzar 10 segundos' },
+                { name: 'decrement', label: 'Retroceder 10 segundos' },
+              ]}
+              accessibilityHint="Toca o arrastra el aro para cambiar la posición; toca al perrito para acariciarlo"
+              accessibilityLabel="Avance de la canción"
+              accessibilityRole="adjustable"
+              accessibilityState={{ disabled: !kit.ready || kit.duration <= 0 }}
+              accessibilityValue={{
+                min: 0,
+                max: Math.ceil(kit.duration),
+                now: Math.floor(kit.position),
+                text: formatTime(kit.position),
+              }}
+              collapsable={false}
+              onAccessibilityAction={event => {
+                if (!kit.ready || kit.duration <= 0) return;
+                const delta =
+                  event.nativeEvent.actionName === 'increment' ? 10 : -10;
+                kit.seekTo((kit.position + delta) / kit.duration);
+              }}
+              style={StyleSheetFill}
+            >
+              <Svg height={stage} width={stage}>
+                <Circle
+                  cx={stage / 2}
+                  cy={stage / 2}
+                  fill={colors.skin.disc}
+                  r={radius}
+                />
+                <Circle
+                  cx={stage / 2}
+                  cy={stage / 2}
+                  fill="none"
+                  r={radius}
+                  stroke={colors.skin.ring}
+                  strokeWidth={16}
+                />
+                <Circle
+                  cx={stage / 2}
+                  cy={stage / 2}
+                  fill="none"
+                  r={radius}
+                  stroke={colors.accent}
+                  strokeDasharray={`${kit.progress * length} ${length}`}
+                  strokeLinecap="round"
+                  strokeWidth={16}
+                  transform={`rotate(-90 ${stage / 2} ${stage / 2})`}
+                />
+                <Path
+                  d={HEART}
+                  fill="#ffffff"
+                  stroke={colors.accent}
+                  strokeLinejoin="round"
+                  strokeWidth={2.6}
+                  transform={`translate(${stage / 2 + Math.cos(angle) * radius} ${
+                    stage / 2 + Math.sin(angle) * radius
+                  }) scale(1.4)`}
+                />
+              </Svg>
+            </View>
+          </GestureDetector>
           <View
             pointerEvents="none"
             style={[styles.dog, { left: stage * 0.1, top: stage * 0.11 }]}

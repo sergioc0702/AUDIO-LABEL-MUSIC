@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Pressable,
   View,
   type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { RepeatMode } from 'react-native-track-player';
 import { useApp } from '../../state/AppContext';
 import { formatTime } from '../../utils/formatTime';
@@ -199,29 +200,55 @@ export function SeekArea({
   children: ReactNode;
   label?: string;
 }) {
-  const width = useRef(1);
+  const width = useSharedValue(0);
+  const seek = (x: number) => {
+    'worklet';
+    if (width.value <= 0) return;
+    scheduleOnRN(kit.seekTo, Math.max(0, Math.min(1, x / width.value)));
+  };
+  const pan = Gesture.Pan()
+    .enabled(kit.ready && kit.duration > 0)
+    .activeOffsetX([-5, 5])
+    .failOffsetY([-12, 12])
+    .onEnd((event, success) => {
+      if (success) seek(event.x);
+    });
+  const tap = Gesture.Tap()
+    .enabled(kit.ready && kit.duration > 0)
+    .onEnd((event, success) => {
+      if (success) seek(event.x);
+    });
   return (
-    <Pressable
-      accessibilityActions={[
-        { name: 'increment', label: 'Avanzar 10 segundos' },
-        { name: 'decrement', label: 'Retroceder 10 segundos' },
-      ]}
-      accessibilityLabel={label}
-      accessibilityRole="adjustable"
-      accessibilityValue={{ text: formatTime(kit.position) }}
-      disabled={!kit.ready || kit.duration <= 0}
-      onAccessibilityAction={event => {
-        const delta = event.nativeEvent.actionName === 'increment' ? 10 : -10;
-        kit.seekTo((kit.position + delta) / kit.duration);
-      }}
-      onLayout={(event: LayoutChangeEvent) => {
-        width.current = Math.max(1, event.nativeEvent.layout.width);
-      }}
-      onPress={event => kit.seekTo(event.nativeEvent.locationX / width.current)}
-      style={style}
-    >
-      {children}
-    </Pressable>
+    <GestureDetector gesture={Gesture.Exclusive(pan, tap)}>
+      <View
+        accessible
+        accessibilityActions={[
+          { name: 'increment', label: 'Avanzar 10 segundos' },
+          { name: 'decrement', label: 'Retroceder 10 segundos' },
+        ]}
+        accessibilityLabel={label}
+        accessibilityRole="adjustable"
+        accessibilityState={{ disabled: !kit.ready || kit.duration <= 0 }}
+        accessibilityValue={{
+          min: 0,
+          max: Math.ceil(kit.duration),
+          now: Math.floor(kit.position),
+          text: formatTime(kit.position),
+        }}
+        collapsable={false}
+        onAccessibilityAction={event => {
+          if (!kit.ready || kit.duration <= 0) return;
+          const delta = event.nativeEvent.actionName === 'increment' ? 10 : -10;
+          kit.seekTo((kit.position + delta) / kit.duration);
+        }}
+        onLayout={(event: LayoutChangeEvent) => {
+          width.value = Math.max(1, event.nativeEvent.layout.width);
+        }}
+        style={style}
+      >
+        {children}
+      </View>
+    </GestureDetector>
   );
 }
 
