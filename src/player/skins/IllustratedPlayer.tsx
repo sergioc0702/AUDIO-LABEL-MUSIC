@@ -34,6 +34,7 @@ import { formatTime } from '../../utils/formatTime';
 import { PlayPauseIcon } from '../PlayPauseIcon';
 import { Batch3ThemeScene } from './ThemeScenesBatch3';
 import { Batch4ThemeScene } from './ThemeScenesBatch4';
+import { Batch5ThemeScene } from './ThemeScenesBatch5';
 import {
   DragHeader,
   SeekArea,
@@ -58,7 +59,11 @@ export type IllustratedKind =
   | 'steampunk'
   | 'naveespacial'
   | 'y2k'
-  | 'western';
+  | 'western'
+  | 'fantasiamedieval'
+  | 'lofi'
+  | 'terrorgotico'
+  | 'playa';
 
 function Loop({
   active,
@@ -546,7 +551,16 @@ function Scene({ kind, kit }: { kind: IllustratedKind; kit: PlayerKit }) {
   ) {
     return <Batch3ThemeScene kind={kind} kit={kit} />;
   }
-  return <Batch4ThemeScene kind={kind} kit={kit} />;
+  if (
+    kind === 'manga' ||
+    kind === 'steampunk' ||
+    kind === 'naveespacial' ||
+    kind === 'y2k' ||
+    kind === 'western'
+  ) {
+    return <Batch4ThemeScene kind={kind} kit={kit} />;
+  }
+  return <Batch5ThemeScene kind={kind} kit={kit} />;
 }
 
 export function IllustratedPlayer({

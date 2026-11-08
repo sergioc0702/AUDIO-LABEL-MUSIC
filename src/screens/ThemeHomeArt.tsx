@@ -17,6 +17,10 @@ const copy: Record<string, string> = {
   naveespacial: 'Rumbo a nuevos sonidos',
   y2k: 'Brillo cromado para tu biblioteca',
   western: 'El próximo tema ya está buscado',
+  fantasiamedieval: 'Una aventura en cada álbum',
+  lofi: 'Un lugar tranquilo para escuchar',
+  terrorgotico: 'La noche tiene banda sonora',
+  playa: 'Escucha al ritmo de las olas',
 };
 
 const motifs: Record<string, string> = {
@@ -30,6 +34,10 @@ const motifs: Record<string, string> = {
   naveespacial: '◌',
   y2k: '✧',
   western: '★',
+  fantasiamedieval: '✥',
+  lofi: '☾',
+  terrorgotico: '♜',
+  playa: '≈',
 };
 
 export function ThemeHomeArt() {

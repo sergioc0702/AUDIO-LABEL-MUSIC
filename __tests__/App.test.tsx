@@ -1010,6 +1010,14 @@ test.each([
   ['Nave espacial', 'Ventana de nave espacial con planeta', 'naveespacial'],
   ['Y2K', 'Disco compacto cromado Y2K', 'y2k'],
   ['Western', 'Cartel western de se busca en el desierto', 'western'],
+  [
+    'Fantasía medieval',
+    'Orbe de fantasía medieval rodeado de runas',
+    'fantasiamedieval',
+  ],
+  ['Lo-fi', 'Habitación lo-fi con lluvia en la ventana', 'lofi'],
+  ['Terror gótico', 'Castillo gótico bajo la luna', 'terrorgotico'],
+  ['Playa', 'Playa con olas y velero', 'playa'],
 ])('the %s theme brings its own player', async (theme, part, id) => {
   const tracks = [makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);

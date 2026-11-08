@@ -22,6 +22,10 @@ import { SteampunkPlayer } from './SteampunkPlayer';
 import { NaveEspacialPlayer } from './NaveEspacialPlayer';
 import { Y2KPlayer } from './Y2KPlayer';
 import { WesternPlayer } from './WesternPlayer';
+import { FantasiaMedievalPlayer } from './FantasiaMedievalPlayer';
+import { LofiPlayer } from './LofiPlayer';
+import { TerrorGoticoPlayer } from './TerrorGoticoPlayer';
+import { PlayaPlayer } from './PlayaPlayer';
 
 const players = {
   kawaii: KawaiiPlayer,
@@ -45,10 +49,10 @@ const players = {
   naveespacial: NaveEspacialPlayer,
   y2k: Y2KPlayer,
   western: WesternPlayer,
-  fantasiamedieval: TurntablePlayer,
-  lofi: KawaiiPlayer,
-  terrorgotico: TicketPlayer,
-  playa: KawaiiPlayer,
+  fantasiamedieval: FantasiaMedievalPlayer,
+  lofi: LofiPlayer,
+  terrorgotico: TerrorGoticoPlayer,
+  playa: PlayaPlayer,
 };
 
 /** The full player of the active theme. */
