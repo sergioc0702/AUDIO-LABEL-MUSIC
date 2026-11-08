@@ -32,6 +32,7 @@ import { IconButton } from '../../ui/Buttons';
 import { createStyles, spacing, useColors } from '../../theme/theme';
 import { formatTime } from '../../utils/formatTime';
 import { PlayPauseIcon } from '../PlayPauseIcon';
+import { Batch3ThemeScene } from './ThemeScenesBatch3';
 import {
   DragHeader,
   SeekArea,
@@ -46,7 +47,12 @@ export type IllustratedKind =
   | 'radio'
   | 'pixel'
   | 'acuarela'
-  | 'neon';
+  | 'neon'
+  | 'constelacion'
+  | 'jardin'
+  | 'origami'
+  | 'cyberpunk'
+  | 'vaporwave';
 
 function Loop({
   active,
@@ -524,7 +530,8 @@ function Scene({ kind, kit }: { kind: IllustratedKind; kit: PlayerKit }) {
   if (kind === 'radio') return <RadioScene kit={kit} />;
   if (kind === 'pixel') return <PixelScene kit={kit} />;
   if (kind === 'acuarela') return <WatercolorScene kit={kit} />;
-  return <NeonScene kit={kit} />;
+  if (kind === 'neon') return <NeonScene kit={kit} />;
+  return <Batch3ThemeScene kind={kind} kit={kit} />;
 }
 
 export function IllustratedPlayer({

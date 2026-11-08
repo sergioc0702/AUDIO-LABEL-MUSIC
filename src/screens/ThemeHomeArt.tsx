@@ -7,6 +7,19 @@ const copy: Record<string, string> = {
   pixel: 'Cada canción es un nuevo nivel',
   acuarela: 'Colores para escuchar despacio',
   neonbar: 'Sube el volumen de la noche',
+  constelacion: 'Tu cola forma su propia constelación',
+  jardin: 'Deja que la música florezca',
+  origami: 'Historias que se pliegan en papel',
+  cyberpunk: 'La ciudad también tiene ritmo',
+  vaporwave: 'Una noche de sintetizadores',
+};
+
+const motifs: Record<string, string> = {
+  constelacion: '✦',
+  jardin: '✿',
+  origami: '◇',
+  cyberpunk: '▰',
+  vaporwave: '◉',
 };
 
 export function ThemeHomeArt() {
@@ -167,6 +180,36 @@ export function ThemeHomeArt() {
             </Text>
           </View>
         ) : null}
+        {id in motifs ? (
+          <View
+            style={[
+              styles.motif,
+              { backgroundColor: colors.skin.panel ?? colors.surfaceHigh },
+            ]}
+          >
+            <View
+              style={[
+                styles.motifGlow,
+                { backgroundColor: colors.skin.accent ?? colors.accent },
+              ]}
+            />
+            <Text
+              style={[
+                type.display,
+                styles.motifMark,
+                { color: colors.skin.accent ?? colors.accent },
+              ]}
+            >
+              {motifs[id]}
+            </Text>
+            <View
+              style={[
+                styles.motifLine,
+                { backgroundColor: colors.skin.line ?? colors.outline },
+              ]}
+            />
+          </View>
+        ) : null}
       </View>
       <Text
         style={[type.label, styles.caption, { color: colors.textSecondary }]}
@@ -177,7 +220,7 @@ export function ThemeHomeArt() {
   );
 }
 
-const useStyles = createStyles(() => ({
+const useStyles = createStyles(colors => ({
   wrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   hero: {
     alignItems: 'center',
@@ -268,5 +311,29 @@ const useStyles = createStyles(() => ({
     justifyContent: 'center',
     height: 82,
     width: 180,
+  },
+  motif: {
+    alignItems: 'center',
+    borderColor: colors.outline,
+    borderRadius: 18,
+    borderWidth: colors.design.line || 1,
+    height: 90,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 170,
+  },
+  motifGlow: {
+    borderRadius: 80,
+    height: 90,
+    opacity: 0.15,
+    position: 'absolute',
+    width: 90,
+  },
+  motifMark: { fontSize: 42, lineHeight: 54 },
+  motifLine: {
+    bottom: 12,
+    height: 3,
+    position: 'absolute',
+    width: '66%',
   },
 }));

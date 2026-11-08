@@ -102,11 +102,11 @@ export function MiniPlayer() {
   const variant = colors.design.mini;
   const ink =
     variant === 'band'
-      ? colors.skin.bandInk
+      ? colors.skin.bandInk ?? colors.text
       : variant === 'cassette'
-      ? colors.skin.shellInk
+      ? colors.skin.shellInk ?? colors.text
       : variant === 'ticket'
-      ? colors.skin.ink
+      ? colors.skin.ink ?? colors.text
       : colors.text;
   const shift = useSharedValue(0);
   const busy = useSharedValue(false);
@@ -224,7 +224,12 @@ export function MiniPlayer() {
             onPress={togglePlayback}
             style={styles.blockPlay}
           >
-            <Text style={[type.headline, { color: colors.skin.onHot }]}>
+            <Text
+              style={[
+                type.headline,
+                { color: colors.skin.onHot ?? colors.onAccent },
+              ]}
+            >
               {isPlaying ? 'Pausa' : 'Play'}
             </Text>
           </Pressable>

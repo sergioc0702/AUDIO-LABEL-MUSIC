@@ -12,6 +12,11 @@ import { RadioBulbosPlayer } from './RadioBulbosPlayer';
 import { PixelPlayer } from './PixelPlayer';
 import { AcuarelaPlayer } from './AcuarelaPlayer';
 import { NeonBarPlayer } from './NeonBarPlayer';
+import { ConstelacionPlayer } from './ConstelacionPlayer';
+import { JardinPlayer } from './JardinPlayer';
+import { OrigamiPlayer } from './OrigamiPlayer';
+import { CyberpunkPlayer } from './CyberpunkPlayer';
+import { VaporwavePlayer } from './VaporwavePlayer';
 
 const players = {
   kawaii: KawaiiPlayer,
@@ -25,11 +30,11 @@ const players = {
   pixel: PixelPlayer,
   acuarela: AcuarelaPlayer,
   neonbar: NeonBarPlayer,
-  constelacion: TurntablePlayer,
-  jardin: KawaiiPlayer,
-  origami: TicketPlayer,
-  cyberpunk: TerminalPlayer,
-  vaporwave: MixtapePlayer,
+  constelacion: ConstelacionPlayer,
+  jardin: JardinPlayer,
+  origami: OrigamiPlayer,
+  cyberpunk: CyberpunkPlayer,
+  vaporwave: VaporwavePlayer,
   manga: BrutalPlayer,
   steampunk: TurntablePlayer,
   naveespacial: TerminalPlayer,

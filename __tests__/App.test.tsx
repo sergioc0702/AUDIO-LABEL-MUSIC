@@ -996,6 +996,15 @@ test.each([
   ['Pixel', 'Cambiar la posición de la canción', 'pixel'],
   ['Acuarela', 'Cambiar la posición de la canción', 'acuarela'],
   ['Neón de bar', 'Volumen del teléfono', 'neonbar'],
+  [
+    'Constelación',
+    'Cola de reproducción convertida en constelación',
+    'constelacion',
+  ],
+  ['Jardín', 'Jardín musical que crece con el avance', 'jardin'],
+  ['Origami', 'Grulla de papel origami', 'origami'],
+  ['Cyberpunk', 'Ciudad ciberpunk con lluvia', 'cyberpunk'],
+  ['Vaporwave', 'Atardecer vaporwave con cuadrícula', 'vaporwave'],
 ])('the %s theme brings its own player', async (theme, part, id) => {
   const tracks = [makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
@@ -1011,7 +1020,16 @@ test.each([
   await press('Abrir reproductor: Tema 1 de Artista');
   expect(hasLabel(part)).toBe(true);
   expect(hasLabel('Pausar') || hasLabel('Reproducir')).toBe(true);
-  if (['acuario', 'radiobulbos', 'pixel', 'acuarela', 'neonbar'].includes(id)) {
+  if (
+    ![
+      'kawaii',
+      'brutalista',
+      'terminal',
+      'tornamesa',
+      'mixtape',
+      'taquilla',
+    ].includes(id)
+  ) {
     const labels = renderer.root
       .findAll(node => typeof node.props.accessibilityLabel === 'string')
       .map(node => node.props.accessibilityLabel as string);
