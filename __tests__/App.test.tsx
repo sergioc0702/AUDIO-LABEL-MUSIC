@@ -924,6 +924,8 @@ test('shows the theme in the settings', async () => {
   await press('Tema, Estándar');
 
   expect(hasLabel('Cerrar temas')).toBe(true);
+  expect(hasLabel('Lista desplazable de temas disponibles')).toBe(true);
+  expect(hasLabel('Playa')).toBe(true);
 });
 
 test('opens with the saved palette', async () => {

@@ -371,6 +371,8 @@ function SyncedLyrics({ lines }: { lines: ReturnType<typeof parseLrc> }) {
 
 export function ThemeSheet() {
   const { colors } = useColors();
+  const styles = useStyles();
+  const { height } = useWindowDimensions();
   const { playerSheet, setPlayerSheet, theme, selectTheme } = useApp();
 
   return (
@@ -381,19 +383,25 @@ export function ThemeSheet() {
       title="Tema"
       visible={playerSheet === 'theme'}
     >
-      {appThemes.map(item => (
-        <SheetAction
-          key={item.id}
-          label={item.name}
-          onPress={() => selectTheme(item.id)}
-          selected={item.id === theme.id}
-          trailing={
-            item.id === theme.id ? (
-              <Check color={colors.accent} size={22} />
-            ) : null
-          }
-        />
-      ))}
+      <ScrollView
+        accessibilityLabel="Lista desplazable de temas disponibles"
+        style={[styles.themeList, { maxHeight: height * 0.68 }]}
+        showsVerticalScrollIndicator
+      >
+        {appThemes.map(item => (
+          <SheetAction
+            key={item.id}
+            label={item.name}
+            onPress={() => selectTheme(item.id)}
+            selected={item.id === theme.id}
+            trailing={
+              item.id === theme.id ? (
+                <Check color={colors.accent} size={22} />
+              ) : null
+            }
+          />
+        ))}
+      </ScrollView>
     </Sheet>
   );
 }
@@ -520,6 +528,7 @@ export function QueueSheet() {
 }
 
 const useStyles = createStyles(colors => ({
+  themeList: { flexGrow: 0 },
   palettes: {
     gap: spacing.md,
     paddingBottom: spacing.lg,
