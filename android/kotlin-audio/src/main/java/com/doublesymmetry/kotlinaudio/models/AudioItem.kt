@@ -1,6 +1,5 @@
 package com.doublesymmetry.kotlinaudio.models
 
-import android.graphics.Bitmap
 
 interface AudioItem {
     var audioUrl: String
@@ -59,6 +58,4 @@ data class DefaultAudioItem(
 
 class AudioItemHolder(
     var audioItem: AudioItem
-) {
-    var artworkBitmap: Bitmap? = null
-}
+)

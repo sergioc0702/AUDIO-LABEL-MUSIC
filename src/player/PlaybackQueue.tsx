@@ -57,7 +57,6 @@ const QueueRow = memo(function QueueRowContent({
   active,
   disabled,
   from,
-  destination,
   onMove,
   onPlay,
   onRemove,
@@ -69,7 +68,6 @@ const QueueRow = memo(function QueueRowContent({
   active: boolean;
   disabled: boolean;
   from: SharedValue<number>;
-  destination: SharedValue<number>;
   onMove: (from: number, to: number) => Promise<void>;
   onPlay: (index: number) => void;
   onRemove: (track: Track, index: number) => void;
@@ -79,17 +77,8 @@ const QueueRow = memo(function QueueRowContent({
   const sourceStyle = useAnimatedStyle(() => ({
     opacity: from.value === index ? 0.3 : 1,
   }));
-  const targetStyle = useAnimatedStyle(() => ({
-    opacity: destination.value === index && from.value !== index ? 1 : 0,
-    transform: [{ translateY: from.value < index ? rowHeight - 2 : 0 }],
-  }));
-
   return (
     <Animated.View style={[styles.row, { height: rowHeight }, sourceStyle]}>
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.marker, targetStyle]}
-      />
       <View
         accessible
         accessibilityRole="adjustable"
@@ -253,6 +242,16 @@ export function PlaybackQueue({
       },
     ],
   }));
+  const markerStyle = useAnimatedStyle(() => {
+    const source = from.value;
+    const target = destination.value;
+    if (source < 0 || target < 0 || source === target) return { opacity: 0 };
+    const edge = target * rowHeight + (source < target ? rowHeight - 2 : 0);
+    return {
+      opacity: 1,
+      transform: [{ translateY: edge - scrollOffset.value }],
+    };
+  });
 
   return (
     <View
@@ -290,7 +289,6 @@ export function PlaybackQueue({
             active={item.id === currentId}
             disabled={disabled || Boolean(dragged)}
             from={from}
-            destination={destination}
             onMove={onMove}
             onPlay={onPlay}
             onRemove={onRemove}
@@ -298,13 +296,19 @@ export function PlaybackQueue({
         )}
       />
       {dragged ? (
-        <Animated.View
-          pointerEvents="none"
-          importantForAccessibility="no-hide-descendants"
-          style={[styles.floating, { height: rowHeight }, floatingStyle]}
-        >
-          <QueueSong active={dragged.id === currentId} track={dragged} />
-        </Animated.View>
+        <>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.marker, markerStyle]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            importantForAccessibility="no-hide-descendants"
+            style={[styles.floating, { height: rowHeight }, floatingStyle]}
+          >
+            <QueueSong active={dragged.id === currentId} track={dragged} />
+          </Animated.View>
+        </>
       ) : null}
       {count > 1 && !disabled ? (
         <GestureDetector gesture={drag}>

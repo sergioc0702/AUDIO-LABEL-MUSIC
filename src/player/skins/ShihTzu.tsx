@@ -1,5 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { AppState, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedProps,
   useAnimatedStyle,
@@ -252,7 +252,7 @@ function Art({ size, children }: { size: number; children: ReactNode }) {
   );
 }
 
-export function ShihTzu({
+export const ShihTzu = memo(function ShihTzuView({
   mood,
   size,
   bow,
@@ -267,41 +267,71 @@ export function ShihTzu({
   quiet?: boolean;
 }) {
   const reducedMotion = useReducedMotion();
+  const [appState, setAppState] = useState(AppState.currentState);
   const k = size / 328;
   const at = (x: number, y: number) => `${(x + 14) * k}px ${(y + 30) * k}px`;
   const pose = useSharedValue<Pose>(POSES[mood]);
   const goal = useSharedValue<Pose>(POSES[mood]);
-  const time = useSharedValue(0);
+  const transitioning = useSharedValue(false);
+  const time = useSharedValue(0.15);
   const bob = useSharedValue(0);
   const wag = useSharedValue(0);
   const said = useRef(SAYS[mood] ?? SAYS.feliz ?? '');
   if (SAYS[mood]) said.current = SAYS[mood] ?? said.current;
-  const moving = active && !reducedMotion;
+  const previousMood = useRef(mood);
+  const moving =
+    active && !reducedMotion && (appState === 'active' || appState === null);
 
   const frame = useFrameCallback(info => {
     'worklet';
     const dt = Math.min(0.05, (info.timeSincePreviousFrame ?? 16) / 1000);
-    const ease = 1 - Math.pow(0.87, dt * 30);
-    const from = pose.value;
-    const to = goal.value;
-    const next = { ...from };
-    for (const key in to) {
-      const name = key as keyof Pose;
-      next[name] = from[name] + (to[name] - from[name]) * ease;
+    if (transitioning.value) {
+      const ease = 1 - Math.pow(0.87, dt * 30);
+      const from = pose.value;
+      const to = goal.value;
+      const next = { ...from };
+      let unsettled = false;
+      for (const key in to) {
+        const name = key as keyof Pose;
+        next[name] = from[name] + (to[name] - from[name]) * ease;
+        if (Math.abs(to[name] - next[name]) > 0.01) unsettled = true;
+      }
+      pose.value = unsettled ? next : to;
+      transitioning.value = unsettled;
     }
-    pose.value = next;
+    const current = pose.value;
     time.value += dt;
-    bob.value += next.bobHz * dt * Math.PI * 2;
-    wag.value += next.tailHz * dt * Math.PI * 2;
+    bob.value += current.bobHz * dt * Math.PI * 2;
+    wag.value += current.tailHz * dt * Math.PI * 2;
   }, false);
 
   useEffect(() => {
-    goal.value = POSES[mood];
-    if (!moving) pose.value = POSES[mood];
-  }, [goal, mood, moving, pose]);
+    const subscription = AppState.addEventListener('change', setAppState);
+    return () => subscription.remove();
+  }, []);
+
   useEffect(() => {
-    frame.setActive(moving);
-  }, [frame, moving]);
+    const changed = previousMood.current !== mood;
+    previousMood.current = mood;
+    goal.value = POSES[mood];
+    transitioning.value = moving && changed;
+    if (!moving || (mood === 'triste' && !changed)) {
+      pose.value = POSES[mood];
+      frame.setActive(false);
+      return;
+    }
+
+    frame.setActive(true);
+    if (mood !== 'triste') return;
+
+    // Let the dog's head drop on pause, then hold the sad pose.
+    const settle = setTimeout(() => {
+      frame.setActive(false);
+      transitioning.value = false;
+      pose.value = POSES.triste;
+    }, 700);
+    return () => clearTimeout(settle);
+  }, [frame, goal, mood, moving, pose, transitioning]);
 
   const root = useAnimatedStyle(() => {
     const v = pose.value;
@@ -909,7 +939,7 @@ export function ShihTzu({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   say: {
