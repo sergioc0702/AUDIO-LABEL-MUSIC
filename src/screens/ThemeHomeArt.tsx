@@ -12,6 +12,11 @@ const copy: Record<string, string> = {
   origami: 'Historias que se pliegan en papel',
   cyberpunk: 'La ciudad también tiene ritmo',
   vaporwave: 'Una noche de sintetizadores',
+  manga: 'Tu banda sonora, en viñetas',
+  steampunk: 'Música de precisión y engranajes',
+  naveespacial: 'Rumbo a nuevos sonidos',
+  y2k: 'Brillo cromado para tu biblioteca',
+  western: 'El próximo tema ya está buscado',
 };
 
 const motifs: Record<string, string> = {
@@ -20,6 +25,11 @@ const motifs: Record<string, string> = {
   origami: '◇',
   cyberpunk: '▰',
   vaporwave: '◉',
+  manga: '!',
+  steampunk: '⚙',
+  naveespacial: '◌',
+  y2k: '✧',
+  western: '★',
 };
 
 export function ThemeHomeArt() {

@@ -17,6 +17,11 @@ import { JardinPlayer } from './JardinPlayer';
 import { OrigamiPlayer } from './OrigamiPlayer';
 import { CyberpunkPlayer } from './CyberpunkPlayer';
 import { VaporwavePlayer } from './VaporwavePlayer';
+import { MangaPlayer } from './MangaPlayer';
+import { SteampunkPlayer } from './SteampunkPlayer';
+import { NaveEspacialPlayer } from './NaveEspacialPlayer';
+import { Y2KPlayer } from './Y2KPlayer';
+import { WesternPlayer } from './WesternPlayer';
 
 const players = {
   kawaii: KawaiiPlayer,
@@ -35,11 +40,11 @@ const players = {
   origami: OrigamiPlayer,
   cyberpunk: CyberpunkPlayer,
   vaporwave: VaporwavePlayer,
-  manga: BrutalPlayer,
-  steampunk: TurntablePlayer,
-  naveespacial: TerminalPlayer,
-  y2k: MixtapePlayer,
-  western: TicketPlayer,
+  manga: MangaPlayer,
+  steampunk: SteampunkPlayer,
+  naveespacial: NaveEspacialPlayer,
+  y2k: Y2KPlayer,
+  western: WesternPlayer,
   fantasiamedieval: TurntablePlayer,
   lofi: KawaiiPlayer,
   terrorgotico: TicketPlayer,

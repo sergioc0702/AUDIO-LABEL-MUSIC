@@ -33,6 +33,7 @@ import { createStyles, spacing, useColors } from '../../theme/theme';
 import { formatTime } from '../../utils/formatTime';
 import { PlayPauseIcon } from '../PlayPauseIcon';
 import { Batch3ThemeScene } from './ThemeScenesBatch3';
+import { Batch4ThemeScene } from './ThemeScenesBatch4';
 import {
   DragHeader,
   SeekArea,
@@ -52,7 +53,12 @@ export type IllustratedKind =
   | 'jardin'
   | 'origami'
   | 'cyberpunk'
-  | 'vaporwave';
+  | 'vaporwave'
+  | 'manga'
+  | 'steampunk'
+  | 'naveespacial'
+  | 'y2k'
+  | 'western';
 
 function Loop({
   active,
@@ -531,7 +537,16 @@ function Scene({ kind, kit }: { kind: IllustratedKind; kit: PlayerKit }) {
   if (kind === 'pixel') return <PixelScene kit={kit} />;
   if (kind === 'acuarela') return <WatercolorScene kit={kit} />;
   if (kind === 'neon') return <NeonScene kit={kit} />;
-  return <Batch3ThemeScene kind={kind} kit={kit} />;
+  if (
+    kind === 'constelacion' ||
+    kind === 'jardin' ||
+    kind === 'origami' ||
+    kind === 'cyberpunk' ||
+    kind === 'vaporwave'
+  ) {
+    return <Batch3ThemeScene kind={kind} kit={kit} />;
+  }
+  return <Batch4ThemeScene kind={kind} kit={kit} />;
 }
 
 export function IllustratedPlayer({

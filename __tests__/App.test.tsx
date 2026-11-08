@@ -1005,6 +1005,11 @@ test.each([
   ['Origami', 'Grulla de papel origami', 'origami'],
   ['Cyberpunk', 'Ciudad ciberpunk con lluvia', 'cyberpunk'],
   ['Vaporwave', 'Atardecer vaporwave con cuadrícula', 'vaporwave'],
+  ['Manga', 'Viñeta de manga con líneas de acción', 'manga'],
+  ['Steampunk', 'Engranajes y manómetro steampunk', 'steampunk'],
+  ['Nave espacial', 'Ventana de nave espacial con planeta', 'naveespacial'],
+  ['Y2K', 'Disco compacto cromado Y2K', 'y2k'],
+  ['Western', 'Cartel western de se busca en el desierto', 'western'],
 ])('the %s theme brings its own player', async (theme, part, id) => {
   const tracks = [makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
