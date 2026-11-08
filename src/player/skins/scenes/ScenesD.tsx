@@ -339,12 +339,18 @@ function Lofi({ kit }: { kit: PlayerKit }) {
           stroke={s.desk}
           strokeWidth={5}
         />
+        <Defs>
+          <RadialGradient cx="50%" cy="50%" id="lofi-lamp" r="50%">
+            <Stop offset="0" stopColor={s.lamp} stopOpacity={1} />
+            <Stop offset="1" stopColor={s.lamp} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
         <AnimatedCircle
           animatedProps={lamp}
           cx={280}
           cy={110}
-          fill={s.lamp}
-          r={70}
+          fill="url(#lofi-lamp)"
+          r={90}
         />
         <Path
           d="M250 210 L 272 98 L 284 102"

@@ -176,7 +176,7 @@ function Manga({ kit }: { kit: PlayerKit }) {
             {
               position: 'absolute',
               left: '-36%',
-              top: '-70%',
+              top: '-102%',
               width: '172%',
               aspectRatio: 1,
             },
@@ -486,7 +486,7 @@ function Steampunk({ kit }: { kit: PlayerKit }) {
       />
       <View
         pointerEvents="none"
-        style={[place(26, 150, 120, 16), styles.center]}
+        style={[place(46, 108, 80, 14), styles.center]}
       >
         <Text
           style={[

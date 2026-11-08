@@ -1090,7 +1090,11 @@ function NeonScene({ kit }: { kit: PlayerKit }) {
           <Text
             style={[
               styles.neonSmall,
-              { color: tubeB, fontFamily: font, textShadowColor: tubeB },
+              {
+                color: kit.isPlaying ? tubeB : off,
+                fontFamily: font,
+                textShadowColor: kit.isPlaying ? tubeB : 'transparent',
+              },
             ]}
           >
             AHORA SUENA
@@ -1113,7 +1117,11 @@ function NeonScene({ kit }: { kit: PlayerKit }) {
             numberOfLines={1}
             style={[
               styles.neonArtist,
-              { color: tubeB, fontFamily: font, textShadowColor: tubeB },
+              {
+                color: kit.isPlaying ? tubeB : off,
+                fontFamily: font,
+                textShadowColor: kit.isPlaying ? tubeB : 'transparent',
+              },
             ]}
           >
             {kit.track?.artist}

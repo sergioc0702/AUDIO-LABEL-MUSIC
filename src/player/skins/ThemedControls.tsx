@@ -78,7 +78,11 @@ export type Look = {
 const pick = (value: string | undefined, fallback: string) => value ?? fallback;
 
 /** The controls of each illustrated theme, taken from its prototype. */
-export function lookFor(kind: IllustratedKind, colors: Palette): Look {
+export function lookFor(
+  kind: IllustratedKind,
+  colors: Palette,
+  playing = true,
+): Look {
   const s = colors.skin;
   const c = colors;
   const fonts = c.design.fonts;
@@ -298,11 +302,11 @@ export function lookFor(kind: IllustratedKind, colors: Palette): Look {
         },
         play: {
           shape: 'circle',
-          bg: tubeA,
-          fg: pick(s.onA, onAccent),
+          bg: playing ? tubeA : off,
+          fg: playing ? pick(s.onA, onAccent) : ink,
           width: 88,
           height: 88,
-          shadow: `0 0 18px ${tubeA}`,
+          shadow: playing ? `0 0 18px ${tubeA}` : undefined,
         },
         tool: {
           shape: 'rounded',
@@ -760,21 +764,21 @@ const cutStyles = {
     left: '12%' as const,
     right: '12%' as const,
     top: 4,
-    height: '38%' as const,
+    height: '30%' as const,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.45)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
 };
 
 function Decorations({ plate, page }: { plate: Plate; page: string }) {
-  return (
-    <>
-      {plate.glossy ? (
-        <View pointerEvents="none" style={cutStyles.gloss} />
-      ) : null}
-      {plate.shape === 'cut' ? <CutCorners page={page} /> : null}
-    </>
-  );
+  return plate.shape === 'cut' ? <CutCorners page={page} /> : null;
+}
+
+/** A soft highlight drawn under the content of glossy plates. */
+function Gloss({ plate }: { plate: Plate }) {
+  return plate.glossy ? (
+    <View pointerEvents="none" style={cutStyles.gloss} />
+  ) : null;
 }
 
 /* ───────────── icons ───────────── */
@@ -886,6 +890,7 @@ export function ThemedButton({
         { opacity: disabled ? 0.4 : pressed ? 0.75 : 1 },
       ]}
     >
+      <Gloss plate={plate} />
       {look.knobs && (icon === 'prev' || icon === 'next') ? (
         <View
           style={[knobStyles.dial, { transform: [{ rotate: `${turn}deg` }] }]}
@@ -951,6 +956,7 @@ export function ThemedPlay({
         },
       ]}
     >
+      <Gloss plate={p} />
       <View style={p.shape === 'diamond' ? knobStyles.unrotate : undefined}>
         {p.text ? (
           <Text
@@ -1015,7 +1021,10 @@ export function ThemedTool({
         { opacity: pressed ? 0.75 : 1 },
       ]}
     >
+      <Gloss plate={plate} />
       <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
         numberOfLines={1}
         style={[
           textStyle,

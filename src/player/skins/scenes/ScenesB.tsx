@@ -257,7 +257,7 @@ function Constellation({ kit }: { kit: PlayerKit }) {
       ))}
       <View
         pointerEvents="none"
-        style={[place(labelX - 80, from[1] + 22, 160, 20), styles.center]}
+        style={[place(labelX - 80, from[1] + 30, 160, 20), styles.center]}
       >
         <Text
           numberOfLines={1}
@@ -895,7 +895,7 @@ function Cyberpunk({ kit }: { kit: PlayerKit }) {
         </View>
         <Animated.View
           pointerEvents="none"
-          style={[place(206, 12, 100, 18), live]}
+          style={[place(176, 12, 100, 18), live]}
         >
           <Text
             style={[

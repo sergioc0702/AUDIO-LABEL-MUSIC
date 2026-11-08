@@ -1,5 +1,9 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import {
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Animated, {
   useFrameCallback,
   useSharedValue,
@@ -169,6 +173,12 @@ export function SceneBox({
   radius?: number;
 }) {
   const styles = useStyles();
+  const { width, height } = useWindowDimensions();
+  // Lying down, the scene shares the height with the title and the seek bar.
+  const landscape =
+    width > height
+      ? { maxWidth: Math.max(160, (height - 230) * (W / H)) }
+      : null;
   return (
     <View
       accessible
@@ -176,6 +186,7 @@ export function SceneBox({
       onLayout={clock.onLayout}
       style={[
         styles.box,
+        landscape,
         { backgroundColor: background },
         radius !== undefined && { borderRadius: radius },
       ]}

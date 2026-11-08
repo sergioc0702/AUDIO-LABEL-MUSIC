@@ -199,8 +199,9 @@ export function KawaiiPlayer({ covered, headerGesture, onClose }: SkinProps) {
     const dx = x - stage / 2;
     const dy = y - stage / 2;
     return (
-      (Math.atan2(dy, dx) + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2)
-    ) / (Math.PI * 2);
+      ((Math.atan2(dy, dx) + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2)) /
+      (Math.PI * 2)
+    );
   };
   const seekRing = (x: number, y: number) => {
     'worklet';
@@ -337,9 +338,9 @@ export function KawaiiPlayer({ covered, headerGesture, onClose }: SkinProps) {
                   stroke={colors.accent}
                   strokeLinejoin="round"
                   strokeWidth={2.6}
-                  transform={`translate(${stage / 2 + Math.cos(angle) * radius} ${
-                    stage / 2 + Math.sin(angle) * radius
-                  }) scale(1.4)`}
+                  transform={`translate(${
+                    stage / 2 + Math.cos(angle) * radius
+                  } ${stage / 2 + Math.sin(angle) * radius}) scale(1.4)`}
                 />
               </Svg>
             </View>

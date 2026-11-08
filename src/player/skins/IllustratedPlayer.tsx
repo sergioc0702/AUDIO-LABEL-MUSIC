@@ -113,7 +113,7 @@ export function IllustratedPlayer({
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
   if (!kit.track) return null;
-  const look = lookFor(kind, colors);
+  const look = lookFor(kind, colors, kit.isPlaying);
   const toolRows = [
     tools[0],
     tools[1],
