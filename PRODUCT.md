@@ -31,7 +31,7 @@ Se usa con una mano, a menudo con audífonos y en segundo plano, y también con 
 - Biblioteca desde MediaStore con caché de etiquetas en Room. Listas e historial en Room; favoritos y ajustes en SharedPreferences.
 - Ecualizador por software de cinco bandas en el procesador de audio.
 - Se distribuye como APK fuera de Google Play.
-- Temas adicionales: por ahora solo existe Estándar, con sus seis paletas de colores; la estructura ya admite más.
+- Apariencia: 26 temas globales, cada uno con seis paletas y tipografías locales cuando corresponde. Todos conservan los mismos flujos y funciones de la app; el tema cambia la presentación visual.
 - Nombre: la app se llama "Mi Música" y el repositorio "AUDIO-LABEL-MUSIC". Sin confirmar si el nombre cambia.
 
 ## Brand Commitments

@@ -347,7 +347,9 @@ La pieza más repetida de la app.
 
 ## Temas y paletas de colores
 
-Un tema es el diseño de toda la app y trae su propio conjunto de paletas; una paleta solo cambia colores. Ambos se eligen únicamente en Ajustes, en el grupo Apariencia, y se declaran en `src/theme/themes.ts`. Hoy existe el tema Estándar, que es este sistema, con seis paletas: Clásico, Portada, Aurora, Ondas, Brasas y Atardecer.
+Un tema es el diseño de toda la app y trae su propio conjunto de seis paletas; una paleta cambia los colores dentro de ese diseño. Ambos se eligen únicamente en Ajustes, en el grupo Apariencia, y se declaran en `src/theme/themes.ts`. La app incluye Estándar, Kawaii, Brutalista, Terminal, Tornamesa, Mixtape, Taquilla, Acuario, Radio de bulbos, Pixel, Acuarela, Neón de bar, Constelación, Jardín, Origami, Cyberpunk, Vaporwave, Manga, Steampunk, Nave espacial, Y2K, Western, Fantasía medieval, Lo-fi, Terror gótico y Playa. Cada reproductor conserva los controles y herramientas comunes mediante `usePlayerKit` y `playerTools`; los temas cambian la presentación, no el comportamiento de reproducción. Las tipografías específicas de los temas están incluidas localmente en Android.
+
+El tema Estándar conserva este sistema y sus seis paletas: Clásico, Portada, Aurora, Ondas, Brasas y Atardecer. Los detalles y el orden de paletas de los temas se mantienen en `src/theme/themes.ts` y `src/theme/themePalettes.ts`.
 
 Los colores nombrados en este documento son los de la paleta Clásico. Cada paleta define los mismos papeles (fondo, navegación, superficies, contorno, textos, acento, control y peligro), y toda la interfaz los lee de la paleta activa con `useColors` y `createStyles`: ningún componente fija un color propio. Un test exige contraste legible de texto y acento sobre todas las superficies de cada paleta.
 
