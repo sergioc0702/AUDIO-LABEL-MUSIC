@@ -7,11 +7,12 @@ jest.mock('react-native-worklets', () =>
 // Exercise the player/controller integration without a native UI runtime.
 jest.mock('react-native-reanimated', () => {
   const React = require('react');
-  const { Easing, FlatList, View } = require('react-native');
+  const { Easing, FlatList, Text, View } = require('react-native');
   return {
     __esModule: true,
     default: {
       View,
+      Text,
       FlatList,
       createAnimatedComponent: Component => Component,
     },

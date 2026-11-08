@@ -1,20 +1,10 @@
-import { useEffect, useRef } from 'react';
 import {
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated, {
-  ReduceMotion,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import {
   Heart,
   Repeat,
@@ -24,22 +14,19 @@ import {
   SkipForward,
 } from 'lucide-react-native';
 import { RepeatMode } from 'react-native-track-player';
-import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMediaVolume } from '../../hooks/useMediaVolume';
-import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { IconButton } from '../../ui/Buttons';
 import { createStyles, spacing, useColors } from '../../theme/theme';
 import { formatTime } from '../../utils/formatTime';
 import { PlayPauseIcon } from '../PlayPauseIcon';
-import { Batch3ThemeScene } from './ThemeScenesBatch3';
-import { Batch4ThemeScene } from './ThemeScenesBatch4';
-import { Batch5ThemeScene } from './ThemeScenesBatch5';
+import { ScenesA } from './scenes/ScenesA';
+import { ScenesB } from './scenes/ScenesB';
+import { ScenesC } from './scenes/ScenesC';
+import { ScenesD } from './scenes/ScenesD';
 import {
   DragHeader,
   SeekArea,
   playerTools,
-  useTrackChange,
   type PlayerKit,
   type SkinProps,
 } from './kit';
@@ -65,483 +52,38 @@ export type IllustratedKind =
   | 'terrorgotico'
   | 'playa';
 
-function Loop({
-  active,
-  duration,
-  children,
-}: {
-  active: boolean;
-  duration: number;
-  children: React.ReactNode;
-}) {
-  const phase = useSharedValue(0);
-  useEffect(() => {
-    phase.value = active
-      ? withRepeat(
-          withTiming(1, { duration, reduceMotion: ReduceMotion.System }),
-          -1,
-          true,
-        )
-      : withTiming(0, { duration: 700, reduceMotion: ReduceMotion.System });
-  }, [active, duration, phase]);
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: Math.sin(phase.value * Math.PI * 2) * 5 }],
-  }));
-  return <Animated.View style={style}>{children}</Animated.View>;
-}
-
-function AquariumScene({ kit }: { kit: PlayerKit }) {
-  const { colors } = useColors();
-  const styles = useStyles();
-  const s = colors.skin;
-  return (
-    <View style={styles.scene}>
-      <Svg height="100%" width="100%" viewBox="0 0 320 270">
-        <Rect fill={s.glass} height="250" rx="42" width="300" x="10" y="10" />
-        <Path d="M10 182 Q80 160 160 184 T310 178 V260 H10Z" fill={s.water} />
-        <Path
-          d="M10 215 Q100 195 170 218 T310 210 V260 H10Z"
-          fill={s.deep}
-          opacity={0.55}
-        />
-        <Path d="M10 238 Q85 222 158 239 T310 232 V260 H10Z" fill={s.sand} />
-        {[45, 72, 247, 275].map((x, i) => (
-          <Path
-            key={x}
-            d={`M${x} 238 Q${x + (i % 2 ? 18 : -16)} 188 ${x + 4} ${
-              154 + i * 9
-            }`}
-            fill="none"
-            stroke={s.plant}
-            strokeLinecap="round"
-            strokeWidth={8}
-          />
-        ))}
-        {[0, 1, 2, 3, 4, 5].map(i => (
-          <Circle
-            key={i}
-            cx={34 + i * 47}
-            cy={44 + (i % 3) * 32}
-            fill="none"
-            r={5 + (i % 3) * 2}
-            stroke={s.bubble}
-            strokeWidth={2}
-            opacity={0.72}
-          />
-        ))}
-      </Svg>
-      <View pointerEvents="none" style={styles.fishLayer}>
-        {(s.fish ?? '#ff8b5e,#ffd04a,#ff5c8a')
-          .split(',')
-          .slice(0, 3)
-          .map((fish, index) => (
-            <Loop
-              key={`${fish}-${index}`}
-              active={kit.visible}
-              duration={kit.lively ? 1700 + index * 380 : 6500}
-            >
-              <View
-                style={[
-                  styles.fish,
-                  { top: 88 + index * 42, left: 45 + index * 68 },
-                ]}
-              >
-                <Svg height={34} width={54} viewBox="0 0 54 34">
-                  <Path d="M13 17 0 5 3 17 0 29Z" fill={fish} />
-                  <Ellipse cx={29} cy={17} fill={fish} rx={21} ry={12} />
-                  <Circle cx={38} cy={13} fill={s.ink} r={2.5} />
-                </Svg>
-              </View>
-            </Loop>
-          ))}
-      </View>
-    </View>
-  );
-}
-
-function RadioScene({ kit }: { kit: PlayerKit }) {
-  const { colors } = useColors();
-  const styles = useStyles();
-  const s = colors.skin;
-  const angle = useSharedValue(-30);
-  const reduced = useReducedMotion();
-  const last = useRef(kit.track?.id);
-  useEffect(() => {
-    if (kit.track?.id && last.current && kit.track.id !== last.current) {
-      angle.value = withTiming(
-        reduced ? 20 : 25 + ((kit.track.id.length * 41) % 130),
-        {
-          duration: reduced ? 0 : 620,
-          reduceMotion: ReduceMotion.System,
-        },
-      );
-    }
-    last.current = kit.track?.id;
-  }, [angle, kit.track?.id, reduced]);
-  const needleStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${angle.value}deg` }],
-  }));
-  return (
-    <Pressable
-      accessibilityLabel="Sintonizar siguiente canción"
-      accessibilityRole="button"
-      onPress={kit.next}
-      style={[
-        styles.scene,
-        {
-          backgroundColor: s.cabinet ?? colors.surfaceHigh,
-          borderRadius: 24,
-          padding: 16,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.radioFace,
-          {
-            backgroundColor: s.dial ?? colors.surface,
-            borderColor: s.cabinetDark ?? colors.outline,
-          },
-        ]}
-      >
-        <Svg height="100%" width="100%" viewBox="0 0 320 240">
-          <Rect
-            fill={s.grille ?? colors.surfaceHigh}
-            height="84"
-            rx="12"
-            width="250"
-            x="35"
-            y="132"
-          />
-          {Array.from({ length: 8 }, (_, i) => (
-            <Line
-              key={i}
-              stroke={s.grilleLine ?? colors.outline}
-              strokeWidth={3}
-              x1={48}
-              x2={272}
-              y1={142 + i * 9}
-              y2={142 + i * 9}
-            />
-          ))}
-          <Circle
-            cx="160"
-            cy="85"
-            fill={s.glow ?? colors.accent}
-            opacity={kit.lively ? 0.8 : 0.35}
-            r="27"
-          />
-          <Circle
-            cx="160"
-            cy="85"
-            fill={s.dial ?? colors.surface}
-            r="20"
-            stroke={s.dialInk ?? colors.text}
-            strokeWidth="3"
-          />
-          <Line
-            stroke={s.needle ?? colors.accent}
-            strokeWidth="4"
-            x1="45"
-            x2="275"
-            y1="78"
-            y2="78"
-          />
-          <Circle cx="54" cy="78" fill={s.dialInk ?? colors.text} r="4" />
-          <Circle cx="266" cy="78" fill={s.dialInk ?? colors.text} r="4" />
-        </Svg>
-        <Animated.View style={[styles.radioNeedle, needleStyle]} />
-      </View>
-      <View style={styles.radioKnobs}>
-        {[0, 1].map(i => (
-          <View
-            key={i}
-            style={[
-              styles.knob,
-              {
-                backgroundColor: s.knob ?? colors.surfaceHigh,
-                borderColor: s.knobInk ?? colors.outline,
-              },
-            ]}
-          />
-        ))}
-      </View>
-      <Text style={[styles.sceneCaption, { color: colors.onAccent }]}>
-        Toca el dial para sintonizar
-      </Text>
-    </Pressable>
-  );
-}
-
-function PixelScene({ kit }: { kit: PlayerKit }) {
-  const { colors } = useColors();
-  const styles = useStyles();
-  const reduced = useReducedMotion();
-  const jump = useSharedValue(0);
-  const last = useRef(kit.track?.id);
-  useEffect(() => {
-    if (kit.track?.id && last.current && kit.track.id !== last.current) {
-      jump.value = withSequence(
-        withTiming(reduced ? 0 : -38, {
-          duration: reduced ? 0 : 150,
-          reduceMotion: ReduceMotion.System,
-        }),
-        withTiming(0, {
-          duration: reduced ? 0 : 350,
-          reduceMotion: ReduceMotion.System,
-        }),
-      );
-    }
-    last.current = kit.track?.id;
-  }, [jump, kit.track?.id, reduced]);
-  const jumpStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: jump.value }],
-  }));
-  return (
-    <View
-      style={[
-        styles.scene,
-        styles.pixelScene,
-        { backgroundColor: colors.skin.screen ?? colors.surfaceHigh },
-      ]}
-    >
-      <View style={styles.pixelBars}>
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-          <View
-            key={n}
-            style={[
-              styles.pixelBar,
-              {
-                height: 16 + ((n * 19 + (kit.track?.title.length ?? 0)) % 42),
-                backgroundColor: n % 2 ? colors.skin.s1 : colors.skin.s2,
-              },
-            ]}
-          />
-        ))}
-      </View>
-      <Animated.View style={[styles.pixelHero, jumpStyle]}>
-        <View
-          style={[styles.pixelBlock, { backgroundColor: colors.skin.s2 }]}
-        />
-        <View
-          style={[styles.pixelEyes, { backgroundColor: colors.skin.ink }]}
-        />
-        <View style={[styles.pixelBase, { backgroundColor: colors.skin.s1 }]} />
-      </Animated.View>
-      <View style={styles.pixelGround}>
-        {Array.from({ length: 18 }, (_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.pixelTile,
-              { backgroundColor: i % 2 ? colors.skin.s2 : colors.skin.s1 },
-            ]}
-          />
-        ))}
-      </View>
-      {!kit.isPlaying ? (
-        <Text style={[styles.pauseStamp, { color: colors.skin.ink }]}>
-          PAUSA
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function WatercolorScene({ kit }: { kit: PlayerKit }) {
-  const { colors } = useColors();
-  const styles = useStyles();
-  const reduced = useReducedMotion();
-  const drop = useSharedValue(0);
-  useTrackChange(kit.track?.id, () => {
-    drop.value = withSequence(
-      withTiming(reduced ? 0 : 1, {
-        duration: reduced ? 0 : 220,
-        reduceMotion: ReduceMotion.System,
-      }),
-      withTiming(0, {
-        duration: reduced ? 0 : 520,
-        reduceMotion: ReduceMotion.System,
-      }),
-    );
-  });
-  const dropStyle = useAnimatedStyle(() => ({
-    opacity: 0.15 + drop.value * 0.45,
-    transform: [{ scale: 0.85 + drop.value * 0.35 }],
-  }));
-  const blobs = (colors.skin.blobs ?? '#d4b7d9,#e5a89b,#a7c8ae').split(',');
-  return (
-    <View
-      style={[
-        styles.scene,
-        styles.waterScene,
-        { backgroundColor: colors.skin.paper2 ?? colors.surfaceHigh },
-      ]}
-    >
-      <Svg height="100%" width="100%" viewBox="0 0 320 270">
-        <Circle
-          cx="92"
-          cy="110"
-          fill={blobs[0]}
-          opacity={kit.lively ? 0.64 : 0.82}
-          r="66"
-        />
-        <Circle
-          cx="205"
-          cy="96"
-          fill={blobs[1]}
-          opacity={kit.lively ? 0.56 : 0.76}
-          r="60"
-        />
-        <Circle
-          cx="165"
-          cy="178"
-          fill={blobs[2]}
-          opacity={kit.lively ? 0.62 : 0.8}
-          r="74"
-        />
-        <Path
-          d="M52 215 Q150 178 264 214"
-          fill="none"
-          stroke={colors.skin.accent}
-          strokeLinecap="round"
-          strokeWidth="5"
-          opacity={0.65}
-        />
-      </Svg>
-      <Animated.View
-        style={[
-          styles.waterDrop,
-          dropStyle,
-          { backgroundColor: colors.skin.accent },
-        ]}
-      />
-    </View>
-  );
-}
-
-function NeonScene({ kit }: { kit: PlayerKit }) {
-  const { colors } = useColors();
-  const styles = useStyles();
-  const volume = useMediaVolume(kit.visible);
-  const reduced = useReducedMotion();
-  const flicker = useSharedValue(1);
-  useTrackChange(kit.track?.id, () => {
-    flicker.value = withSequence(
-      withTiming(reduced ? 1 : 0.15, {
-        duration: reduced ? 0 : 90,
-        reduceMotion: ReduceMotion.System,
-      }),
-      withTiming(1, {
-        duration: reduced ? 0 : 260,
-        reduceMotion: ReduceMotion.System,
-      }),
-    );
-  });
-  const flickerStyle = useAnimatedStyle(() => ({ opacity: flicker.value }));
-  const sliderWidth = useSharedValue(1);
-  const sendVolume = (x: number) =>
-    volume.change(Math.max(0, Math.min(1, x / sliderWidth.value)));
-  const textColor = colors.skin.tubeA ?? colors.accent;
-  return (
-    <View
-      style={[
-        styles.scene,
-        styles.neonScene,
-        {
-          backgroundColor: colors.skin.wall ?? colors.background,
-          borderColor: colors.skin.mortar ?? colors.outline,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.neonSignFrame,
-          { borderColor: colors.skin.tubeB ?? colors.accent },
-        ]}
-      >
-        <Animated.View style={flickerStyle}>
-          <Text
-            numberOfLines={2}
-            style={[
-              styles.neonTitle,
-              {
-                color: textColor,
-                textShadowColor: textColor,
-                opacity: kit.isPlaying ? 0.62 + volume.level * 0.38 : 0.32,
-              },
-            ]}
-          >
-            {kit.track?.title}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.neonArtist,
-              { color: colors.skin.tubeB ?? colors.accent },
-            ]}
-          >
-            {kit.track?.artist}
-          </Text>
-        </Animated.View>
-      </View>
-      <View style={styles.volumeRow}>
-        <Text style={[styles.volumeLabel, { color: colors.textSecondary }]}>
-          Volumen real
-        </Text>
-        <Pressable
-          accessibilityActions={[
-            { name: 'increment', label: 'Subir volumen' },
-            { name: 'decrement', label: 'Bajar volumen' },
-          ]}
-          accessibilityLabel="Volumen del teléfono"
-          accessibilityRole="adjustable"
-          accessibilityValue={{
-            min: 0,
-            max: 100,
-            now: Math.round(volume.level * 100),
-          }}
-          disabled={volume.fixed}
-          onLayout={event => {
-            sliderWidth.value = event.nativeEvent.layout.width;
-          }}
-          onAccessibilityAction={event =>
-            volume.change(
-              volume.level +
-                (event.nativeEvent.actionName === 'increment' ? 0.05 : -0.05),
-            )
-          }
-          onMoveShouldSetResponder={() => !volume.fixed}
-          onResponderGrant={event => sendVolume(event.nativeEvent.locationX)}
-          onResponderMove={event => sendVolume(event.nativeEvent.locationX)}
-          style={[styles.volumeTrack, { backgroundColor: colors.surfaceHigh }]}
-        >
-          <View style={styles.volumeBar}>
-            <View
-              style={[
-                styles.volumeFill,
-                {
-                  backgroundColor: textColor,
-                  width: `${Math.round(volume.level * 100)}%`,
-                },
-              ]}
-            />
-          </View>
-        </Pressable>
-        <Text style={[styles.volumePercent, { color: colors.textSecondary }]}>
-          {Math.round(volume.level * 100)}%
-        </Text>
-      </View>
-    </View>
-  );
-}
+const TITLES: Record<IllustratedKind, string> = {
+  acuario: 'Pecera',
+  radio: 'Radio de bulbos',
+  pixel: 'Nivel de música',
+  acuarela: 'Acuarela sonora',
+  neon: 'Neón de bar',
+  constelacion: 'Constelación',
+  jardin: 'Jardín',
+  origami: 'Origami',
+  cyberpunk: 'Distrito en línea',
+  vaporwave: 'Canal vaporwave',
+  manga: 'Capítulo',
+  steampunk: 'Máquina de vapor',
+  naveespacial: 'Puente de mando',
+  y2k: 'Disco Y2K',
+  western: 'Se busca',
+  fantasiamedieval: 'Hechizo',
+  lofi: 'Para estudiar',
+  terrorgotico: 'Noche gótica',
+  playa: 'Playa',
+};
 
 function Scene({ kind, kit }: { kind: IllustratedKind; kit: PlayerKit }) {
-  if (kind === 'acuario') return <AquariumScene kit={kit} />;
-  if (kind === 'radio') return <RadioScene kit={kit} />;
-  if (kind === 'pixel') return <PixelScene kit={kit} />;
-  if (kind === 'acuarela') return <WatercolorScene kit={kit} />;
-  if (kind === 'neon') return <NeonScene kit={kit} />;
+  if (
+    kind === 'acuario' ||
+    kind === 'radio' ||
+    kind === 'pixel' ||
+    kind === 'acuarela' ||
+    kind === 'neon'
+  ) {
+    return <ScenesA kind={kind} kit={kit} />;
+  }
   if (
     kind === 'constelacion' ||
     kind === 'jardin' ||
@@ -549,7 +91,7 @@ function Scene({ kind, kit }: { kind: IllustratedKind; kit: PlayerKit }) {
     kind === 'cyberpunk' ||
     kind === 'vaporwave'
   ) {
-    return <Batch3ThemeScene kind={kind} kit={kit} />;
+    return <ScenesB kind={kind} kit={kit} />;
   }
   if (
     kind === 'manga' ||
@@ -558,9 +100,9 @@ function Scene({ kind, kit }: { kind: IllustratedKind; kit: PlayerKit }) {
     kind === 'y2k' ||
     kind === 'western'
   ) {
-    return <Batch4ThemeScene kind={kind} kit={kit} />;
+    return <ScenesC kind={kind} kit={kit} />;
   }
-  return <Batch5ThemeScene kind={kind} kit={kit} />;
+  return <ScenesD kind={kind} kit={kit} />;
 }
 
 export function IllustratedPlayer({
@@ -614,16 +156,7 @@ export function IllustratedPlayer({
     },
   ];
   const { skin } = colors;
-  const playerTitle =
-    kind === 'acuario'
-      ? 'Pecera'
-      : kind === 'radio'
-      ? 'Radio de bulbos'
-      : kind === 'pixel'
-      ? 'Nivel de música'
-      : kind === 'acuarela'
-      ? 'Acuarela sonora'
-      : 'Neón de bar';
+  const playerTitle = TITLES[kind];
   return (
     <View
       style={[
@@ -874,122 +407,6 @@ const useStyles = createStyles(colors => ({
   landscape: { flexDirection: 'row', alignItems: 'center' },
   artColumn: { flex: 1, minWidth: 0 },
   controlsColumn: { flex: 1, justifyContent: 'center', minWidth: 0 },
-  scene: {
-    alignSelf: 'center',
-    aspectRatio: 1.16,
-    borderRadius: colors.design.radius.lg,
-    maxHeight: 300,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  fishLayer: { ...StyleSheet.absoluteFill },
-  fish: { position: 'absolute' },
-  radioFace: { borderRadius: 18, borderWidth: 4, flex: 1, overflow: 'hidden' },
-  radioNeedle: {
-    backgroundColor: colors.skin.needle ?? colors.accent,
-    height: 4,
-    left: '50%',
-    position: 'absolute',
-    top: '32%',
-    transform: [{ translateX: -2 }],
-    width: '36%',
-  },
-  radioKnobs: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 16,
-    justifyContent: 'center',
-    paddingTop: 10,
-  },
-  knob: { borderRadius: 20, borderWidth: 2, height: 32, width: 32 },
-  sceneCaption: { fontSize: 12, paddingTop: 8, textAlign: 'center' },
-  pixelScene: { justifyContent: 'flex-end', paddingBottom: 18 },
-  pixelBars: {
-    alignItems: 'flex-end',
-    bottom: 58,
-    flexDirection: 'row',
-    gap: 5,
-    justifyContent: 'center',
-    left: 0,
-    opacity: 0.45,
-    position: 'absolute',
-    right: 0,
-  },
-  pixelBar: { width: 10 },
-  pixelHero: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 5,
-    width: 58,
-  },
-  pixelBlock: { height: 34, width: 44 },
-  pixelEyes: { height: 4, marginTop: -24, width: 20 },
-  pixelBase: { height: 18, marginTop: 8, width: 58 },
-  pixelGround: { flexDirection: 'row', height: 12 },
-  pixelTile: { flex: 1, height: 12 },
-  pauseStamp: {
-    fontSize: 18,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    textAlign: 'center',
-    top: 18,
-  },
-  waterScene: { alignItems: 'center', justifyContent: 'center' },
-  waterDrop: {
-    borderRadius: 16,
-    height: 32,
-    position: 'absolute',
-    right: '25%',
-    top: '24%',
-    width: 32,
-  },
-  neonScene: {
-    alignItems: 'center',
-    borderWidth: 5,
-    justifyContent: 'center',
-    padding: spacing.md,
-  },
-  neonSignFrame: {
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 3,
-    justifyContent: 'center',
-    minHeight: 130,
-    padding: spacing.md,
-    width: '100%',
-  },
-  neonTitle: {
-    fontSize: 27,
-    fontWeight: '800',
-    textAlign: 'center',
-    textShadowRadius: 14,
-  },
-  neonArtist: { fontSize: 17, marginTop: 8, textAlign: 'center' },
-  volumeRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
-    width: '100%',
-  },
-  volumeLabel: { fontSize: 11 },
-  volumeTrack: {
-    alignItems: 'center',
-    borderRadius: 99,
-    flex: 1,
-    height: 48,
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  volumeBar: {
-    borderRadius: 99,
-    height: 12,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  volumeFill: { height: 12 },
-  volumePercent: { fontSize: 11, minWidth: 32, textAlign: 'right' },
   trackInfo: {
     alignItems: 'center',
     flexDirection: 'row',
