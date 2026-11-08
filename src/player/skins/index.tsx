@@ -7,6 +7,11 @@ import { TerminalPlayer } from './TerminalPlayer';
 import { TicketPlayer } from './TicketPlayer';
 import { TurntablePlayer } from './TurntablePlayer';
 import type { SkinProps } from './kit';
+import { AcuarioPlayer } from './AcuarioPlayer';
+import { RadioBulbosPlayer } from './RadioBulbosPlayer';
+import { PixelPlayer } from './PixelPlayer';
+import { AcuarelaPlayer } from './AcuarelaPlayer';
+import { NeonBarPlayer } from './NeonBarPlayer';
 
 const players = {
   kawaii: KawaiiPlayer,
@@ -15,11 +20,11 @@ const players = {
   tornamesa: TurntablePlayer,
   mixtape: MixtapePlayer,
   taquilla: TicketPlayer,
-  acuario: KawaiiPlayer,
-  radiobulbos: TurntablePlayer,
-  pixel: TerminalPlayer,
-  acuarela: MixtapePlayer,
-  neonbar: BrutalPlayer,
+  acuario: AcuarioPlayer,
+  radiobulbos: RadioBulbosPlayer,
+  pixel: PixelPlayer,
+  acuarela: AcuarelaPlayer,
+  neonbar: NeonBarPlayer,
   constelacion: TurntablePlayer,
   jardin: KawaiiPlayer,
   origami: TicketPlayer,

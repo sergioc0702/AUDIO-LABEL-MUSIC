@@ -981,13 +981,22 @@ test('hides short audio when the setting is on', async () => {
 });
 
 test.each([
-  ['Kawaii', 'Volumen'],
-  ['Brutalista', 'Cambiar la posición de la canción'],
-  ['Terminal', 'Forma de la canción. Toca para cambiar la posición'],
-  ['Tornamesa', 'Cambiar la posición de la canción'],
-  ['Mixtape', 'Contador de cinta 0:00'],
-  ['Taquilla', 'Código de barras. Toca para cambiar la posición'],
-])('the %s theme brings its own player', async (theme, part) => {
+  ['Kawaii', 'Volumen', 'kawaii'],
+  ['Brutalista', 'Cambiar la posición de la canción', 'brutalista'],
+  [
+    'Terminal',
+    'Forma de la canción. Toca para cambiar la posición',
+    'terminal',
+  ],
+  ['Tornamesa', 'Cambiar la posición de la canción', 'tornamesa'],
+  ['Mixtape', 'Contador de cinta 0:00', 'mixtape'],
+  ['Taquilla', 'Código de barras. Toca para cambiar la posición', 'taquilla'],
+  ['Acuario', 'Cambiar la posición de la canción', 'acuario'],
+  ['Radio de bulbos', 'Sintonizar siguiente canción', 'radiobulbos'],
+  ['Pixel', 'Cambiar la posición de la canción', 'pixel'],
+  ['Acuarela', 'Cambiar la posición de la canción', 'acuarela'],
+  ['Neón de bar', 'Volumen del teléfono', 'neonbar'],
+])('the %s theme brings its own player', async (theme, part, id) => {
   const tracks = [makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
   setActive(tracks[0]);
@@ -997,11 +1006,49 @@ test.each([
   await press(theme);
 
   expect(storeAppearance).toHaveBeenLastCalledWith(
-    expect.objectContaining({ themeId: theme.toLowerCase() }),
+    expect.objectContaining({ themeId: id }),
   );
   await press('Abrir reproductor: Tema 1 de Artista');
   expect(hasLabel(part)).toBe(true);
   expect(hasLabel('Pausar') || hasLabel('Reproducir')).toBe(true);
+  if (['acuario', 'radiobulbos', 'pixel', 'acuarela', 'neonbar'].includes(id)) {
+    const labels = renderer.root
+      .findAll(node => typeof node.props.accessibilityLabel === 'string')
+      .map(node => node.props.accessibilityLabel as string);
+    expect(
+      labels.some(label => label.startsWith('Abrir cola de reproducción con ')),
+    ).toBe(true);
+    [
+      'Abrir letras de Tema 1',
+      'Activar mezcla',
+      'Activar repetir canción',
+      'Configurar temporizador de apagado',
+      'Velocidad de reproducción 1×',
+      'Abrir ecualizador',
+      'Más acciones para Tema 1',
+    ].forEach(label => expect(hasLabel(label)).toBe(true));
+  }
+});
+
+test('Neón de bar adjusts the phone media volume from its accessible slider', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'neonbar' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+  await settle();
+  const slider = renderer.root.find(
+    node => node.props.accessibilityLabel === 'Volumen del teléfono',
+  );
+  await ReactTestRenderer.act(async () => {
+    slider.props.onAccessibilityAction({
+      nativeEvent: { actionName: 'increment' },
+    });
+  });
+  expect(setMediaVolume).toHaveBeenLastCalledWith(expect.closeTo(0.25, 5));
 });
 
 test('the Kawaii dog asks for more volume when it is low', async () => {
