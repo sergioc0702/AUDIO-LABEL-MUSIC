@@ -1,24 +1,15 @@
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import {
-  Heart,
-  Repeat,
-  Repeat1,
-  Shuffle,
-  SkipBack,
-  SkipForward,
-} from 'lucide-react-native';
+import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { RepeatMode } from 'react-native-track-player';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IconButton } from '../../ui/Buttons';
 import { createStyles, spacing, useColors } from '../../theme/theme';
 import { formatTime } from '../../utils/formatTime';
-import { PlayPauseIcon } from '../PlayPauseIcon';
+import {
+  ThemedButton,
+  ThemedPlay,
+  ThemedSeek,
+  ThemedTool,
+  lookFor,
+} from './ThemedControls';
 import { ScenesA } from './scenes/ScenesA';
 import { ScenesB } from './scenes/ScenesB';
 import { ScenesC } from './scenes/ScenesC';
@@ -122,6 +113,7 @@ export function IllustratedPlayer({
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
   if (!kit.track) return null;
+  const look = lookFor(kind, colors);
   const toolRows = [
     tools[0],
     tools[1],
@@ -138,7 +130,7 @@ export function IllustratedPlayer({
         kit.repeatMode === RepeatMode.Track
           ? 'Canción'
           : kit.repeatMode === RepeatMode.Queue
-          ? 'Cola'
+          ? 'Repite cola'
           : 'Repetir',
       label: kit.repeatLabel,
       active: kit.repeatOn,
@@ -146,7 +138,7 @@ export function IllustratedPlayer({
     },
     tools[2],
     tools[3],
-    tools[4],
+    { ...tools[4], caption: 'Ecualizador' },
     {
       key: 'menu',
       caption: 'Más',
@@ -155,8 +147,8 @@ export function IllustratedPlayer({
       onPress: kit.openMenu,
     },
   ];
-  const { skin } = colors;
-  const playerTitle = TITLES[kind];
+  const headerFont = look.headerFont ? { fontFamily: look.headerFont } : null;
+  const upper = look.upper ? style.upper : null;
   return (
     <View
       style={[
@@ -164,37 +156,33 @@ export function IllustratedPlayer({
         { paddingTop: insets.top, paddingBottom: insets.bottom + 8 },
       ]}
     >
-      <DragHeader
-        gesture={headerGesture}
-        style={[style.header, { backgroundColor: colors.background }]}
-      >
-        <IconButton label="Cerrar reproductor" onPress={onClose}>
-          <Text style={[type.title, { color: colors.text }]}>⌄</Text>
-        </IconButton>
+      <DragHeader gesture={headerGesture} style={style.header}>
+        <ThemedButton
+          icon="close"
+          label="Cerrar reproductor"
+          look={look}
+          onPress={onClose}
+          size={48}
+        />
         <View style={style.headerInfo}>
           <Text
             numberOfLines={1}
-            style={[type.label, { color: colors.textSecondary }]}
+            style={[type.label, style.secondary, headerFont, upper]}
           >
-            {playerTitle}
+            {TITLES[kind]}
           </Text>
-          <Text
-            numberOfLines={1}
-            style={[type.caption, { color: colors.textSecondary }]}
-          >
-            {kit.sourceLabel}
+          <Text numberOfLines={1} style={[type.caption, style.secondary]}>
+            {kit.sourceLabel} · {kit.queueIndex + 1} de {kit.queueCount}
           </Text>
         </View>
-        <IconButton
+        <ThemedButton
+          active={kit.favorite}
+          icon={kit.favorite ? 'heart' : 'heartOff'}
           label={kit.favorite ? 'Quitar de favoritas' : 'Añadir a favoritas'}
+          look={look}
           onPress={kit.toggleFavorite}
-        >
-          <Heart
-            color={kit.favorite ? colors.accent : colors.text}
-            fill={kit.favorite ? colors.accent : 'transparent'}
-            size={22}
-          />
-        </IconButton>
+          size={48}
+        />
       </DragHeader>
 
       <ScrollView
@@ -204,94 +192,26 @@ export function IllustratedPlayer({
         <View style={[style.columns, landscape && style.landscape]}>
           <View style={style.artColumn}>
             <Scene kind={kind} kit={kit} />
-            <View style={style.trackInfo}>
-              <View style={style.songTitles}>
-                <Text
-                  numberOfLines={2}
-                  style={[type.headline, style.trackTitle]}
-                >
-                  {kit.track.title}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={[type.body, { color: colors.textSecondary }]}
-                >
-                  {kit.track.artist}
-                </Text>
-                {kit.track.album ? (
-                  <Text
-                    numberOfLines={1}
-                    style={[type.caption, { color: colors.textSecondary }]}
-                  >
-                    {kit.track.album}
-                  </Text>
-                ) : null}
-              </View>
-              <IconButton
-                label={
-                  kit.favorite ? 'Quitar de favoritas' : 'Añadir a favoritas'
-                }
-                onPress={kit.toggleFavorite}
+            <View style={style.songTitles}>
+              <Text
+                numberOfLines={2}
+                style={[type.headline, style.trackTitle, upper]}
               >
-                <Heart
-                  color={kit.favorite ? colors.accent : colors.textSecondary}
-                  fill={kit.favorite ? colors.accent : 'transparent'}
-                  size={24}
-                />
-              </IconButton>
+                {kit.track.title}
+              </Text>
+              <Text numberOfLines={1} style={[type.body, style.secondary]}>
+                {kit.track.artist}
+                {kit.track.album ? ` · ${kit.track.album}` : ''}
+              </Text>
             </View>
             <SeekArea kit={kit} style={style.seekTouch}>
-              {kind === 'pixel' ? (
-                <View style={style.expBars}>
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <View
-                      key={i}
-                      style={{
-                        flex: 1,
-                        backgroundColor:
-                          i / 24 < kit.progress
-                            ? colors.accent
-                            : colors.surfaceHigh,
-                        marginRight: 2,
-                      }}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <View
-                  style={[
-                    style.seekLine,
-                    { backgroundColor: colors.surfaceHigh },
-                  ]}
-                >
-                  <View
-                    style={[
-                      style.seekFill,
-                      {
-                        width: `${kit.progress * 100}%`,
-                        backgroundColor:
-                          kind === 'acuarela' ? skin.accent : colors.accent,
-                      },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      style.seekDot,
-                      {
-                        left: `${kit.progress * 100}%`,
-                        backgroundColor: colors.accent,
-                        borderColor: colors.background,
-                      },
-                    ]}
-                  />
-                </View>
-              )}
+              <ThemedSeek look={look} progress={kit.progress} />
             </SeekArea>
             <View style={style.times}>
-              <Text style={[type.caption, { color: colors.textSecondary }]}>
+              <Text style={[type.caption, style.secondary]}>
                 {formatTime(kit.position)}
               </Text>
-              <Text style={[type.caption, { color: colors.textSecondary }]}>
+              <Text style={[type.caption, style.secondary]}>
                 {formatTime(kit.duration)}
               </Text>
             </View>
@@ -299,86 +219,54 @@ export function IllustratedPlayer({
 
           <View style={style.controlsColumn}>
             <View style={style.transport}>
-              <IconButton
-                label="Canción anterior"
-                disabled={!kit.ready || kit.busy}
-                onPress={kit.previous}
-              >
-                <SkipBack color={colors.text} fill={colors.text} size={24} />
-              </IconButton>
-              <Pressable
-                accessibilityLabel={kit.isPlaying ? 'Pausar' : 'Reproducir'}
-                accessibilityRole="button"
+              <View style={style.side}>
+                <ThemedButton
+                  disabled={!kit.ready || kit.busy}
+                  icon="prev"
+                  label="Canción anterior"
+                  look={look}
+                  onPress={kit.previous}
+                  size={look.knobs ? 68 : 62}
+                />
+                {look.knobs ? (
+                  <Text style={[type.caption, style.knobCaption]}>
+                    Anterior
+                  </Text>
+                ) : null}
+              </View>
+              <ThemedPlay
                 disabled={!kit.ready}
+                isPlaying={kit.isPlaying}
+                look={look}
                 onPress={kit.toggle}
-                style={[style.playButton, { backgroundColor: colors.control }]}
-              >
-                <PlayPauseIcon
-                  color={colors.onControl}
-                  isPlaying={kit.isPlaying}
-                  size={32}
+              />
+              <View style={style.side}>
+                <ThemedButton
+                  disabled={!kit.ready || kit.busy}
+                  icon="next"
+                  label="Canción siguiente"
+                  look={look}
+                  onPress={kit.next}
+                  size={look.knobs ? 68 : 62}
                 />
-              </Pressable>
-              <IconButton
-                label="Canción siguiente"
-                disabled={!kit.ready || kit.busy}
-                onPress={kit.next}
-              >
-                <SkipForward color={colors.text} fill={colors.text} size={24} />
-              </IconButton>
-            </View>
-            <View style={style.stateRow}>
-              <IconButton
-                label={kit.shuffle ? 'Desactivar mezcla' : 'Activar mezcla'}
-                onPress={kit.toggleShuffle}
-              >
-                <Shuffle
-                  color={kit.shuffle ? colors.accent : colors.textSecondary}
-                  size={22}
-                />
-              </IconButton>
-              <IconButton label={kit.repeatLabel} onPress={kit.cycleRepeat}>
-                {kit.repeatMode === RepeatMode.Track ? (
-                  <Repeat1 color={colors.accent} size={22} />
-                ) : (
-                  <Repeat
-                    color={kit.repeatOn ? colors.accent : colors.textSecondary}
-                    size={22}
-                  />
-                )}
-              </IconButton>
-              <Text style={[type.caption, { color: colors.textSecondary }]}>
-                {kit.queueIndex + 1} / {kit.queueCount}
-              </Text>
+                {look.knobs ? (
+                  <Text style={[type.caption, style.knobCaption]}>
+                    Siguiente
+                  </Text>
+                ) : null}
+              </View>
             </View>
             <View style={style.toolsGrid}>
               {toolRows.map(item => (
-                <Pressable
+                <ThemedTool
                   key={item.key}
-                  accessibilityLabel={item.label}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: item.active }}
+                  active={item.active}
+                  caption={item.caption}
+                  label={item.label}
+                  look={look}
                   onPress={item.onPress}
-                  style={[
-                    style.tool,
-                    {
-                      backgroundColor: item.active
-                        ? colors.accent
-                        : colors.surfaceHigh,
-                    },
-                  ]}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      type.label,
-                      style.toolText,
-                      { color: item.active ? colors.onAccent : colors.text },
-                    ]}
-                  >
-                    {item.caption}
-                  </Text>
-                </Pressable>
+                  textStyle={type.label}
+                />
               ))}
             </View>
           </View>
@@ -393,10 +281,13 @@ const useStyles = createStyles(colors => ({
   header: {
     alignItems: 'center',
     flexDirection: 'row',
-    minHeight: 56,
-    paddingHorizontal: spacing.xs,
+    gap: spacing.sm,
+    minHeight: 64,
+    paddingHorizontal: spacing.md,
   },
   headerInfo: { alignItems: 'center', flex: 1, minWidth: 0 },
+  secondary: { color: colors.textSecondary },
+  upper: { textTransform: 'uppercase' },
   content: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -407,67 +298,28 @@ const useStyles = createStyles(colors => ({
   landscape: { flexDirection: 'row', alignItems: 'center' },
   artColumn: { flex: 1, minWidth: 0 },
   controlsColumn: { flex: 1, justifyContent: 'center', minWidth: 0 },
-  trackInfo: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.xs,
-    paddingTop: spacing.sm,
-  },
-  songTitles: { flex: 1, minWidth: 0 },
-  trackTitle: { color: colors.text, fontSize: 21 },
-  seekTouch: { height: 44, justifyContent: 'center' },
-  seekLine: { borderRadius: 8, height: 8, position: 'relative', width: '100%' },
-  seekFill: {
-    borderRadius: 8,
-    height: 8,
-    left: 0,
-    position: 'absolute',
-    top: 0,
-  },
-  seekDot: {
-    borderRadius: 10,
-    borderWidth: 2,
-    height: 16,
-    marginLeft: -8,
-    position: 'absolute',
-    top: -4,
-    width: 16,
-  },
-  expBars: { flexDirection: 'row', height: 18, width: '100%' },
+  songTitles: { paddingTop: spacing.md },
+  trackTitle: { color: colors.text, fontSize: 22 },
+  seekTouch: { height: 48, justifyContent: 'center' },
   times: { flexDirection: 'row', justifyContent: 'space-between' },
   transport: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: spacing.lg,
     justifyContent: 'center',
+    minHeight: 104,
   },
-  playButton: {
-    alignItems: 'center',
-    borderRadius: 36,
-    height: 72,
-    justifyContent: 'center',
-    marginHorizontal: spacing.md,
-    width: 72,
-  },
-  stateRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    minHeight: 48,
+  side: { alignItems: 'center', gap: 4 },
+  knobCaption: {
+    color: colors.textSecondary,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   toolsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    gap: spacing.sm,
     justifyContent: 'center',
-    paddingTop: spacing.xs,
+    paddingTop: spacing.sm,
   },
-  tool: {
-    alignItems: 'center',
-    borderRadius: colors.design.radius.full,
-    height: 48,
-    justifyContent: 'center',
-    minWidth: '22%',
-    paddingHorizontal: 10,
-  },
-  toolText: { fontSize: 12 },
 }));

@@ -517,7 +517,8 @@ function SpaceStar({
     const warp = c > 0 ? Math.sin((1 - c) * Math.PI) : 0;
     const baseX = noise(n * 3.1) * W;
     const y = noise(n * 7.3 + 2) * H;
-    const x = (baseX - clock.run.value * (4 + noise(n) * 8) + W * 40) % W;
+    const raw = (baseX - clock.run.value * (4 + noise(n) * 8)) % W;
+    const x = raw < 0 ? raw + W : raw;
     const a = Math.atan2(y - H / 2, x - W / 2);
     const len = 2 + warp * 90 * (0.5 + noise(n * 9));
     return {
