@@ -1,6 +1,7 @@
 import type { SkinColors } from './themes';
+import { additionalThemePalettes } from './additionalThemePalettes';
 
-type RawPalette = {
+export type RawPalette = {
   id: string;
   name: string;
   background: string;
@@ -1065,4 +1066,5 @@ export const themePalettes: Record<string, RawPalette[]> = {
       },
     },
   ],
+  ...additionalThemePalettes,
 };
