@@ -667,10 +667,10 @@ export function KawaiiPlayer({ covered, headerGesture, onClose }: SkinProps) {
             style={[
               styles.cushion,
               {
-                width: stage * 0.74,
-                height: stage * 0.15,
-                left: stage * 0.13,
-                top: stage * 0.8,
+                width: stage * 0.72,
+                height: stage * 0.16,
+                left: stage * 0.14,
+                top: stage * 0.7,
                 backgroundColor: colors.skin.ring,
               },
             ]}
