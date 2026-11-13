@@ -1068,8 +1068,22 @@ test('the Kawaii dog asks for more volume when it is low', async () => {
 
   await settle();
   expect(hasLabel('El perrito pide que subas el volumen')).toBe(true);
-  await press('Subir volumen');
+  const slider = renderer.root.find(
+    node =>
+      node.props.accessibilityLabel === 'Volumen' &&
+      typeof node.props.onAccessibilityAction === 'function',
+  );
+  await ReactTestRenderer.act(async () => {
+    slider.props.onAccessibilityAction({
+      nativeEvent: { actionName: 'increment' },
+    });
+  });
   expect(setMediaVolume).toHaveBeenCalledWith(expect.closeTo(0.3, 5));
+
+  // Timer, speed, equalizer and the song menu live behind "Más opciones".
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
   jest.mocked(usePlaybackState).mockReturnValue({ state: 'none' } as never);
 });
 

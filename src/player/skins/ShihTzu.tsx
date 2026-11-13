@@ -315,22 +315,13 @@ export const ShihTzu = memo(function ShihTzuView({
     previousMood.current = mood;
     goal.value = POSES[mood];
     transitioning.value = moving && changed;
-    if (!moving || (mood === 'triste' && !changed)) {
+    if (!moving) {
       pose.value = POSES[mood];
       frame.setActive(false);
       return;
     }
-
+    // Every mood keeps moving, the sad one too: it breathes and its tears fall.
     frame.setActive(true);
-    if (mood !== 'triste') return;
-
-    // Let the dog's head drop on pause, then hold the sad pose.
-    const settle = setTimeout(() => {
-      frame.setActive(false);
-      transitioning.value = false;
-      pose.value = POSES.triste;
-    }, 700);
-    return () => clearTimeout(settle);
   }, [frame, goal, mood, moving, pose, transitioning]);
 
   const root = useAnimatedStyle(() => {
