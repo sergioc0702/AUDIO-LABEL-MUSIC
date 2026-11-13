@@ -32,6 +32,7 @@ import {
   setPlaylistTracks,
   setMediaVolume,
   storeAppearance,
+  storeLyrics,
 } from '../src/native/musicLibrary';
 import type { Playlist, Track } from '../src/types/Track';
 
@@ -155,6 +156,10 @@ jest.mock('../src/native/musicLibrary', () => ({
   renamePlaylist: jest.fn().mockResolvedValue(undefined),
   deletePlaylist: jest.fn().mockResolvedValue(undefined),
   setPlaylistTracks: jest.fn().mockResolvedValue(undefined),
+  getStoredLyrics: jest.fn().mockResolvedValue(null),
+  storeLyrics: jest.fn().mockResolvedValue(undefined),
+  removeStoredLyrics: jest.fn().mockResolvedValue(undefined),
+  importLrcFile: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('react-native-safe-area-context', () => {
@@ -1078,4 +1083,32 @@ test('marks favorites from the player', async () => {
   await press('Añadir a favoritas');
 
   expect(hasLabel('Quitar de favoritas')).toBe(true);
+});
+
+test('the lyrics panel finds synced lyrics online and keeps them', async () => {
+  const LRC = ['[00:00.50] Hola mundo', '[00:04.00] Segunda línea'].join('\n');
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'brutalista' });
+  const fetchMock = jest.mocked(globalThis.fetch);
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      duration: 180,
+      syncedLyrics: LRC,
+    }),
+  } as Response);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+  await press('Abrir letras de Tema 1');
+  await settle();
+  await settle();
+
+  expect(storeLyrics).toHaveBeenCalledWith('1', LRC);
+  expect(screenText()).toContain('Hola mundo');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('lrclib.net');
 });

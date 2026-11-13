@@ -22,6 +22,11 @@ vuelve a abrir si cambia.
   diez temas: Kawaii, Brutalista, Terminal, Tornamesa, Mixtape, Taquilla, Pixel,
   Vaporwave, Manga y Nave espacial. Cada tema tiene su propio reproductor animado y
   seis paletas de colores; la paleta colorea toda la app.
+- **Letras sincronizadas:** al abrir Letras, la app busca gratis la letra de la
+  canción en LRCLIB (lrclib.net) y la guarda para usarla sin internet. Si trae
+  tiempos, avanza con la música y tocar una línea salta a esa parte; también se
+  puede importar un archivo LRC. Solo se envían el título, el artista, el álbum
+  y la duración.
 - **La sesión se recuerda:** al reabrir la app vuelven la cola, la canción, la
   posición, la mezcla y la repetición, sin que empiece a sonar sola.
 - **Temporizador:** 15 a 90 minutos o al terminar la canción. Funciona en segundo

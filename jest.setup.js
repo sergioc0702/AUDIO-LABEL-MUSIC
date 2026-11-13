@@ -37,3 +37,6 @@ jest.mock('react-native-reanimated', () => {
     useAnimatedProps: read => read(),
   };
 });
+
+// Tests never reach the internet; lyrics searches fail as if offline.
+global.fetch = jest.fn(() => Promise.reject(new Error('Sin conexión en pruebas')));

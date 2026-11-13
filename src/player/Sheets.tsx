@@ -5,6 +5,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type ScrollViewInstance,
 } from 'react-native';
 import { Check } from 'lucide-react-native';
 import {
@@ -15,6 +16,8 @@ import {
   subscribeSleepTimer,
   type SleepTimerState,
 } from '../services/sleepTimer';
+import { findOnlineLyrics } from '../services/lyricsSearch';
+import { storeLyrics } from '../native/musicLibrary';
 import { useApp } from '../state/AppContext';
 import { playbackRates } from '../state/useMusicController';
 import { appThemes } from '../theme/themes';
@@ -237,12 +240,46 @@ export function LyricsSheet() {
     music;
   const [contents, setContents] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const visible = playerSheet === 'lyrics';
   const trackId = currentTrack?.id;
   const liveTrackId = useRef(trackId);
   liveTrackId.current = trackId;
+  /** Songs already looked up online in this session, so we do not ask twice. */
+  const searched = useRef(new Set<string>());
   const lines = useMemo(() => parseLrc(contents ?? ''), [contents]);
+  const plain = contents && lines.length === 0 ? contents : null;
+
+  async function searchOnline() {
+    const track = currentTrack;
+    if (!track) return;
+    searched.current.add(track.id);
+    setSearching(true);
+    setNotice(null);
+    try {
+      const found = await findOnlineLyrics(track);
+      if (liveTrackId.current !== track.id) return;
+      if (found.kind === 'synced' || found.kind === 'plain') {
+        await storeLyrics(track.id, found.contents);
+        if (liveTrackId.current === track.id) setContents(found.contents);
+      } else {
+        setNotice(
+          found.kind === 'instrumental'
+            ? 'Esta canción es instrumental.'
+            : 'No encontramos letras para esta canción.',
+        );
+      }
+    } catch {
+      if (liveTrackId.current === track.id) {
+        setNotice(
+          'No se pudieron buscar las letras. Revisa tu conexión a internet.',
+        );
+      }
+    } finally {
+      if (liveTrackId.current === track.id) setSearching(false);
+    }
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -252,16 +289,20 @@ export function LyricsSheet() {
       };
     }
     setLoading(true);
-    setLoadError(null);
+    setNotice(null);
     setContents(null);
     getTrackLyrics(trackId)
       .then(value => {
-        if (mounted) setContents(value);
+        if (!mounted) return;
+        setContents(value);
+        if (!value && !searched.current.has(trackId)) {
+          searchOnline();
+        }
       })
       .catch(error => {
         if (mounted) {
           setContents(null);
-          setLoadError(
+          setNotice(
             error instanceof Error
               ? error.message
               : 'No se pudieron cargar las letras.',
@@ -274,6 +315,8 @@ export function LyricsSheet() {
     return () => {
       mounted = false;
     };
+    // searchOnline reads the current track through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getTrackLyrics, trackId, visible]);
 
   async function chooseLyrics() {
@@ -283,10 +326,10 @@ export function LyricsSheet() {
         const next = await getTrackLyrics(currentTrack.id);
         if (liveTrackId.current === currentTrack.id) {
           setContents(next);
-          setLoadError(null);
+          setNotice(null);
         }
       } catch (error) {
-        setLoadError(
+        setNotice(
           error instanceof Error
             ? error.message
             : 'No se pudieron cargar las letras.',
@@ -305,21 +348,35 @@ export function LyricsSheet() {
         <Text style={[type.secondary, styles.lyricsMessage]}>
           Cargando letras…
         </Text>
-      ) : loadError ? (
+      ) : searching && !contents ? (
+        <Text style={[type.secondary, styles.lyricsMessage]}>
+          Buscando letras en internet…
+        </Text>
+      ) : lines.length > 0 ? (
+        <SyncedLyrics lines={lines} />
+      ) : plain ? (
+        <PlainLyrics text={plain} />
+      ) : (
         <Text
-          accessibilityRole="alert"
+          accessibilityRole={notice ? 'alert' : undefined}
           style={[type.secondary, styles.lyricsMessage]}
         >
-          {loadError}
+          {notice ?? 'Aún no hay letras para esta canción.'}
         </Text>
-      ) : lines.length === 0 ? (
-        <Text style={[type.secondary, styles.lyricsMessage]}>
-          Aún no hay letras locales para esta canción.
-        </Text>
-      ) : (
-        <SyncedLyrics lines={lines} />
       )}
+      {plain ? (
+        <Text style={[type.caption, styles.lyricsNote]}>
+          Esta letra no trae tiempos, así que no avanza con la música.
+        </Text>
+      ) : null}
       <View style={styles.lyricsActions}>
+        <Button
+          disabled={searching || !currentTrack}
+          label={searching ? 'Buscando…' : 'Buscar letras en internet'}
+          multiline
+          onPress={searchOnline}
+          variant="tonal"
+        />
         <Button
           label="Importar archivo LRC"
           multiline
@@ -341,30 +398,80 @@ export function LyricsSheet() {
   );
 }
 
+/** Lines that light up with the song, scroll to stay in view and seek on tap. */
 function SyncedLyrics({ lines }: { lines: ReturnType<typeof parseLrc> }) {
   const { colors, type } = useColors();
   const styles = useStyles();
+  const { music } = useApp();
   const { position } = usePlaybackProgress();
   const activeIndex = currentLyricIndex(lines, position);
+  const scroll = useRef<ScrollViewInstance>(null);
+  const offsets = useRef<number[]>([]);
+  const [viewHeight, setViewHeight] = useState(0);
+  const [userScrolling, setUserScrolling] = useState(false);
+
+  useEffect(() => {
+    if (userScrolling || activeIndex < 0) return;
+    const y = offsets.current[activeIndex];
+    if (y === undefined) return;
+    scroll.current?.scrollTo({
+      y: Math.max(0, y - viewHeight * 0.35),
+      animated: true,
+    });
+  }, [activeIndex, userScrolling, viewHeight]);
 
   return (
-    <ScrollView contentContainerStyle={styles.lyricsLines}>
+    <ScrollView
+      ref={scroll}
+      contentContainerStyle={styles.lyricsLines}
+      onLayout={event => setViewHeight(event.nativeEvent.layout.height)}
+      onMomentumScrollEnd={() => setUserScrolling(false)}
+      onScrollBeginDrag={() => setUserScrolling(true)}
+      onScrollEndDrag={() => setTimeout(() => setUserScrolling(false), 2500)}
+    >
       {lines.map((line, index) => {
         const active = index === activeIndex;
+        const past = index < activeIndex;
         return (
-          <Text
-            accessibilityState={{ selected: active }}
+          <Tap
             key={`${line.timeMs}-${index}`}
-            style={[
-              active ? type.title : type.body,
-              { color: active ? colors.accent : colors.textSecondary },
-              styles.lyricLine,
-            ]}
+            accessibilityHint="Toca para ir a esta parte de la canción"
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            onLayout={event => {
+              offsets.current[index] = event.nativeEvent.layout.y;
+            }}
+            onPress={() => music.seekToPosition(line.timeMs / 1000)}
           >
-            {line.text}
-          </Text>
+            <Text
+              style={[
+                active ? type.title : type.body,
+                {
+                  color: active
+                    ? colors.accent
+                    : past
+                    ? colors.textSecondary
+                    : colors.text,
+                  opacity: active ? 1 : past ? 0.55 : 0.8,
+                },
+                styles.lyricLine,
+              ]}
+            >
+              {line.text}
+            </Text>
+          </Tap>
         );
       })}
+    </ScrollView>
+  );
+}
+
+function PlainLyrics({ text }: { text: string }) {
+  const { type } = useColors();
+  const styles = useStyles();
+  return (
+    <ScrollView contentContainerStyle={styles.lyricsLines}>
+      <Text style={[type.body, styles.lyricLine]}>{text}</Text>
     </ScrollView>
   );
 }
@@ -581,6 +688,11 @@ const useStyles = createStyles(colors => ({
     paddingVertical: spacing.md,
   },
   lyricLine: { textAlign: 'center' },
+  lyricsNote: {
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.lg,
+    textAlign: 'center',
+  },
   lyricsActions: {
     gap: spacing.xs,
     paddingHorizontal: spacing.lg,
