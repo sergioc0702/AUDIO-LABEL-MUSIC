@@ -31,7 +31,7 @@ test('each theme starts on the palette Sergio chose', () => {
   );
   expect(first).toMatchObject({
     kawaii: 'Algodón',
-    brutalista: 'Ácido',
+    brutalista: 'Suizo',
     terminal: 'Ámbar',
     tornamesa: 'Nogal',
     mixtape: 'Naranja',

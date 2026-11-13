@@ -289,7 +289,12 @@ function SeekBar({ kit }: { kit: PlayerKit }) {
         >
           <View style={styles.rail} />
           <View style={[styles.fill, { width: `${shown * 100}%` }]} />
-          <View style={[styles.seekThumb, { left: `${shown * 100}%` }]}>
+          <View
+            style={[
+              styles.seekThumb,
+              { left: `${shown * 100}%`, marginLeft: -shown * 30 },
+            ]}
+          >
             <Svg height={30} viewBox="-15 -15 30 30" width={30}>
               <Path
                 d={HEART}
@@ -377,7 +382,12 @@ function VolumeLine({ volume }: { volume: ReturnType<typeof useMediaVolume> }) {
         >
           <View style={styles.boneRail} />
           <View style={[styles.boneFill, { width: `${percent}%` }]} />
-          <View style={[styles.bone, { left: `${percent}%` }]}>
+          <View
+            style={[
+              styles.bone,
+              { left: `${percent}%`, marginLeft: -(percent / 100) * 34 },
+            ]}
+          >
             <Svg height={24} viewBox="0 0 52 36" width={34}>
               <Path
                 d={BONE}
@@ -698,7 +708,7 @@ export function KawaiiPlayer({ covered, headerGesture, onClose }: SkinProps) {
               size={dog}
             />
           </Pressable>
-          <View style={{ position: 'absolute', right: 0, top: stage * 0.66 }}>
+          <View style={[styles.stickerSpot, { top: stage * 0.02 }]}>
             <Sticker kit={kit} size={Math.round(stage * 0.22)} />
           </View>
         </View>
@@ -819,6 +829,7 @@ const useStyles = createStyles(colors => ({
   },
   cushion: { position: 'absolute', borderRadius: 999 },
   dog: { position: 'absolute' },
+  stickerSpot: { position: 'absolute', right: 0 },
   sticker: {
     borderRadius: 22,
     borderWidth: 5,
@@ -842,7 +853,7 @@ const useStyles = createStyles(colors => ({
     borderRadius: 4,
     backgroundColor: colors.accent,
   },
-  seekThumb: { position: 'absolute', marginLeft: -15 },
+  seekThumb: { position: 'absolute' },
   times: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -897,7 +908,7 @@ const useStyles = createStyles(colors => ({
     borderRadius: 3,
     backgroundColor: colors.textSecondary,
   },
-  bone: { position: 'absolute', marginLeft: -17 },
+  bone: { position: 'absolute' },
   icons: {
     flexDirection: 'row',
     justifyContent: 'space-between',

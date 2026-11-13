@@ -15,7 +15,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withDelay,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
@@ -44,33 +43,26 @@ import {
   type SkinProps,
 } from './kit';
 
+/** Every cell of the grid shares rules this thick. */
+const RULE = 3;
 const SEGMENTS = 18;
 const BAR_HEIGHTS = [
-  26, 38, 19, 44, 31, 22, 42, 35, 17, 40, 29, 44, 24, 36, 21, 33,
+  18, 30, 14, 36, 24, 16, 34, 27, 12, 32, 22, 36, 19, 29, 15, 33, 25, 17, 35,
+  21,
 ];
 const TYPE_MS = 55;
-const LINE = 3;
-const SHADOW = 6;
-/** Clear space between the cover strip (and its tape) and the title. */
-const TITLE_ROOM_TOP = 20;
+/** Anton capitals are about this wide, as a share of the font size. */
+const CAP_WIDTH = 0.47;
 
 const two = (value: number) => String(value).padStart(2, '0');
 
-/* ───────── cover strip ───────── */
+/* ───────── cover cell ───────── */
 
 /**
- * The album art as a wide strip pasted on the page. It is drawn once and
- * only moves on the UI thread: a short sideways jolt when the song changes.
+ * The cover fills its cell. It is drawn once and only moves on the UI thread:
+ * a short sideways jolt when the song changes.
  */
-function CoverStrip({
-  kit,
-  width,
-  height,
-}: {
-  kit: PlayerKit;
-  width: number;
-  height: number;
-}) {
+function CoverCell({ kit, width }: { kit: PlayerKit; width: number }) {
   const { colors } = useColors();
   const styles = useStyles();
   const reduced = useReducedMotion();
@@ -78,9 +70,9 @@ function CoverStrip({
   useTrackChange(kit.track?.id, () => {
     if (reduced) return;
     jolt.value = withSequence(
-      withTiming(14, { duration: 60, easing: Easing.linear }),
-      withTiming(-14, { duration: 60, easing: Easing.linear }),
-      withTiming(8, { duration: 60, easing: Easing.linear }),
+      withTiming(10, { duration: 60, easing: Easing.linear }),
+      withTiming(-10, { duration: 60, easing: Easing.linear }),
+      withTiming(6, { duration: 60, easing: Easing.linear }),
       withTiming(0, { duration: 60, easing: Easing.linear }),
     );
   });
@@ -90,18 +82,8 @@ function CoverStrip({
   const { hot, onHot, paper } = colors.skin;
   const artwork = kit.track?.artwork ?? null;
   return (
-    <View pointerEvents="none" style={{ width: width + SHADOW, height }}>
-      <Animated.View
-        style={[
-          styles.strip,
-          {
-            width,
-            height,
-            boxShadow: `${SHADOW}px ${SHADOW}px 0 ${colors.text}`,
-          },
-          style,
-        ]}
-      >
+    <View pointerEvents="none" style={[styles.coverCell, { width }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, style]}>
         {artwork ? (
           <Image
             resizeMode="cover"
@@ -116,65 +98,37 @@ function CoverStrip({
               style={[
                 styles.blockCircle,
                 {
-                  width: height * 1.3,
-                  height: height * 1.3,
-                  borderRadius: height * 0.65,
-                  top: -height * 0.4,
+                  width: width * 0.9,
+                  height: width * 0.9,
+                  borderRadius: width * 0.45,
                   backgroundColor: hot,
                 },
               ]}
             />
             <View style={[styles.blockPost, { backgroundColor: paper }]} />
-            <View style={[styles.blockBar, { backgroundColor: paper }]} />
           </View>
         )}
-        <Text
-          style={[
-            styles.stamp,
-            { backgroundColor: hot, color: onHot, borderColor: onHot },
-          ]}
-        >
-          {kit.isPlaying ? 'Sonando' : 'Pausa'}
-        </Text>
       </Animated.View>
-      <View
-        style={[styles.tape, styles.tapeLeft, { backgroundColor: paper }]}
-      />
-      <View
-        style={[styles.tape, styles.tapeRight, { backgroundColor: paper }]}
-      />
+      <Text style={[styles.stamp, { backgroundColor: hot, color: onHot }]}>
+        {kit.isPlaying ? 'Sonando' : 'Pausa'}
+      </Text>
     </View>
   );
 }
 
-/* ───────── title ───────── */
+/* ───────── headline ───────── */
 
 /**
- * The title, on one line. It types itself in when a new song starts and, if
- * it is wider than the screen, glides from side to side while the music plays.
- * Only this small piece re-renders while it types.
+ * The title set like a magazine headline, over several lines. It types itself
+ * in when a new song starts; only this small piece re-renders while it types.
  */
-function TypedTitle({
-  kit,
-  size,
-  playing,
-}: {
-  kit: PlayerKit;
-  size: number;
-  playing: boolean;
-}) {
+function Headline({ kit, size }: { kit: PlayerKit; size: number }) {
   const { colors } = useColors();
   const styles = useStyles();
   const reduced = useReducedMotion();
   const title = kit.track?.title ?? '';
   const [typed, setTyped] = useState<number | null>(null);
-  const [boxWidth, setBoxWidth] = useState(0);
-  const [textWidth, setTextWidth] = useState(0);
-  const x = useSharedValue(0);
-  const typing = typed !== null;
   useTrackChange(kit.track?.id, () => {
-    cancelAnimation(x);
-    x.value = 0;
     if (!reduced) setTyped(0);
   });
   useEffect(() => {
@@ -186,60 +140,23 @@ function TypedTitle({
     const timer = setTimeout(() => setTyped(typed + 1), TYPE_MS);
     return () => clearTimeout(timer);
   }, [title.length, typed]);
-  // A title wider than the screen glides from side to side, on the UI thread.
-  useEffect(() => {
-    const overflow = boxWidth > 0 ? Math.max(0, textWidth - boxWidth) : 0;
-    if (typing) {
-      // Keep the cursor in view while the title types itself in.
-      x.value = withTiming(-overflow, {
-        duration: TYPE_MS * 1.5,
-        easing: Easing.linear,
-      });
-      return;
-    }
-    if (overflow <= 0 || reduced || !playing) {
-      cancelAnimation(x);
-      x.value = withTiming(0, { duration: 300 });
-      return;
-    }
-    const glide = {
-      duration: Math.max(1200, overflow * 22),
-      easing: Easing.inOut(Easing.quad),
-    };
-    x.value = withRepeat(
-      withSequence(
-        withDelay(1400, withTiming(-overflow, glide)),
-        withDelay(1400, withTiming(0, glide)),
-      ),
-      -1,
-    );
-    return () => cancelAnimation(x);
-  }, [boxWidth, playing, reduced, textWidth, typing, x]);
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value }],
-  }));
-  const line = size * 1.12;
+  const typing = typed !== null;
   return (
-    <View
+    <Text
       accessibilityLabel={title}
       accessibilityRole="header"
-      accessible
-      onLayout={event => setBoxWidth(event.nativeEvent.layout.width)}
-      style={[styles.titleClip, { height: line }]}
+      ellipsizeMode="tail"
+      numberOfLines={5}
+      style={[
+        styles.headline,
+        { fontSize: size, lineHeight: Math.round(size * 1.14) },
+      ]}
     >
-      <Animated.View style={[styles.titleRail, style]}>
-        <Text
-          numberOfLines={1}
-          onLayout={event => setTextWidth(event.nativeEvent.layout.width)}
-          style={[styles.title, { fontSize: size, lineHeight: line }]}
-        >
-          {typing ? title.slice(0, typed) : title}
-          {typing ? (
-            <Text style={{ backgroundColor: colors.skin.hot }}>{' '}</Text>
-          ) : null}
-        </Text>
-      </Animated.View>
-    </View>
+      {typing ? title.slice(0, typed) : title}
+      {typing ? (
+        <Text style={{ backgroundColor: colors.skin.hot }}>{' '}</Text>
+      ) : null}
+    </Text>
   );
 }
 
@@ -257,6 +174,7 @@ function Bar({
   index: number;
   color: string;
 }) {
+  const styles = useStyles();
   const reduced = useReducedMotion();
   const scale = useSharedValue(0.4);
   useEffect(() => {
@@ -280,15 +198,50 @@ function Bar({
   }));
   return (
     <Animated.View
-      style={[
-        { flex: 1, height, backgroundColor: color, transformOrigin: 'bottom' },
-        style,
-      ]}
+      style={[styles.bar, { height, backgroundColor: color }, style]}
     />
   );
 }
 
-/* ───────── buttons ───────── */
+/* ───────── keys ───────── */
+
+/** A grid cell that acts as a key; it darkens while pressed. */
+function Key({
+  label,
+  onPress,
+  disabled,
+  selected,
+  style,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  selected?: boolean;
+  style: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ selected, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[style, disabled && styles.dim]}
+    >
+      {({ pressed }) => (
+        <>
+          {children}
+          {pressed ? (
+            <View pointerEvents="none" style={styles.pressShade} />
+          ) : null}
+        </>
+      )}
+    </Pressable>
+  );
+}
 
 type IconProps = { color: string; size: number; strokeWidth: number };
 
@@ -298,82 +251,6 @@ function Blocks({ color, size }: IconProps) {
     <Svg height={size} viewBox="0 0 24 24" width={size}>
       <Path d="M3 10h4v4H3zM10 10h4v4h-4zM17 10h4v4h-4z" fill={color} />
     </Svg>
-  );
-}
-
-/** A hard block with a flat shadow that sinks into the page when pressed. */
-function Block({
-  label,
-  onPress,
-  disabled,
-  style,
-  children,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  style: StyleProp<ViewStyle>;
-  children: ReactNode;
-}) {
-  const { colors } = useColors();
-  const styles = useStyles();
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.block,
-        style,
-        pressed
-          ? { transform: [{ translateX: SHADOW }, { translateY: SHADOW }] }
-          : { boxShadow: `${SHADOW}px ${SHADOW}px 0 ${colors.text}` },
-        disabled && styles.dim,
-      ]}
-    >
-      {children}
-    </Pressable>
-  );
-}
-
-function Tool({
-  label,
-  caption,
-  active,
-  onPress,
-  disabled,
-  Icon,
-}: {
-  label: string;
-  caption: string;
-  active?: boolean;
-  onPress: () => void;
-  disabled?: boolean;
-  Icon: ComponentType<IconProps>;
-}) {
-  const { colors } = useColors();
-  const styles = useStyles();
-  const color = active ? colors.skin.onHot : colors.text;
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active, disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={[
-        styles.tool,
-        active && { backgroundColor: colors.skin.hot },
-        disabled && styles.dim,
-      ]}
-    >
-      <Icon color={color} size={21} strokeWidth={2.8} />
-      <Text numberOfLines={1} style={[styles.toolText, { color }]}>
-        {caption}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -426,15 +303,7 @@ function MoreOptions({
         onPress={onClose}
         style={[StyleSheet.absoluteFill, styles.scrim]}
       />
-      <View
-        style={[
-          styles.panel,
-          {
-            bottom: insets.bottom + 16,
-            boxShadow: `${SHADOW}px ${SHADOW}px 0 ${colors.text}`,
-          },
-        ]}
-      >
+      <View style={[styles.panel, { bottom: insets.bottom + 12 }]}>
         <View style={styles.panelHead}>
           <Text style={styles.panelTitle}>Más opciones</Text>
           <Pressable
@@ -443,7 +312,7 @@ function MoreOptions({
             onPress={onClose}
             style={styles.panelClose}
           >
-            <X color={colors.text} size={26} strokeWidth={3.5} />
+            <X color={colors.text} size={24} strokeWidth={3.2} />
           </Pressable>
         </View>
         {rows.map(row => {
@@ -479,193 +348,253 @@ export function BrutalPlayer({ covered, headerGesture, onClose }: SkinProps) {
   const { colors } = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const [more, setMore] = useState(false);
   useEffect(() => {
     if (covered) setMore(false);
   }, [covered]);
 
   if (!kit.track) return null;
-  const inner = width - 32;
-  const stripWidth = inner - SHADOW;
-  const stripHeight = Math.round(Math.max(110, Math.min(height * 0.19, 172)));
-  const titleSize = Math.round(Math.max(40, Math.min(width * 0.15, 60)));
+  const track = kit.track;
+  // The frame is 12 pt from each edge; its rules take 3 pt on each side.
+  const inner = width - 24 - RULE * 2;
+  const coverWidth = Math.round(inner * 0.6);
+  const headlineWidth = inner - coverWidth - RULE - 20;
+  const longest = Math.max(
+    4,
+    ...track.title.split(/\s+/).map(word => word.length),
+  );
+  const headSize = Math.round(
+    Math.max(24, Math.min(48, headlineWidth / (longest * CAP_WIDTH))),
+  );
   const filled = kit.progress * SEGMENTS;
-  const { hot, onHot, paper, ink } = colors.skin;
-  const blockInk = ink ?? colors.text;
+  const { hot, onHot } = colors.skin;
   const RepeatIcon = kit.repeatMode === RepeatMode.Track ? Repeat1 : Repeat;
   const moving = !kit.ready || kit.busy;
+  const tools: {
+    key: string;
+    caption: string;
+    label: string;
+    active?: boolean;
+    disabled?: boolean;
+    Icon: ComponentType<IconProps>;
+    onPress: () => void;
+  }[] = [
+    {
+      key: 'queue',
+      caption: 'Cola',
+      label: `Abrir cola de reproducción con ${kit.queueCount} canciones`,
+      Icon: ListMusic,
+      onPress: kit.openQueue,
+    },
+    {
+      key: 'lyrics',
+      caption: 'Letras',
+      label: `Abrir letras de ${track.title}`,
+      Icon: FileText,
+      onPress: kit.openLyrics,
+    },
+    {
+      key: 'shuffle',
+      caption: 'Mezcla',
+      label: kit.shuffle ? 'Desactivar mezcla' : 'Activar mezcla',
+      active: kit.shuffle,
+      disabled: moving,
+      Icon: Shuffle,
+      onPress: kit.toggleShuffle,
+    },
+    {
+      key: 'repeat',
+      caption: 'Repetir',
+      label: kit.repeatLabel,
+      active: kit.repeatOn,
+      disabled: !kit.ready,
+      Icon: RepeatIcon,
+      onPress: kit.cycleRepeat,
+    },
+    {
+      key: 'more',
+      caption: 'Más',
+      label: 'Más opciones: temporizador, velocidad, ecualizador y acciones',
+      active: more,
+      Icon: Blocks,
+      onPress: () => setMore(true),
+    },
+  ];
 
   return (
     <View
       style={[
         styles.player,
-        { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 12 },
+        { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 12 },
       ]}
     >
-      <DragHeader gesture={headerGesture} style={styles.top}>
-        <Pressable
-          accessibilityLabel="Cerrar reproductor"
-          accessibilityRole="button"
-          onPress={onClose}
-          style={[styles.topCell, styles.topLeft]}
+      <View style={styles.frame}>
+        <DragHeader
+          gesture={headerGesture}
+          style={[styles.row, styles.masthead]}
         >
-          <ChevronDown color={colors.text} size={30} strokeWidth={3.5} />
-        </Pressable>
-        <Text numberOfLines={1} style={styles.counter}>
-          Pista {two(kit.queueIndex + 1)} / {two(kit.queueCount)}
-        </Text>
-        <Pressable
-          accessibilityLabel={
-            kit.favorite ? 'Quitar de favoritas' : 'Añadir a favoritas'
-          }
-          accessibilityRole="button"
-          accessibilityState={{ selected: kit.favorite }}
-          onPress={kit.toggleFavorite}
-          style={[
-            styles.topCell,
-            styles.topRight,
-            kit.favorite && { backgroundColor: hot },
-          ]}
-        >
-          <Heart
-            color={kit.favorite ? onHot : colors.text}
-            fill={kit.favorite ? onHot : 'none'}
-            size={26}
-            strokeWidth={3}
-          />
-        </Pressable>
-      </DragHeader>
-
-      <View style={styles.stripRow}>
-        <CoverStrip height={stripHeight} kit={kit} width={stripWidth} />
-      </View>
-
-      <View
-        style={[
-          styles.titleBox,
-          // One title line, the gap and the artist tag always fit below the cover.
-          { minHeight: TITLE_ROOM_TOP + Math.ceil(titleSize * 1.12) + 44 },
-        ]}
-      >
-        <TypedTitle kit={kit} playing={kit.lively} size={titleSize} />
-        <Text numberOfLines={1} style={styles.artist}>
-          {kit.track.artist}
-        </Text>
-      </View>
-
-      <View style={styles.bars}>
-        {BAR_HEIGHTS.map((barHeight, index) => (
-          <Bar
-            key={index}
-            color={index % 4 === 2 ? hot : colors.text}
-            height={barHeight}
-            index={index}
-            playing={kit.lively}
-          />
-        ))}
-      </View>
-
-      <View style={styles.times}>
-        <Text style={styles.now}>{formatTime(kit.position)}</Text>
-        <Text style={styles.left}>
-          −{formatTime(Math.max(0, kit.duration - kit.position))}
-        </Text>
-      </View>
-      <SeekArea kit={kit} style={styles.segments}>
-        {Array.from({ length: SEGMENTS }, (_, index) => (
-          <View
-            key={index}
+          <Pressable
+            accessibilityLabel="Cerrar reproductor"
+            accessibilityRole="button"
+            onPress={onClose}
+            style={[styles.mastCell, styles.ruleRight]}
+          >
+            <ChevronDown color={colors.text} size={28} strokeWidth={3.5} />
+          </Pressable>
+          <View style={styles.mastTitle}>
+            <Text numberOfLines={1} style={styles.brand}>
+              Mi Música
+            </Text>
+            <Text style={styles.issue}>
+              Nº {two(Math.max(1, kit.queueIndex + 1))}
+              {'\n'}
+              <Text style={styles.issueSub}>de {two(kit.queueCount)}</Text>
+            </Text>
+          </View>
+          <Pressable
+            accessibilityLabel={
+              kit.favorite ? 'Quitar de favoritas' : 'Añadir a favoritas'
+            }
+            accessibilityRole="button"
+            accessibilityState={{ selected: kit.favorite }}
+            onPress={kit.toggleFavorite}
             style={[
-              styles.segment,
-              index < Math.floor(filled)
-                ? { backgroundColor: colors.text }
-                : index === Math.floor(filled)
-                ? { backgroundColor: hot }
-                : null,
+              styles.mastCell,
+              styles.ruleLeft,
+              kit.favorite && { backgroundColor: hot },
             ]}
-          />
-        ))}
-      </SeekArea>
+          >
+            <Heart
+              color={kit.favorite ? onHot : colors.text}
+              fill={kit.favorite ? onHot : 'none'}
+              size={24}
+              strokeWidth={3}
+            />
+          </Pressable>
+        </DragHeader>
 
-      <Block
-        disabled={!kit.ready}
-        label={kit.isPlaying ? 'Pausar' : 'Reproducir'}
-        onPress={kit.toggle}
-        style={[styles.play, { backgroundColor: hot }]}
-      >
-        <Svg height={44} viewBox="0 0 24 24" width={44}>
-          <Path
-            d={kit.isPlaying ? 'M5 4h5v16H5zM14 4h5v16h-5z' : 'M6 3v18l15-9z'}
-            fill={onHot}
-          />
-        </Svg>
-        <Text style={[styles.playText, { color: onHot }]}>
-          {kit.isPlaying ? 'Pausa' : 'Play'}
-        </Text>
-      </Block>
+        <View style={[styles.row, styles.hero]}>
+          <CoverCell kit={kit} width={coverWidth} />
+          <View style={styles.headCell}>
+            <Text style={styles.kicker}>AHORA SUENA</Text>
+            <Headline kit={kit} size={headSize} />
+          </View>
+        </View>
 
-      <View style={styles.skips}>
-        <Block
-          disabled={moving}
-          label="Canción anterior"
-          onPress={kit.previous}
-          style={[styles.skip, { backgroundColor: paper }]}
-        >
-          <Svg height={28} viewBox="0 0 24 24" width={28}>
-            <Path d="M5 4h3v16H5zM20 4v16L9 12z" fill={blockInk} />
-          </Svg>
-          <Text style={[styles.skipText, { color: blockInk }]}>Ant.</Text>
-        </Block>
-        <Block
-          disabled={moving}
-          label="Siguiente canción"
-          onPress={kit.next}
-          style={[styles.skip, { backgroundColor: paper }]}
-        >
-          <Text style={[styles.skipText, { color: blockInk }]}>Sig.</Text>
-          <Svg height={28} viewBox="0 0 24 24" width={28}>
-            <Path d="M16 4h3v16h-3zM4 4l11 8-11 8z" fill={blockInk} />
-          </Svg>
-        </Block>
-      </View>
+        <View style={[styles.row, styles.info]}>
+          <View
+            style={[styles.infoCell, styles.ruleRight, { width: coverWidth }]}
+          >
+            <Text style={styles.kicker}>ARTISTA</Text>
+            <Text numberOfLines={1} style={styles.artist}>
+              {track.artist}
+            </Text>
+          </View>
+          <View style={styles.timeCell}>
+            <Text style={styles.now}>{formatTime(kit.position)}</Text>
+            <Text numberOfLines={1} style={styles.left}>
+              −{formatTime(Math.max(0, kit.duration - kit.position))} ·{' '}
+              {formatTime(kit.duration)}
+            </Text>
+          </View>
+        </View>
 
-      <View style={[styles.tools, { width: inner }]}>
-        <Tool
-          caption="Cola"
-          Icon={ListMusic}
-          label={`Abrir cola de reproducción con ${kit.queueCount} canciones`}
-          onPress={kit.openQueue}
-        />
-        <Tool
-          caption="Letras"
-          Icon={FileText}
-          label={`Abrir letras de ${kit.track.title}`}
-          onPress={kit.openLyrics}
-        />
-        <Tool
-          active={kit.shuffle}
-          caption="Mezcla"
-          disabled={moving}
-          Icon={Shuffle}
-          label={kit.shuffle ? 'Desactivar mezcla' : 'Activar mezcla'}
-          onPress={kit.toggleShuffle}
-        />
-        <Tool
-          active={kit.repeatOn}
-          caption="Repetir"
-          disabled={!kit.ready}
-          Icon={RepeatIcon}
-          label={kit.repeatLabel}
-          onPress={kit.cycleRepeat}
-        />
-        <Tool
-          active={more}
-          caption="Más"
-          Icon={Blocks}
-          label="Más opciones: temporizador, velocidad, ecualizador y acciones"
-          onPress={() => setMore(true)}
-        />
+        <View pointerEvents="none" style={[styles.row, styles.bars]}>
+          {BAR_HEIGHTS.map((barHeight, index) => (
+            <Bar
+              key={index}
+              color={index % 5 === 2 ? hot : colors.text}
+              height={barHeight}
+              index={index}
+              playing={kit.lively}
+            />
+          ))}
+        </View>
+
+        <SeekArea kit={kit} style={[styles.row, styles.seek]}>
+          {Array.from({ length: SEGMENTS }, (_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.segment,
+                index < Math.floor(filled)
+                  ? { backgroundColor: colors.text }
+                  : index === Math.floor(filled)
+                  ? { backgroundColor: hot }
+                  : null,
+              ]}
+            />
+          ))}
+        </SeekArea>
+
+        <View style={[styles.row, styles.transport]}>
+          <Key
+            disabled={moving}
+            label="Canción anterior"
+            onPress={kit.previous}
+            style={[styles.skip, styles.ruleRight]}
+          >
+            <Svg height={30} viewBox="0 0 24 24" width={30}>
+              <Path d="M5 4h3v16H5zM20 4v16L9 12z" fill={colors.text} />
+            </Svg>
+            <Text style={styles.skipText}>ANT.</Text>
+          </Key>
+          <Key
+            disabled={!kit.ready}
+            label={kit.isPlaying ? 'Pausar' : 'Reproducir'}
+            onPress={kit.toggle}
+            style={[styles.play, { backgroundColor: hot }]}
+          >
+            <Svg height={36} viewBox="0 0 24 24" width={36}>
+              <Path
+                d={
+                  kit.isPlaying ? 'M5 4h5v16H5zM14 4h5v16h-5z' : 'M6 3v18l15-9z'
+                }
+                fill={onHot}
+              />
+            </Svg>
+            <Text style={[styles.playText, { color: onHot }]}>
+              {kit.isPlaying ? 'Pausa' : 'Play'}
+            </Text>
+          </Key>
+          <Key
+            disabled={moving}
+            label="Siguiente canción"
+            onPress={kit.next}
+            style={[styles.skip, styles.ruleLeft]}
+          >
+            <Svg height={30} viewBox="0 0 24 24" width={30}>
+              <Path d="M16 4h3v16h-3zM4 4l11 8-11 8z" fill={colors.text} />
+            </Svg>
+            <Text style={styles.skipText}>SIG.</Text>
+          </Key>
+        </View>
+
+        <View style={styles.tools}>
+          {tools.map((tool, index) => {
+            const color = tool.active ? colors.background : colors.text;
+            return (
+              <Key
+                key={tool.key}
+                disabled={tool.disabled}
+                label={tool.label}
+                onPress={tool.onPress}
+                selected={tool.active}
+                style={[
+                  styles.tool,
+                  index < tools.length - 1 && styles.ruleRight,
+                  tool.active && { backgroundColor: colors.text },
+                ]}
+              >
+                <tool.Icon color={color} size={20} strokeWidth={2.8} />
+                <Text numberOfLines={1} style={[styles.toolText, { color }]}>
+                  {tool.caption}
+                </Text>
+              </Key>
+            );
+          })}
+        </View>
       </View>
 
       {more ? <MoreOptions kit={kit} onClose={() => setMore(false)} /> : null}
@@ -676,209 +605,217 @@ export function BrutalPlayer({ covered, headerGesture, onClose }: SkinProps) {
 const useStyles = createStyles(colors => {
   const display = colors.design.fonts.display;
   const label = colors.design.fonts.label;
-  const border = { borderWidth: LINE, borderColor: colors.text };
+  const body = colors.design.fonts.body;
+  const rule = colors.text;
   return {
     player: {
       flex: 1,
-      paddingHorizontal: 16,
-      gap: 12,
+      paddingHorizontal: 12,
       backgroundColor: colors.background,
     },
-    top: { flexDirection: 'row', height: 56, ...border },
-    topCell: { width: 54, alignItems: 'center', justifyContent: 'center' },
-    topLeft: { borderRightWidth: LINE, borderColor: colors.text },
-    topRight: { borderLeftWidth: LINE, borderColor: colors.text },
-    counter: {
+    frame: { flex: 1, borderWidth: RULE, borderColor: rule },
+    row: { borderBottomWidth: RULE, borderColor: rule },
+    ruleRight: { borderRightWidth: RULE, borderColor: rule },
+    ruleLeft: { borderLeftWidth: RULE, borderColor: rule },
+    masthead: { flexDirection: 'row', height: 52 },
+    mastCell: { width: 50, alignItems: 'center', justifyContent: 'center' },
+    mastTitle: {
       flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 12,
+    },
+    brand: {
+      flexShrink: 1,
       color: colors.text,
       fontFamily: display,
-      fontSize: 22,
-      textAlign: 'center',
-      textAlignVertical: 'center',
+      fontSize: 26,
+      lineHeight: 32,
       textTransform: 'uppercase',
-      fontVariant: ['tabular-nums'],
     },
-    stripRow: { alignItems: 'center', paddingTop: 6 },
-    strip: { overflow: 'hidden', ...border },
-    blockCircle: { position: 'absolute', left: '8%' },
+    issue: {
+      color: colors.text,
+      fontFamily: label,
+      fontSize: 11,
+      lineHeight: 14,
+      textAlign: 'right',
+    },
+    issueSub: { fontFamily: body },
+    hero: { flex: 1, minHeight: 190, flexDirection: 'row' },
+    coverCell: {
+      overflow: 'hidden',
+      borderRightWidth: RULE,
+      borderColor: rule,
+      backgroundColor: colors.text,
+    },
+    blockCircle: { position: 'absolute', left: '-15%', top: '20%' },
     blockPost: {
       position: 'absolute',
-      left: '62%',
+      left: '70%',
       top: 0,
       bottom: 0,
-      width: '12%',
-    },
-    blockBar: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 18,
-      height: 14,
+      width: '16%',
     },
     stamp: {
       position: 'absolute',
-      right: 12,
-      top: 12,
+      left: 0,
+      bottom: 0,
       paddingHorizontal: 8,
-      paddingVertical: 1,
-      borderWidth: LINE,
+      paddingVertical: 3,
       fontFamily: display,
-      fontSize: 18,
+      fontSize: 14,
+      lineHeight: 20,
       textTransform: 'uppercase',
-      transform: [{ rotate: '6deg' }],
     },
-    tape: {
-      position: 'absolute',
-      width: 56,
-      height: 20,
-      opacity: 0.85,
-      transform: [{ rotate: '-32deg' }],
-    },
-    tapeLeft: { left: -16, top: -12 },
-    tapeRight: { right: -10, bottom: -12 },
-    titleBox: {
+    headCell: {
       flex: 1,
-      paddingTop: TITLE_ROOM_TOP,
-      justifyContent: 'flex-end',
-      alignItems: 'flex-start',
-      gap: 8,
+      paddingHorizontal: 10,
+      paddingTop: 10,
+      paddingBottom: 8,
+      justifyContent: 'space-between',
+      overflow: 'hidden',
     },
-    title: {
+    kicker: {
+      color: colors.text,
+      fontFamily: body,
+      fontSize: 10,
+      letterSpacing: 1.4,
+    },
+    headline: {
       color: colors.text,
       fontFamily: display,
       textTransform: 'uppercase',
     },
-    titleClip: { alignSelf: 'stretch', overflow: 'hidden' },
-    titleRail: {
-      position: 'absolute',
-      left: 0,
-      top: 0,
-      width: 4000,
-      flexDirection: 'row',
-      alignItems: 'flex-start',
+    info: { flexDirection: 'row', height: 76 },
+    infoCell: {
+      paddingHorizontal: 12,
+      justifyContent: 'center',
+      gap: 4,
     },
     artist: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      backgroundColor: colors.text,
-      color: colors.background,
-      fontFamily: label,
-      fontSize: 16,
+      color: colors.text,
+      fontFamily: display,
+      fontSize: 24,
+      lineHeight: 30,
       textTransform: 'uppercase',
     },
-    bars: {
-      height: 44,
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      gap: 4,
-      borderBottomWidth: LINE,
-      borderColor: colors.text,
-    },
-    times: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'baseline',
-      marginBottom: -6,
+    timeCell: {
+      flex: 1,
+      paddingHorizontal: 10,
+      justifyContent: 'center',
+      gap: 2,
     },
     now: {
       color: colors.text,
       fontFamily: display,
-      fontSize: 24,
+      fontSize: 30,
+      lineHeight: 34,
       fontVariant: ['tabular-nums'],
     },
     left: {
       color: colors.text,
-      fontFamily: label,
-      fontSize: 15,
+      fontFamily: body,
+      fontSize: 12,
       fontVariant: ['tabular-nums'],
     },
-    segments: {
-      height: 40,
+    bars: {
+      height: 50,
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 3,
+      paddingHorizontal: 10,
+      paddingTop: 6,
+    },
+    bar: { flex: 1, transformOrigin: 'bottom' },
+    seek: {
+      height: 44,
       flexDirection: 'row',
       gap: 3,
-      padding: 3,
-      ...border,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
     },
-    segment: { flex: 1 },
-    block: {
-      ...border,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
+    segment: { flex: 1, borderWidth: 2, borderColor: rule },
+    transport: { flexDirection: 'row', height: 112 },
+    skip: { width: 80, alignItems: 'center', justifyContent: 'center', gap: 6 },
+    skipText: {
+      color: colors.text,
+      fontFamily: label,
+      fontSize: 11,
+      letterSpacing: 1.3,
     },
-    dim: { opacity: 0.5 },
-    play: { height: 78, gap: 16, marginRight: SHADOW },
-    playText: { fontFamily: display, fontSize: 40, textTransform: 'uppercase' },
-    skips: {
-      flexDirection: 'row',
-      gap: 12,
-      height: 56,
-      marginTop: 4,
-      marginRight: SHADOW,
-    },
-    skip: { flex: 1, gap: 10 },
-    skipText: { fontFamily: display, fontSize: 22, textTransform: 'uppercase' },
-    tools: {
-      flexDirection: 'row',
-      marginTop: 10,
-      borderTopWidth: LINE,
-      borderLeftWidth: LINE,
-      borderColor: colors.text,
-    },
-    tool: {
+    play: {
       flex: 1,
-      height: 56,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 3,
-      borderRightWidth: LINE,
-      borderBottomWidth: LINE,
-      borderColor: colors.text,
+      gap: 12,
     },
-    toolText: { fontFamily: label, fontSize: 11, textTransform: 'uppercase' },
+    playText: {
+      fontFamily: display,
+      fontSize: 32,
+      lineHeight: 40,
+      textTransform: 'uppercase',
+    },
+    tools: { flexDirection: 'row', height: 66 },
+    tool: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5 },
+    toolText: {
+      fontFamily: label,
+      fontSize: 10,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+    },
+    pressShade: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(0,0,0,0.15)',
+    },
+    dim: { opacity: 0.45 },
     scrim: { backgroundColor: colors.scrim },
     panel: {
       position: 'absolute',
-      left: 16,
-      right: 16 + SHADOW,
+      left: 12,
+      right: 12,
+      borderWidth: RULE,
+      borderColor: rule,
       backgroundColor: colors.background,
-      ...border,
     },
     panelHead: {
       flexDirection: 'row',
       alignItems: 'center',
-      borderBottomWidth: LINE,
-      borderColor: colors.text,
+      borderBottomWidth: RULE,
+      borderColor: rule,
     },
     panelTitle: {
       flex: 1,
-      paddingHorizontal: 16,
+      paddingHorizontal: 14,
       color: colors.text,
       fontFamily: display,
-      fontSize: 26,
+      fontSize: 24,
+      lineHeight: 30,
       textTransform: 'uppercase',
     },
     panelClose: {
-      width: 56,
-      height: 56,
+      width: 54,
+      height: 54,
       alignItems: 'center',
       justifyContent: 'center',
-      borderLeftWidth: LINE,
-      borderColor: colors.text,
+      borderLeftWidth: RULE,
+      borderColor: rule,
     },
     panelRow: {
-      minHeight: 58,
-      paddingHorizontal: 16,
+      minHeight: 54,
+      paddingHorizontal: 14,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderBottomWidth: LINE,
-      borderColor: colors.text,
+      borderBottomWidth: RULE,
+      borderColor: rule,
     },
-    panelLabel: { fontFamily: label, fontSize: 17, textTransform: 'uppercase' },
+    panelLabel: { fontFamily: label, fontSize: 15, textTransform: 'uppercase' },
     panelValue: {
       fontFamily: display,
-      fontSize: 20,
+      fontSize: 18,
+      lineHeight: 24,
       textTransform: 'uppercase',
     },
   };

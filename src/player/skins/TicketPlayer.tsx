@@ -254,8 +254,8 @@ function Stub({
   const tear = useSharedValue(0);
   const lift = useAnimatedStyle(() => ({
     transform: [
-      { translateY: -10 * tear.value },
-      { rotate: `${tilt * tear.value}deg` },
+      { translateY: -5 * tear.value },
+      { rotate: `${tilt * 0.55 * tear.value}deg` },
     ],
   }));
   return (
@@ -275,7 +275,7 @@ function Stub({
           if (!reduced) {
             tear.value = withSequence(
               withTiming(1, { duration: 110, easing: Easing.out(Easing.quad) }),
-              withSpring(0, { damping: 9, stiffness: 180 }),
+              withSpring(0, { damping: 16, stiffness: 200 }),
             );
           }
           onPress();
@@ -496,34 +496,39 @@ export function TicketPlayer({ covered, headerGesture, onClose }: SkinProps) {
     }
   }, [kit.lively, reduced, shine]);
 
-  // A new song: the stub tears off and falls, the new ticket slides in from the
-  // right, the stub rises to join it, then it is stamped. All on the UI thread.
+  // A new song: the stub tears loose and drops a little, the new ticket eases
+  // in from the right, the stub settles back into place, then it is stamped.
+  // Small, smooth moves with no bounce, all on the UI thread.
   useTrackChange(kit.track?.id, () => {
     if (reduced) return;
     fall.value = withSequence(
-      withTiming(1, { duration: 300, easing: Easing.in(Easing.quad) }),
-      withDelay(500, withSpring(0, { damping: 11, stiffness: 140 })),
+      withTiming(1, { duration: 260, easing: Easing.out(Easing.quad) }),
+      withDelay(
+        320,
+        withTiming(0, { duration: 380, easing: Easing.inOut(Easing.cubic) }),
+      ),
     );
     enter.value = withSequence(
-      withDelay(300, withTiming(1, { duration: 0 })),
-      withTiming(0, { duration: 480, easing: Easing.out(Easing.cubic) }),
+      withDelay(220, withTiming(1, { duration: 0 })),
+      withTiming(0, { duration: 420, easing: Easing.out(Easing.cubic) }),
     );
     stamp.value = withSequence(
       withTiming(0, { duration: 0 }),
       withDelay(
-        1200,
+        1000,
         withTiming(1, { duration: 220, easing: Easing.in(Easing.quad) }),
       ),
     );
   });
 
   const ticketStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: enter.value * (width + 40) }],
+    opacity: 1 - enter.value * 0.6,
+    transform: [{ translateX: enter.value * width * 0.28 }],
   }));
   const stubStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: fall.value * 380 },
-      { rotate: `${fall.value * 14}deg` },
+      { translateY: fall.value * 60 },
+      { rotate: `${fall.value * 5}deg` },
     ],
   }));
   const foilStyle = useAnimatedStyle(() => ({
@@ -720,7 +725,7 @@ export function TicketPlayer({ covered, headerGesture, onClose }: SkinProps) {
                 ]}
                 tilt={0}
               >
-                <Svg height={28} viewBox="0 0 24 24" width={28}>
+                <Svg height={22} viewBox="0 0 24 24" width={22}>
                   <Path
                     d={
                       kit.isPlaying
@@ -730,7 +735,10 @@ export function TicketPlayer({ covered, headerGesture, onClose }: SkinProps) {
                     fill={paper}
                   />
                 </Svg>
-                <Text style={[local.playText, { color: paper }]}>
+                <Text
+                  numberOfLines={1}
+                  style={[local.playText, { color: paper }]}
+                >
                   {kit.isPlaying ? 'PAUSA' : 'ENTRAR'}
                 </Text>
               </Stub>
@@ -956,9 +964,9 @@ const useStyles = createStyles(colors => {
       justifyContent: 'center',
       gap: 4,
     },
-    playStub: { flexDirection: 'row', gap: 10 },
+    playStub: { flexDirection: 'row', gap: 9 },
     stubText: { fontFamily: monoBold, fontSize: 11, letterSpacing: 1.3 },
-    playText: { fontFamily: slab, fontSize: 20, letterSpacing: 0.8 },
+    playText: { fontFamily: slab, fontSize: 15, letterSpacing: 2.2 },
     notch: {
       position: 'absolute',
       top: -11,

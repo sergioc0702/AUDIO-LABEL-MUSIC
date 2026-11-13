@@ -1039,6 +1039,8 @@ test.each([
       'tornamesa',
       'mixtape',
       'taquilla',
+      'pixel',
+      'vaporwave',
     ].includes(id)
   ) {
     const labels = renderer.root
@@ -1288,6 +1290,89 @@ test('the Taquilla ticket shows the cover as its poster and keeps working across
   await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
   expect(hasLabel('Velocidad: 1×')).toBe(true);
   expect(hasLabel('Más acciones de la canción: ›')).toBe(true);
+});
+
+test('the Pixel console labels every button and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'pixel' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  // The cover is on the cartridge label.
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  ['COLA', 'LETRAS', 'ANT', 'SIG', 'MÁS', 'MEZCLA', 'REPETIR'].forEach(tag =>
+    expect(screenText()).toContain(tag),
+  );
+  [
+    'Pantalla de juego con un personaje que camina mientras suena la música',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+  expect(screenText()).toContain('NIVEL');
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+});
+
+test('the Vaporwave player floats the cover and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'vaporwave' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  // The cover floats over the horizon (and shows in its reflection).
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  ['COLA', 'LETRAS', 'MEZCLA', 'REPETIR', 'MÁS', 'REW', 'FF'].forEach(tag =>
+    expect(screenText()).toContain(tag),
+  );
+  [
+    'Atardecer vaporwave con una cuadrícula que avanza',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
 });
 
 test('marks favorites from the player', async () => {
