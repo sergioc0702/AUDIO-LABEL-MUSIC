@@ -84,4 +84,3 @@ desinstalar, y eso borra listas, favoritas e historial.
 - `src/native/` y `android/app/`: acceso a MediaStore y base de datos Room.
 - `android/kotlin-audio/`: copia local de KotlinAudio (licencia Apache 2.0, en su
   carpeta) con el ecualizador por software y correcciones de la cola.
-- `PRODUCT.md`: qué es el producto y para quién.

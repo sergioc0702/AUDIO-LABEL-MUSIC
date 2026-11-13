@@ -81,3 +81,15 @@ yarn-error.log
 /.impeccable/mocks/
 /.impeccable/questions/
 /.impeccable/review/
+
+# Notas, prototipos y configuración de herramientas (solo en este PC)
+docs/
+.codex/
+.cursor/
+.gemini/
+.impeccable/
+.vscode/
+.claude/
+DESIGN.md
+PRODUCT.md
+MiMusica.apk
