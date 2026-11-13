@@ -925,7 +925,7 @@ test('shows the theme in the settings', async () => {
 
   expect(hasLabel('Cerrar temas')).toBe(true);
   expect(hasLabel('Lista desplazable de temas disponibles')).toBe(true);
-  expect(hasLabel('Playa')).toBe(true);
+  expect(hasLabel('Nave espacial')).toBe(true);
 });
 
 test('opens with the saved palette', async () => {
@@ -993,37 +993,22 @@ test.each([
   ['Tornamesa', 'Cambiar la posición de la canción', 'tornamesa'],
   ['Mixtape', 'Contador de cinta 0:00', 'mixtape'],
   ['Taquilla', 'Código de barras. Toca para cambiar la posición', 'taquilla'],
-  ['Acuario', 'Cambiar la posición de la canción', 'acuario'],
   [
-    'Radio de bulbos',
-    'Dial de estaciones. Toca para sintonizar la siguiente canción',
-    'radiobulbos',
+    'Pixel',
+    'Pantalla de juego con un personaje que camina mientras suena la música',
+    'pixel',
   ],
-  ['Pixel', 'Cambiar la posición de la canción', 'pixel'],
-  ['Acuarela', 'Cambiar la posición de la canción', 'acuarela'],
-  ['Neón de bar', 'Volumen del teléfono', 'neonbar'],
-  ['Constelación', 'Tu cola convertida en constelación', 'constelacion'],
-  ['Jardín', 'Planta que crece con la canción y florece al final', 'jardin'],
-  ['Origami', 'Grulla de papel que se dobla con cada canción', 'origami'],
-  ['Cyberpunk', 'Ciudad cyberpunk con lluvia', 'cyberpunk'],
-  ['Vaporwave', 'Atardecer vaporwave con cuadrícula', 'vaporwave'],
-  ['Manga', 'Viñetas de manga que laten con la música', 'manga'],
-  ['Steampunk', 'Engranajes de vapor que giran con la música', 'steampunk'],
-  ['Nave espacial', 'Ventana de una nave espacial', 'naveespacial'],
-  ['Y2K', 'Disco tornasol que gira sobre un fondo holográfico', 'y2k'],
-  ['Western', 'Cartel de se busca en el desierto', 'western'],
   [
-    'Fantasía medieval',
-    'Orbe mágico dentro de un círculo de runas',
-    'fantasiamedieval',
+    'Vaporwave',
+    'Atardecer vaporwave con una cuadrícula que avanza',
+    'vaporwave',
   ],
-  ['Lo-fi', 'Cuarto acogedor con lluvia en la ventana', 'lofi'],
+  ['Manga', 'Viñeta de acción que late con la música', 'manga'],
   [
-    'Terror gótico',
-    'Castillo bajo la luna con murciélagos y velas',
-    'terrorgotico',
+    'Nave espacial',
+    'Ventana de la nave con estrellas y un planeta',
+    'naveespacial',
   ],
-  ['Playa', 'Playa con olas, un velero y gaviotas', 'playa'],
 ])('the %s theme brings its own player', async (theme, part, id) => {
   const tracks = [makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
@@ -1065,27 +1050,6 @@ test.each([
       'Más acciones para Tema 1',
     ].forEach(label => expect(hasLabel(label)).toBe(true));
   }
-});
-
-test('Neón de bar adjusts the phone media volume from its accessible slider', async () => {
-  const tracks = [makeTrack('1')];
-  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
-  jest
-    .mocked(getStoredAppearance)
-    .mockResolvedValueOnce({ themeId: 'neonbar' });
-  setActive(tracks[0]);
-  await renderApp();
-  await press('Abrir reproductor: Tema 1 de Artista');
-  await settle();
-  const slider = renderer.root.find(
-    node => node.props.accessibilityLabel === 'Volumen del teléfono',
-  );
-  await ReactTestRenderer.act(async () => {
-    slider.props.onAccessibilityAction({
-      nativeEvent: { actionName: 'increment' },
-    });
-  });
-  expect(setMediaVolume).toHaveBeenLastCalledWith(expect.closeTo(0.25, 5));
 });
 
 test('the Kawaii dog asks for more volume when it is low', async () => {

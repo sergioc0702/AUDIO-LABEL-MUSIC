@@ -89,7 +89,8 @@ export function useSceneClock(
   {
     boost = 3,
     changeSeconds = 1.4,
-  }: { boost?: number; changeSeconds?: number } = {},
+    baseWidth = W,
+  }: { boost?: number; changeSeconds?: number; baseWidth?: number } = {},
 ): SceneClock {
   const reduced = useReducedMotion();
   const wall = useSharedValue(0);
@@ -153,7 +154,7 @@ export function useSceneClock(
     unit,
     reduced,
     onLayout: event => {
-      unit.value = Math.max(0.1, event.nativeEvent.layout.width / W);
+      unit.value = Math.max(0.1, event.nativeEvent.layout.width / baseWidth);
     },
   };
 }
@@ -197,19 +198,38 @@ export function SceneBox({
 }
 
 /** A full-size SVG layer in scene units. */
-export function Layer({ children }: { children: ReactNode }) {
+export function Layer({
+  children,
+  w = W,
+  h = H,
+}: {
+  children: ReactNode;
+  w?: number;
+  h?: number;
+}) {
   const styles = useStyles();
   return (
     <Svg
       height="100%"
       pointerEvents="none"
       style={styles.layer}
-      viewBox={`0 0 ${W} ${H}`}
+      viewBox={`0 0 ${w} ${h}`}
       width="100%"
     >
       {children}
     </Svg>
   );
+}
+
+/** Like `place`, for a scene drawn in a box of bw×bh units. */
+export function placeIn(bw: number, bh: number) {
+  return (x: number, y: number, w: number, h: number) => ({
+    position: 'absolute' as const,
+    left: `${(x / bw) * 100}%` as const,
+    top: `${(y / bh) * 100}%` as const,
+    width: `${(w / bw) * 100}%` as const,
+    height: `${(h / bh) * 100}%` as const,
+  });
 }
 
 /** Places a child view of scene size w×h with its top-left at x,y. */

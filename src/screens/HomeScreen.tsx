@@ -23,7 +23,6 @@ import { SectionHeader } from '../ui/Rows';
 import { Tap } from '../ui/Tap';
 import { groupAlbums, groupArtists } from '../utils/collections';
 import { shuffleTracks } from '../utils/shuffleQueue';
-import { ThemeHomeArt } from './ThemeHomeArt';
 
 function greeting() {
   const hour = new Date().getHours();
@@ -268,8 +267,6 @@ export function HomeScreen() {
           <Settings color={colors.text} size={24} />
         </IconButton>
       </View>
-
-      <ThemeHomeArt />
 
       {permissionDenied ? (
         <View style={styles.notice}>
