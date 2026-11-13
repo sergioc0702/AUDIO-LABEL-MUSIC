@@ -115,14 +115,14 @@ internal class SoftwareEqualizerAudioProcessor : AudioProcessor {
         val settings = SoftwareEqualizer.snapshot()
         if (!settings.enabled || settings.bandGainsDb.all { it == 0f }) {
             resetFilterStates()
-            outputBuffer = input
+            passThrough(input)
             return
         }
 
         val bytesPerSample =
             if (encoding == C.ENCODING_PCM_16BIT) Short.SIZE_BYTES else Float.SIZE_BYTES
         if (input.remaining() % bytesPerSample != 0) {
-            outputBuffer = input
+            passThrough(input)
             return
         }
         prepareFilters(settings.bandGainsDb)
@@ -219,6 +219,18 @@ internal class SoftwareEqualizerAudioProcessor : AudioProcessor {
             a1 = (-2f * cosine) / a0,
             a2 = (1f - alpha / amplitude) / a0,
         )
+    }
+
+    /**
+     * Copies the samples unchanged into this processor's own buffer. The input
+     * cannot be handed back as output: queueInput marks it consumed, so the
+     * decoder reuses that memory for the next chunk while the audio track may
+     * still be playing the previous one, which garbles the sound.
+     */
+    private fun passThrough(input: ByteBuffer) {
+        val output = replaceOutputBuffer(input.remaining())
+        output.put(input)
+        output.flip()
     }
 
     private fun replaceOutputBuffer(size: Int): ByteBuffer {

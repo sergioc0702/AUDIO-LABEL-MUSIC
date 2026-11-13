@@ -38,6 +38,37 @@ class SoftwareEqualizerAudioProcessorTest {
         assertEquals(-1_234, output.short.toInt())
     }
 
+    /**
+     * Once queueInput consumes a buffer, the decoder reuses it for the next
+     * chunk of the song. Output still waiting to be played must not change
+     * when that happens, or flat or disabled playback sounds garbled.
+     */
+    @Test
+    fun outputSurvivesTheDecoderReusingTheInputBuffer() {
+        listOf(
+            false to List(EQUALIZER_BAND_COUNT) { 0f },
+            true to List(EQUALIZER_BAND_COUNT) { 0f },
+        ).forEach { (enabled, gains) ->
+            SoftwareEqualizer.update(enabled, gains)
+            processor.configure(AudioProcessor.AudioFormat(44_100, 2, C.ENCODING_PCM_16BIT))
+            val input = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN)
+                .putShort(1_234)
+                .putShort(-1_234)
+            input.flip()
+
+            processor.queueInput(input)
+            assertEquals(input.limit(), input.position())
+            val output = processor.getOutput().order(ByteOrder.LITTLE_ENDIAN)
+            // The decoder writes the next chunk into the same memory.
+            input.clear()
+            input.putShort(9_999).putShort(9_999)
+
+            assertEquals(1_234, output.short.toInt())
+            assertEquals(-1_234, output.short.toInt())
+            processor.reset()
+        }
+    }
+
     @Test
     fun enabledBandBoostsMatchingSignalRelativeToOtherBands() {
         SoftwareEqualizer.update(true, listOf(12f, 0f, 0f, 0f, 0f))

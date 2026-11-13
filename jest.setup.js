@@ -16,7 +16,8 @@ jest.mock('react-native-reanimated', () => {
       FlatList,
       createAnimatedComponent: Component => Component,
     },
-    Easing,
+    // React Native's Easing has no steps(); Reanimated's does.
+    Easing: { ...Easing, steps: () => t => t },
     ReduceMotion: { System: 'system' },
     useSharedValue: value => React.useRef({ value }).current,
     useAnimatedStyle: read => read(),
@@ -28,6 +29,10 @@ jest.mock('react-native-reanimated', () => {
     scrollTo: jest.fn(),
     cancelAnimation: jest.fn(),
     withTiming: (value, _config, onFinish) => {
+      onFinish?.(true);
+      return value;
+    },
+    withSpring: (value, _config, onFinish) => {
       onFinish?.(true);
       return value;
     },

@@ -55,6 +55,8 @@ function Shortcut({
 
   if (variant === 'rows') {
     const hot = index === 1;
+    // The ink made for the hot color; `control` can be the very same color.
+    const hotInk = colors.skin.onHot ?? colors.onControl;
     return (
       <Tap
         {...press}
@@ -62,11 +64,11 @@ function Shortcut({
       >
         <Text
           numberOfLines={1}
-          style={[type.headline, hot && { color: colors.control }]}
+          style={[type.headline, hot && { color: hotInk }]}
         >
           {label}
         </Text>
-        <Icon color={hot ? colors.control : colors.text} size={26} />
+        <Icon color={hot ? hotInk : colors.text} size={26} />
       </Tap>
     );
   }

@@ -16,6 +16,7 @@ import {
   createPlaylist,
   deletePlaylist,
   deleteTrackFromDevice,
+  getPixelCover,
   getDeviceTracks,
   getEqualizerSettings,
   getPlaybackRate,
@@ -160,6 +161,7 @@ jest.mock('../src/native/musicLibrary', () => ({
   storeLyrics: jest.fn().mockResolvedValue(undefined),
   removeStoredLyrics: jest.fn().mockResolvedValue(undefined),
   importLrcFile: jest.fn().mockResolvedValue(null),
+  getPixelCover: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('react-native-safe-area-context', () => {
@@ -1085,6 +1087,207 @@ test('the Kawaii dog asks for more volume when it is low', async () => {
   expect(hasLabel('Velocidad: 1×')).toBe(true);
   expect(hasLabel('Ecualizador: Apagado')).toBe(true);
   jest.mocked(usePlaybackState).mockReturnValue({ state: 'none' } as never);
+});
+
+test('the Brutalista player keeps working across a song change', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'brutalista' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  [
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+    'Siguiente canción',
+    'Canción anterior',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  // A new song: the title types itself in and everything else stays usable.
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+  await settle();
+  expect(screenText()).toContain('Tema 2');
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  expect(hasLabel('Más acciones de la canción: ›')).toBe(true);
+});
+
+test('the Terminal player draws a pixel cover and survives a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'terminal' });
+  jest
+    .mocked(getPixelCover)
+    .mockResolvedValueOnce('file:///cache/pixel-covers/1.png');
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+  await settle();
+
+  expect(getPixelCover).toHaveBeenCalledWith(
+    'file:///covers/1.jpg',
+    64,
+    expect.any(String),
+    expect.any(String),
+  );
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///cache/pixel-covers/1.png',
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(hasLabel('Forma de la canción. Toca para cambiar la posición')).toBe(
+    true,
+  );
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+  expect(screenText()).toContain('reproduciendo "Tema 2"');
+  // The second song has no cover, so the box says so.
+  expect(screenText()).toContain('[ sin portada ]');
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+});
+
+test('the Tornamesa deck plays from START and keeps its mixer across a song change', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'tornamesa' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  // START · STOP is the player's only play button (the mini player's own
+  // button, wrapped in Tap, stays mounted underneath).
+  const name = (node: ReactTestRenderer.ReactTestInstance | null) =>
+    !node || typeof node.type === 'string'
+      ? node?.type
+      : (node.type as { displayName?: string; name?: string }).displayName ??
+        (node.type as { name?: string }).name;
+  const playButtons = renderer.root.findAll(
+    node =>
+      ['Pausar', 'Reproducir'].includes(node.props.accessibilityLabel) &&
+      name(node) === 'Pressable' &&
+      name(node.parent) !== 'Tap',
+  );
+  expect(playButtons).toHaveLength(1);
+  expect(screenText()).toContain('START · STOP');
+  [
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir ecualizador',
+    'Velocidad de reproducción 1×',
+    'Canción anterior',
+    'Siguiente canción',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+  expect(screenText()).toContain('Tema 2');
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Más acciones de la canción: ›')).toBe(true);
+});
+
+test('the Mixtape walkman shows the cover on the cassette and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'mixtape' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  // The cover is taped to the cassette label.
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  [
+    'Contador de cinta 0:00',
+    'Canción anterior',
+    'Reproducir',
+    'Pausar',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+  expect(screenText()).toContain('Tema 2');
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+});
+
+test('the Taquilla ticket shows the cover as its poster and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'taquilla' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(screenText()).toContain('ADMITIDO');
+  [
+    'Código de barras. Toca para cambiar la posición',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+  expect(screenText()).toContain('Tema 2');
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Más acciones de la canción: ›')).toBe(true);
 });
 
 test('marks favorites from the player', async () => {

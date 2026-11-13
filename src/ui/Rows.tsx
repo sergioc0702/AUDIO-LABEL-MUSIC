@@ -195,7 +195,15 @@ export function SectionHeader({
   const styles = useStyles();
   return (
     <View style={styles.section}>
-      <Text style={type.headline}>{title}</Text>
+      {/* Big theme fonts shrink the title so the action always fits beside it. */}
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+        numberOfLines={1}
+        style={[type.headline, styles.sectionTitle]}
+      >
+        {title}
+      </Text>
       {action && onAction ? (
         <Tap
           accessibilityRole="button"
@@ -203,7 +211,9 @@ export function SectionHeader({
           hitSlop={14}
           onPress={onAction}
         >
-          <Text style={type.secondary}>{action}</Text>
+          <Text numberOfLines={1} style={type.secondary}>
+            {action}
+          </Text>
         </Tap>
       ) : null}
     </View>
@@ -256,8 +266,10 @@ const useStyles = createStyles(colors => ({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: spacing.md,
     paddingBottom: spacing.md,
     paddingHorizontal: screenPadding,
     paddingTop: spacing.xl,
   },
+  sectionTitle: { flexShrink: 1 },
 }));

@@ -60,7 +60,10 @@ function typeValuesFor(colors: Palette) {
       value.textTransform = 'uppercase';
     }
     if (family && fontSize >= 28) {
-      value.lineHeight = Math.round(fontSize * 1.08);
+      // Accents and the tilde on capitals (Á, Ñ) sit above the cap height,
+      // so uppercase text needs more room or Android clips them.
+      const leading = value.textTransform === 'uppercase' ? 1.2 : 1.08;
+      value.lineHeight = Math.round(fontSize * leading);
     }
     return [role, value] as const;
   });

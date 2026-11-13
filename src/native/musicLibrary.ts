@@ -34,6 +34,12 @@ type MusicLibraryModule = {
   getLyrics(trackId: string): Promise<string | null>;
   saveLyrics(trackId: string, contents: string): Promise<void>;
   deleteLyrics(trackId: string): Promise<void>;
+  getPixelCover(
+    uri: string,
+    size: number,
+    dark: string,
+    light: string,
+  ): Promise<string | null>;
   getMediaVolume(): Promise<MediaVolume>;
   setMediaVolume(level: number): Promise<MediaVolume>;
   startVolumeUpdates(): void;
@@ -259,6 +265,21 @@ export function importLrcFile(): Promise<string | null> {
     throw new Error('El módulo nativo de música no está disponible.');
   }
   return musicLibrary.importLyricsFile();
+}
+
+/**
+ * A pixel-art copy of a cover in shades between two colors, as a cached image
+ * file URI. Null when the cover cannot be read.
+ */
+export function getPixelCover(
+  uri: string,
+  size: number,
+  dark: string,
+  light: string,
+): Promise<string | null> {
+  return (
+    musicLibrary?.getPixelCover(uri, size, dark, light) ?? Promise.resolve(null)
+  );
 }
 
 export function getStoredLyrics(trackId: string): Promise<string | null> {
