@@ -92,7 +92,7 @@ import {
 } from '../utils/shuffleQueue';
 
 export const playbackRates = [0.75, 1, 1.25, 1.5, 2];
-export const equalizerBandCount = 5;
+const equalizerBandCount = 5;
 export const shortAudioSeconds = 30;
 
 const hideShortAudioKey = 'hideShortAudio';

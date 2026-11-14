@@ -40,6 +40,7 @@ jest.mock('react-native-reanimated', () => {
     withSequence: (...values) => values[values.length - 1],
     withDelay: (_delay, value) => value,
     useAnimatedProps: read => read(),
+    useDerivedValue: read => ({ value: read() }),
   };
 });
 

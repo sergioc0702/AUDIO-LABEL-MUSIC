@@ -22,8 +22,16 @@ export const Cover = memo(function CoverImage({
       : colors.design.radius.sm,
     height: size,
     width: size,
-    // Brutalist covers are framed like everything else in that theme.
-    borderWidth: colors.design.line >= 3 && size >= 56 ? colors.design.line : 0,
+    // Brutalist covers are framed like everything else in that theme, and
+    // Manga covers like a panel, with a thin ink line.
+    borderWidth:
+      size < 56
+        ? 0
+        : colors.design.line >= 3
+        ? colors.design.line
+        : colors.design.player === 'manga'
+        ? 2
+        : 0,
     borderColor: colors.text,
   };
 

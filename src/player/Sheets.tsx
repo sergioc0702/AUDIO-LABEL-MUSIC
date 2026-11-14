@@ -20,7 +20,7 @@ import { findOnlineLyrics } from '../services/lyricsSearch';
 import { storeLyrics } from '../native/musicLibrary';
 import { useApp } from '../state/AppContext';
 import { playbackRates } from '../state/useMusicController';
-import { appThemes } from '../theme/themes';
+import { appThemes } from '../themes/catalog';
 import { spacing, createStyles, useColors } from '../theme/theme';
 import { Button } from '../ui/Buttons';
 import { Sheet, SheetAction } from '../ui/Sheet';

@@ -19,9 +19,11 @@ vuelve a abrir si cambia.
   el mini-reproductor, se cierra deslizando hacia abajo y la carátula cambia de
   canción al deslizarla a los lados.
 - **Temas y paletas de colores:** en Ajustes se elige el diseño Estándar o uno de
-  diez temas: Kawaii, Brutalista, Terminal, Tornamesa, Mixtape, Taquilla, Pixel,
-  Vaporwave, Manga y Nave espacial. Cada tema tiene su propio reproductor animado y
-  seis paletas de colores; la paleta colorea toda la app.
+  quince temas: Kawaii, Brutalista, Terminal, Tornamesa, Mixtape, Taquilla, Pixel,
+  Vaporwave, Manga, Nave espacial, Constelación, Cyberpunk, Terror, Bloques y
+  Poder. Cada tema tiene su propio reproductor animado, sus fuentes, su inicio,
+  sus pestañas, su mini-reproductor y seis paletas de colores; la paleta colorea
+  toda la app.
 - **Letras sincronizadas:** al abrir Letras, la app busca gratis la letra de la
   canción en LRCLIB (lrclib.net) y la guarda para usarla sin internet. Si trae
   tiempos, avanza con la música y tocar una línea salta a esa parte; también se
@@ -70,16 +72,21 @@ desinstalar, y eso borra listas, favoritas e historial.
 
 ## Organización del código
 
-- `App.tsx`: estructura general, pestañas y avisos.
+- `App.tsx`: estructura general: pantallas, mini-reproductor, pestañas y hojas.
 - `src/state/useMusicController.ts`: toda la lógica de biblioteca, cola y listas,
   sin interfaz. `src/state/AppContext.tsx`: navegación y estado compartido.
 - `src/screens/`: Inicio, Buscar, Biblioteca, detalle y Ajustes.
-- `src/player/`: reproductor, mini-reproductor, cola, ecualizador, temporizador y
-  menús.
-- `src/theme/themes.ts`: temas y sus paletas. Una paleta nueva es una entrada en su
-  tema; un tema nuevo trae su propio conjunto de paletas. `src/theme/theme.ts` da los
-  colores activos con `useColors` y `createStyles`.
-- `src/ui/`: componentes reutilizables. `src/theme/theme.ts`: colores y tipografía.
+- `src/navigation/TabBar.tsx`: la barra de pestañas.
+- `src/player/`: lo común a todos los reproductores: la ventana, el
+  mini-reproductor, la cola, el ecualizador, el temporizador y los menús.
+  `src/player/kit/` reúne lo que usan los reproductores con tema (datos y
+  acciones, reloj de animación, marquesina).
+- `src/theme/`: el motor de temas: los tipos (`types.ts`), los ayudantes de
+  diseño (`design.ts`) y `useColors` / `createStyles` (`theme.ts`).
+- `src/themes/`: un tema por carpeta. Cada una tiene `theme.ts` (nombre, diseño y
+  seis paletas), su reproductor y sus ayudantes. `src/themes/catalog.ts` decide
+  qué temas hay y en qué orden. Cómo añadir uno: ver `AGENTS.md`.
+- `src/ui/`: componentes reutilizables.
 - `src/services/`: reproductor, sesión guardada y temporizador.
 - `src/native/` y `android/app/`: acceso a MediaStore y base de datos Room.
 - `android/kotlin-audio/`: copia local de KotlinAudio (licencia Apache 2.0, en su

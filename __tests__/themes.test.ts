@@ -2,7 +2,7 @@ import {
   appThemes,
   defaultAppearance,
   resolveAppearance,
-} from '../src/theme/themes';
+} from '../src/themes/catalog';
 
 function luminance(hex: string) {
   const channels = [1, 3, 5].map(start => {

@@ -17,7 +17,7 @@ import { Tap } from './Tap';
 export const trackRowHeight = 64;
 const restingBars = [0.45, 0.9, 0.6];
 
-export function NowPlayingBars({ isPlaying }: { isPlaying: boolean }) {
+function NowPlayingBars({ isPlaying }: { isPlaying: boolean }) {
   const styles = useStyles();
   const reducedMotion = useReducedMotion();
   const bars = useRef([

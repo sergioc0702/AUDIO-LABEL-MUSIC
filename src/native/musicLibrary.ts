@@ -1,5 +1,5 @@
 import { NativeModules } from 'react-native';
-import type { Appearance } from '../theme/themes';
+import type { Appearance } from '../themes/catalog';
 import type {
   Playlist,
   RecentPlayback,

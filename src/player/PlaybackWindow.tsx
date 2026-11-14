@@ -26,7 +26,7 @@ import { useApp } from '../state/AppContext';
 import { createStyles, spacing, useColors } from '../theme/theme';
 import { IconButton } from '../ui/Buttons';
 import { Snackbar } from '../ui/Snackbar';
-import { ThemedPlayer } from './skins';
+import { ThemedPlayer } from './ThemedPlayer';
 import { acceptsSwipe, playerMotion } from './playerMotion';
 import {
   EqualizerSheet,

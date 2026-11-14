@@ -98,7 +98,7 @@ export function parseM3u(contents: string): {
   return { entries, malformedLines };
 }
 
-export function resolveM3uEntries(
+function resolveM3uEntries(
   entries: M3uEntry[],
   tracks: Track[],
 ): PlaylistImportResult {

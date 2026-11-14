@@ -14,10 +14,9 @@ import { ColorsContext } from '../theme/theme';
 import {
   defaultAppearance,
   resolveAppearance,
-  type AppTheme,
   type Appearance,
-  type Palette,
-} from '../theme/themes';
+} from '../themes/catalog';
+import type { AppTheme, Palette } from '../theme/types';
 import type { Playlist, Track } from '../types/Track';
 import type { CollectionRef } from '../utils/collections';
 import { useMusicController, type MusicController } from './useMusicController';

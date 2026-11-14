@@ -1010,12 +1010,17 @@ test.each([
     'Atardecer vaporwave con una cuadrícula que avanza',
     'vaporwave',
   ],
-  ['Manga', 'Viñeta de acción que late con la música', 'manga'],
+  ['Manga', 'Página de manga con la portada y líneas de acción', 'manga'],
   [
     'Nave espacial',
-    'Ventana de la nave con estrellas y un planeta',
+    'Parabrisas de la nave: el planeta de destino es la portada',
     'naveespacial',
   ],
+  ['Constelación', 'Portada de Tema 1', 'constelacion'],
+  ['Cyberpunk', 'Portada de Tema 1', 'cyberpunk'],
+  ['Terror', 'Portada de Tema 1', 'terror'],
+  ['Bloques', 'Portada de Tema 1', 'bloques'],
+  ['Poder', 'Portada de Tema 1', 'poder'],
 ])('the %s theme brings its own player', async (theme, part, id) => {
   const tracks = [makeTrack('1')];
   jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
@@ -1041,6 +1046,13 @@ test.each([
       'taquilla',
       'pixel',
       'vaporwave',
+      'manga',
+      'naveespacial',
+      'constelacion',
+      'cyberpunk',
+      'terror',
+      'bloques',
+      'poder',
     ].includes(id)
   ) {
     const labels = renderer.root
@@ -1373,6 +1385,495 @@ test('the Vaporwave player floats the cover and keeps working across a song chan
   expect(hasLabel('Ecualizador: Apagado')).toBe(true);
   await press('Velocidad: 1×');
   expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the Manga player shows the cover in a page and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'manga' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  ['CAPÍTULO 1', 'COLA', 'LETRAS', 'MEZCLA', 'REPETIR', 'MÁS'].forEach(tag =>
+    expect(screenText()).toContain(tag),
+  );
+  [
+    'Página de manga con la portada y líneas de acción',
+    'Cerrar reproductor',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  // The second song has no cover: the player draws one in the palette.
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(screenText()).toContain('EXTRAS');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the Manga theme turns the home, the tabs and the mini player into manga panels', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'manga' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Tus listas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  expect(hasLabel('Inicio')).toBe(true);
+  await press('Buscar');
+  expect(hasLabel('Buscar')).toBe(true);
+});
+
+test('the spaceship player flies to the cover and keeps working across a jump', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'naveespacial' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  // The planet rolls, so the cover is drawn twice at the same size.
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  [
+    'DESTINO',
+    'ACELERADOR',
+    'COLA',
+    'LETRAS',
+    'MEZCLA',
+    'REPETIR',
+    'MÁS',
+  ].forEach(tag => expect(screenText()).toContain(tag));
+  [
+    'Parabrisas de la nave: el planeta de destino es la portada',
+    'Cerrar reproductor',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(screenText()).toContain('SISTEMAS AUXILIARES');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the spaceship theme gives the home, the tabs and the mini player a console look', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'naveespacial' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  expect(screenText()).toContain('FAVORITAS');
+  expect(hasLabel('Mezclar todo')).toBe(true);
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  await press('Biblioteca');
+  expect(hasLabel('Inicio')).toBe(true);
+});
+
+test('the Pixel theme turns the home into cartridges and the mini player into a handheld', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'pixel' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Más escuchadas', 'Tus listas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  // The round A and B buttons keep the usual labels.
+  expect(hasLabel('Siguiente canción')).toBe(true);
+  expect(hasLabel('Pausar') || hasLabel('Reproducir')).toBe(true);
+  await press('Buscar');
+  expect(hasLabel('Inicio')).toBe(true);
+});
+
+test('the Vaporwave theme gives the home sunsets and the mini player a VCR display', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'vaporwave' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Añadidas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(screenText()).toMatch(/▶ PLAY|❚❚ PAUSA/);
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  await press('Biblioteca');
+  expect(hasLabel('Inicio')).toBe(true);
+});
+
+test('the star animal of Constelación lives over the cover and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'constelacion' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(screenText()).toContain('Bestiario celeste');
+  const labels = renderer.root
+    .findAll(node => typeof node.props.accessibilityLabel === 'string')
+    .map(node => node.props.accessibilityLabel as string);
+  expect(labels.some(label => label.startsWith('Despertar a '))).toBe(true);
+  expect(
+    labels.some(label => label.startsWith('Abrir cola de reproducción con ')),
+  ).toBe(true);
+  [
+    'Portada de Tema 1',
+    'Cerrar reproductor',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(screenText()).toContain('Más allá de las estrellas');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the Constelación theme gives the home, the tabs and the mini player a night look', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'constelacion' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Tus listas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  await press('Buscar');
+  expect(hasLabel('Inicio')).toBe(true);
+});
+
+test('the Cyberpunk ride shows the cover on the billboard and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'cyberpunk' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(screenText()).toContain('SINCRONÍA');
+  const labels = renderer.root
+    .findAll(node => typeof node.props.accessibilityLabel === 'string')
+    .map(node => node.props.accessibilityLabel as string);
+  expect(
+    labels.some(label => label.startsWith('Abrir cola de reproducción con ')),
+  ).toBe(true);
+  [
+    'Portada de Tema 1',
+    'Cerrar reproductor',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(screenText()).toContain('AJUSTES');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the Cyberpunk theme turns the home shortcuts into highway exits', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'cyberpunk' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Tus listas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(screenText()).toContain('SALIDA 01');
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  await press('Biblioteca');
+  expect(hasLabel('Inicio')).toBe(true);
+});
+
+test('the Terror room keeps the cover on the wall and works across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'terror' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(screenText()).toContain('BATERÍA');
+  const labels = renderer.root
+    .findAll(node => typeof node.props.accessibilityLabel === 'string')
+    .map(node => node.props.accessibilityLabel as string);
+  expect(
+    labels.some(label => label.startsWith('Abrir cola de reproducción con ')),
+  ).toBe(true);
+  [
+    'Portada de Tema 1',
+    'Cerrar reproductor',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(screenText()).toContain('Notas del cuaderno');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the Terror theme turns the home shortcuts into notes on the wall', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'terror' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Tus listas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  await press('Buscar');
+  expect(hasLabel('Inicio')).toBe(true);
+});
+
+test('the Bloques board shows the cover and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'bloques' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(screenText()).toContain('FILAS');
+  const labels = renderer.root
+    .findAll(node => typeof node.props.accessibilityLabel === 'string')
+    .map(node => node.props.accessibilityLabel as string);
+  expect(
+    labels.some(label => label.startsWith('Abrir cola de reproducción con ')),
+  ).toBe(true);
+  [
+    'Portada de Tema 1',
+    'Cerrar reproductor',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(screenText()).toContain('MÁS OPCIONES');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the Bloques theme turns the home shortcuts into colored blocks', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest
+    .mocked(getStoredAppearance)
+    .mockResolvedValueOnce({ themeId: 'bloques' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Tus listas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  await press('Biblioteca');
+  expect(hasLabel('Inicio')).toBe(true);
+});
+
+test('the Poder sphere holds the cover and keeps working across a song change', async () => {
+  const tracks = [
+    makeTrack('1', { artwork: 'file:///covers/1.jpg' }),
+    makeTrack('2'),
+  ];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'poder' });
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  expect(
+    renderer.root.findAll(
+      node => node.props.source?.uri === 'file:///covers/1.jpg',
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(screenText()).toContain('PODER');
+  expect(screenText()).toContain('TÉCNICAS');
+  const labels = renderer.root
+    .findAll(node => typeof node.props.accessibilityLabel === 'string')
+    .map(node => node.props.accessibilityLabel as string);
+  expect(
+    labels.some(label => label.startsWith('Abrir cola de reproducción con ')),
+  ).toBe(true);
+  [
+    'Portada de Tema 1',
+    'Cerrar reproductor',
+    'Canción anterior',
+    'Siguiente canción',
+    'Activar mezcla',
+    'Activar repetir canción',
+    'Abrir letras de Tema 1',
+  ].forEach(label => expect(hasLabel(label)).toBe(true));
+
+  setActive(tracks[1]);
+  await press('Añadir a favoritas');
+  await settle();
+  expect(hasLabel('Abrir letras de Tema 2')).toBe(true);
+
+  await press('Más opciones: temporizador, velocidad, ecualizador y acciones');
+  expect(screenText()).toContain('MÁS TÉCNICAS');
+  expect(hasLabel('Temporizador: Apagado')).toBe(true);
+  expect(hasLabel('Velocidad: 1×')).toBe(true);
+  expect(hasLabel('Ecualizador: Apagado')).toBe(true);
+  await press('Velocidad: 1×');
+  expect(hasLabel('Velocidad: 1×')).toBe(false);
+});
+
+test('the Poder theme gives the home shortcuts an aura', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getStoredAppearance).mockResolvedValueOnce({ themeId: 'poder' });
+  setActive(tracks[0]);
+  await renderApp();
+
+  ['Favoritas', 'Mezclar todo', 'Tus listas'].forEach(label =>
+    expect(hasLabel(label)).toBe(true),
+  );
+  expect(hasLabel('Abrir reproductor: Tema 1 de Artista')).toBe(true);
+  await press('Buscar');
+  expect(hasLabel('Inicio')).toBe(true);
 });
 
 test('marks favorites from the player', async () => {
