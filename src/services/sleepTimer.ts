@@ -1,4 +1,5 @@
 import TrackPlayer from 'react-native-track-player';
+import { setCrossfadeSuppressed } from '../native/musicLibrary';
 
 export type SleepTimerState =
   | { mode: 'off' }
@@ -13,6 +14,8 @@ const listeners = new Set<(next: SleepTimerState) => void>();
 
 function setState(next: SleepTimerState) {
   state = next;
+  // "Stop after this song" must let it play to its very end.
+  setCrossfadeSuppressed(next.mode === 'endOfTrack');
   listeners.forEach(listener => listener(next));
 }
 

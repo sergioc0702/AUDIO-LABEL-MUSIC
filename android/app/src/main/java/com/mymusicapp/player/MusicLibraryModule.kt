@@ -20,7 +20,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.media.RingtoneManager
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
@@ -36,6 +38,8 @@ import com.facebook.react.bridge.ReactMethod
 import com.doublesymmetry.kotlinaudio.audio.EQUALIZER_BAND_COUNT
 import com.doublesymmetry.kotlinaudio.audio.EQUALIZER_MAX_GAIN_DB
 import com.doublesymmetry.kotlinaudio.audio.EQUALIZER_MIN_GAIN_DB
+import com.doublesymmetry.kotlinaudio.audio.CROSSFADE_MAX_SECONDS
+import com.doublesymmetry.kotlinaudio.audio.PlaybackTuning
 import com.doublesymmetry.kotlinaudio.audio.SoftwareEqualizer
 import java.io.File
 import java.io.FileOutputStream
@@ -80,6 +84,10 @@ class MusicLibraryModule(
         finishDocumentRequest(resultCode, data?.data)
         return
       }
+      if (requestCode == BULK_DELETE_REQUEST_CODE) {
+        finishBulkDeletion(resultCode)
+        return
+      }
       if (requestCode != DELETE_REQUEST_CODE) {
         return
       }
@@ -122,6 +130,8 @@ class MusicLibraryModule(
   private var pendingBackup: PendingBackup? = null
   @Volatile
   private var pendingDocument: PendingDocument? = null
+  @Volatile
+  private var pendingBulkDeletion: PendingBulkDeletion? = null
 
   init {
     val preferences = context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
@@ -130,6 +140,10 @@ class MusicLibraryModule(
       List(EQUALIZER_BAND_COUNT) { index ->
         preferences.getFloat("equalizer_gain_$index", 0f)
       },
+    )
+    PlaybackTuning.setNormalizeVolume(preferences.getBoolean("level_volume", true))
+    PlaybackTuning.setCrossfadeSeconds(
+      preferences.getInt("crossfade_seconds", 0).coerceIn(0, CROSSFADE_MAX_SECONDS),
     )
     context.contentResolver.registerContentObserver(
       MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -247,6 +261,11 @@ class MusicLibraryModule(
       "La operación con el archivo se canceló porque la aplicación se reinició.",
     )
     pendingDocument = null
+    pendingBulkDeletion?.promise?.reject(
+      "E_TRACK_DELETE",
+      "La eliminación se canceló porque la aplicación se reinició.",
+    )
+    pendingBulkDeletion = null
     playlistScope.cancel()
     super.invalidate()
   }
@@ -769,6 +788,17 @@ class MusicLibraryModule(
     promise.resolve(null)
   }
 
+  /** The palette colors the home-screen widget should use, as "#rrggbb". */
+  @ReactMethod
+  fun saveWidgetColors(colors: ReadableArray) {
+    val keys = PlaybackWidgetProvider.WIDGET_COLOR_KEYS
+    if (colors.size() != keys.size) return
+    val editor = context.getSharedPreferences("music_library", Context.MODE_PRIVATE).edit()
+    keys.forEachIndexed { index, key -> editor.putString(key, colors.getString(index)) }
+    editor.apply()
+    PlaybackWidgetProvider.updateWidgets(context)
+  }
+
   @ReactMethod
   fun getAppearance(promise: Promise) {
     val preferences =
@@ -887,6 +917,161 @@ class MusicLibraryModule(
       promise.reject("E_EQUALIZER_WRITE", "No se pudo guardar la configuración del ecualizador.", error)
     }
   }
+
+  @ReactMethod
+  fun getPlaybackTuning(promise: Promise) {
+    promise.resolve(Arguments.createMap().apply {
+      putBoolean("levelVolume", PlaybackTuning.normalizeVolume)
+      putInt("crossfadeSeconds", PlaybackTuning.crossfadeMs / 1000)
+    })
+  }
+
+  @ReactMethod
+  fun setVolumeLeveling(enabled: Boolean, promise: Promise) {
+    context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+      .edit()
+      .putBoolean("level_volume", enabled)
+      .apply()
+    PlaybackTuning.setNormalizeVolume(enabled)
+    promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun setCrossfadeSeconds(seconds: Int, promise: Promise) {
+    if (seconds !in 0..CROSSFADE_MAX_SECONDS) {
+      promise.reject("E_CROSSFADE_INVALID", "El fundido debe durar entre 0 y 12 segundos.")
+      return
+    }
+    context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+      .edit()
+      .putInt("crossfade_seconds", seconds)
+      .apply()
+    PlaybackTuning.setCrossfadeSeconds(seconds)
+    promise.resolve(null)
+  }
+
+  /** Plays the next song change without blending, for "stop after this song". */
+  @ReactMethod
+  fun setCrossfadeSuppressed(suppressed: Boolean) {
+    PlaybackTuning.crossfadeSuppressed = suppressed
+  }
+
+  /**
+   * Makes a song the phone's ringtone. Android only allows it after the person
+   * turns on "modify system settings" for the app, so the first call opens that
+   * screen and resolves "permission"; once granted it resolves "done".
+   */
+  @ReactMethod
+  fun setAsRingtone(trackId: String, promise: Promise) {
+    val mediaId = trackId.toLongOrNull()?.takeIf { it > 0 }
+    if (mediaId == null) {
+      promise.reject("E_TRACK_INVALID", "La canción seleccionada no es válida.")
+      return
+    }
+    try {
+      if (!Settings.System.canWrite(context)) {
+        val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
+          .setData(Uri.parse("package:" + context.packageName))
+          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        promise.resolve("permission")
+        return
+      }
+      RingtoneManager.setActualDefaultRingtoneUri(
+        context,
+        RingtoneManager.TYPE_RINGTONE,
+        ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mediaId),
+      )
+      promise.resolve("done")
+    } catch (error: Exception) {
+      promise.reject("E_RINGTONE", "No se pudo cambiar el tono de llamada.", error)
+    }
+  }
+
+  /**
+   * Deletes several songs with a single confirmation from Android. Resolves the
+   * ids that were deleted, or an empty list if the person cancels.
+   */
+  @ReactMethod
+  fun deleteTracks(trackIds: ReadableArray, promise: Promise) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+      promise.reject("E_UNSUPPORTED", "Esta versión de Android solo permite eliminar canciones una por una.")
+      return
+    }
+    val ids = (0 until trackIds.size()).mapNotNull { index ->
+      trackIds.getString(index)?.takeIf { (it.toLongOrNull() ?: 0) > 0 }
+    }.distinct()
+    if (ids.isEmpty()) {
+      promise.resolve(Arguments.createArray())
+      return
+    }
+    if (pendingDeletion != null || pendingBulkDeletion != null) {
+      promise.reject("E_DELETE_IN_PROGRESS", "Ya hay una eliminación pendiente.")
+      return
+    }
+    val pending = PendingBulkDeletion(ids, promise)
+    pendingBulkDeletion = pending
+    context.runOnUiQueueThread {
+      try {
+        val activity = context.currentActivity
+          ?: throw IllegalStateException("No hay una pantalla activa para solicitar permiso.")
+        val uris = ids.map {
+          ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it.toLong())
+        }
+        activity.startIntentSenderForResult(
+          MediaStore.createDeleteRequest(context.contentResolver, uris).intentSender,
+          BULK_DELETE_REQUEST_CODE,
+          null,
+          0,
+          0,
+          0,
+        )
+      } catch (error: Exception) {
+        if (pendingBulkDeletion === pending) {
+          pendingBulkDeletion = null
+        }
+        promise.reject("E_TRACK_DELETE", "No se pudo solicitar permiso para eliminar las canciones.", error)
+      }
+    }
+  }
+
+  private fun finishBulkDeletion(resultCode: Int) {
+    val deletion = pendingBulkDeletion ?: return
+    pendingBulkDeletion = null
+    if (resultCode != Activity.RESULT_OK) {
+      deletion.promise.resolve(Arguments.createArray())
+      return
+    }
+    playlistScope.launch {
+      try {
+        val dao = playlistDatabase.playlistDao()
+        playlistDatabase.withTransaction {
+          deletion.trackIds.forEach { trackId ->
+            dao.deletePlaylistTrackReferences(trackId)
+            dao.deletePlaybackHistoryForTrack(trackId)
+            dao.deleteLyrics(trackId)
+          }
+        }
+        val preferences = context.getSharedPreferences("music_library", Context.MODE_PRIVATE)
+        val favorites = preferences.getStringSet("favorite_track_ids", emptySet())
+          .orEmpty()
+          .toMutableSet()
+        favorites.removeAll(deletion.trackIds.toSet())
+        preferences.edit().putStringSet("favorite_track_ids", favorites).apply()
+        deletion.promise.resolve(Arguments.createArray().apply {
+          deletion.trackIds.forEach(::pushString)
+        })
+      } catch (error: Exception) {
+        deletion.promise.reject(
+          "E_DELETE_CLEANUP",
+          "Las canciones se eliminaron, pero no se pudieron limpiar sus datos guardados.",
+          error,
+        )
+      }
+    }
+  }
+
+  private class PendingBulkDeletion(val trackIds: List<String>, val promise: Promise)
 
   private fun runPlaylistOperation(
     promise: Promise,
@@ -1458,6 +1643,7 @@ class MusicLibraryModule(
     const val PLAYLIST_EXPORT_REQUEST_CODE = 7415
     const val PLAYLIST_IMPORT_REQUEST_CODE = 7416
     const val LYRICS_IMPORT_REQUEST_CODE = 7417
+    const val BULK_DELETE_REQUEST_CODE = 7418
     const val MAX_PLAYLIST_FILE_BYTES = 10 * 1024 * 1024
     const val MAX_BACKUP_FILE_BYTES = 10 * 1024 * 1024
     const val MAX_LYRICS_FILE_BYTES = 1024 * 1024

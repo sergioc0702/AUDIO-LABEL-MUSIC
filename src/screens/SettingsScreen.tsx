@@ -3,7 +3,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Clock3,
+  Blend,
   Download,
+  FolderCog,
   Gauge,
   History,
   LayoutTemplate,
@@ -12,6 +14,7 @@ import {
   SlidersHorizontal,
   Timer,
   Upload,
+  Volume2,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
 import { shortAudioSeconds } from '../state/useMusicController';
@@ -75,6 +78,42 @@ export function SettingsScreen() {
         title="Temporizador"
       />
 
+      <ListRow
+        accessibilityLabel={`Volumen parejo, ${
+          music.levelVolume ? 'activado' : 'desactivado'
+        }`}
+        leading={
+          <SquareIcon>
+            <Volume2 {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={music.toggleLevelVolume}
+        showChevron={false}
+        subtitle={`Baja las canciones más fuertes · ${
+          music.levelVolume ? 'Activado' : 'Desactivado'
+        }`}
+        title="Volumen parejo"
+      />
+      <ListRow
+        accessibilityLabel={`Fundido entre canciones, ${
+          music.crossfadeSeconds > 0
+            ? `${music.crossfadeSeconds} segundos`
+            : 'desactivado'
+        }`}
+        leading={
+          <SquareIcon>
+            <Blend {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={() => setPlayerSheet('crossfade')}
+        subtitle={
+          music.crossfadeSeconds > 0
+            ? `${music.crossfadeSeconds} segundos`
+            : 'Desactivado'
+        }
+        title="Fundido entre canciones"
+      />
+
       <Text style={[type.label, styles.group]}>Apariencia</Text>
       <ListRow
         accessibilityLabel={`Tema, ${theme.name}`}
@@ -113,6 +152,21 @@ export function SettingsScreen() {
         showChevron={false}
         subtitle={`${tracks.length} canciones encontradas`}
         title="Actualizar biblioteca"
+      />
+      <ListRow
+        accessibilityLabel={`Carpetas de la biblioteca, ${music.excludedFolders.length} ocultas`}
+        leading={
+          <SquareIcon>
+            <FolderCog {...iconProps} />
+          </SquareIcon>
+        }
+        onPress={() => setPlayerSheet('folders')}
+        subtitle={
+          music.excludedFolders.length > 0
+            ? `${music.excludedFolders.length} ocultas`
+            : 'Se muestran todas'
+        }
+        title="Carpetas"
       />
       <ListRow
         accessibilityLabel="Borrar historial de reproducción"

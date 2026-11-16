@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, type ReactNode } from 'react';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Animated, Text, View } from 'react-native';
-import { ChevronRight, MoreVertical } from 'lucide-react-native';
+import { Check, ChevronRight, MoreVertical } from 'lucide-react-native';
 import {
   screenPadding,
   spacing,
@@ -79,6 +79,9 @@ export const TrackRow = memo(function TrackRowContent({
   accessibilityLabel,
   leading,
   trailing,
+  selecting = false,
+  selected = false,
+  onSelect,
 }: {
   track: Track;
   subtitle?: string;
@@ -86,6 +89,11 @@ export const TrackRow = memo(function TrackRowContent({
   isPlaying: boolean;
   onPress: () => void;
   onMore?: () => void;
+  /** While songs are being picked, a tap picks this one instead of playing it. */
+  selecting?: boolean;
+  selected?: boolean;
+  /** A long press starts picking songs; without it, it opens the menu. */
+  onSelect?: () => void;
   accessibilityLabel?: string;
   leading?: ReactNode;
   trailing?: ReactNode;
@@ -93,16 +101,20 @@ export const TrackRow = memo(function TrackRowContent({
   const { colors, type } = useColors();
   const styles = useStyles();
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, selected && styles.rowSelected]}>
       {leading}
       <Tap
-        accessibilityRole="button"
+        accessibilityRole={selecting ? 'checkbox' : 'button'}
         accessibilityLabel={
-          accessibilityLabel ?? `Reproducir ${track.title} de ${track.artist}`
+          selecting
+            ? `Seleccionar ${track.title} de ${track.artist}`
+            : accessibilityLabel ??
+              `Reproducir ${track.title} de ${track.artist}`
         }
+        accessibilityState={selecting ? { checked: selected } : undefined}
         android_ripple={{ color: colors.ripple }}
-        onLongPress={onMore}
-        onPress={onPress}
+        onLongPress={onSelect ?? onMore}
+        onPress={selecting && onSelect ? onSelect : onPress}
         style={styles.rowMain}
       >
         <Cover uri={track.artwork} size={48} />
@@ -117,10 +129,14 @@ export const TrackRow = memo(function TrackRowContent({
             {subtitle ?? track.artist}
           </Text>
         </View>
-        {isCurrent ? <NowPlayingBars isPlaying={isPlaying} /> : null}
+        {selected ? (
+          <Check color={colors.accent} size={22} />
+        ) : isCurrent ? (
+          <NowPlayingBars isPlaying={isPlaying} />
+        ) : null}
       </Tap>
       {trailing}
-      {onMore ? (
+      {onMore && !selecting ? (
         <IconButton label={`Más acciones para ${track.title}`} onPress={onMore}>
           <MoreVertical color={colors.textSecondary} size={20} />
         </IconButton>
@@ -227,6 +243,7 @@ const useStyles = createStyles(colors => ({
     minHeight: trackRowHeight,
     paddingRight: spacing.xs,
   },
+  rowSelected: { backgroundColor: colors.surfaceHigh },
   rowMain: {
     alignItems: 'center',
     flex: 1,

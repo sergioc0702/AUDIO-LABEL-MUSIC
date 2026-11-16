@@ -2,14 +2,6 @@ import type { Track } from '../types/Track';
 
 export type TrackSort = 'titleAsc' | 'titleDesc' | 'dateAdded';
 
-export type TrackFilterOptions = {
-  query: string;
-  favoritesOnly: boolean;
-  favoriteIds: ReadonlySet<string>;
-  sort: TrackSort;
-  genre?: string | null;
-};
-
 const compareText = new Intl.Collator('es', {
   numeric: true,
   sensitivity: 'base',
@@ -90,51 +82,4 @@ export function sortTracks(tracks: Track[], sort: TrackSort): Track[] {
         return second.dateAdded - first.dateAdded;
     }
   });
-}
-
-export function findAlphabeticalTrackIndex(
-  tracks: Track[],
-  letter: string,
-  sort: TrackSort,
-): number {
-  const isLetter = (track: Track) => {
-    const first = track.title
-      .trim()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .charAt(0)
-      .toLocaleUpperCase();
-    return /^[A-Z]$/.test(first) ? first : null;
-  };
-
-  return tracks.findIndex(track => {
-    const first = isLetter(track);
-    if (letter === '#') {
-      return first === null;
-    }
-    if (first === null) {
-      return false;
-    }
-    return sort === 'titleDesc' ? first <= letter : first >= letter;
-  });
-}
-
-export function filterAndSortTracks(
-  tracks: Track[],
-  options: TrackFilterOptions,
-): Track[] {
-  const query = options.query.trim().toLocaleLowerCase();
-  const filteredTracks = tracks.filter(
-    track =>
-      (!options.favoritesOnly || options.favoriteIds.has(track.id)) &&
-      (!options.genre ||
-        normalizeGenre(track.genre) === normalizeGenre(options.genre)) &&
-      (!query ||
-        `${track.title} ${track.artist} ${track.album} ${track.genre ?? ''} ${
-          track.year ?? ''
-        }`
-          .toLocaleLowerCase()
-          .includes(query)),
-  );
-  return sortTracks(filteredTracks, options.sort);
 }

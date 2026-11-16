@@ -30,8 +30,12 @@ import {
   renamePlaylist,
   setEqualizerSettings,
   setPlaybackRate,
+  setCrossfadeSeconds,
   setPlaylistTracks,
   setMediaVolume,
+  setTrackAsRingtone,
+  setVolumeLeveling,
+  storePreference,
   storeAppearance,
   storeLyrics,
 } from '../src/native/musicLibrary';
@@ -87,6 +91,7 @@ jest.mock('react-native-track-player', () => ({
     skipToPrevious: jest.fn().mockResolvedValue(undefined),
     seekTo: jest.fn().mockResolvedValue(undefined),
     seekBy: jest.fn().mockResolvedValue(undefined),
+    getActiveTrack: jest.fn().mockResolvedValue(undefined),
     setRate: jest.fn().mockResolvedValue(undefined),
     setPlayWhenReady: jest.fn().mockResolvedValue(undefined),
     removeUpcomingTracks: jest.fn().mockResolvedValue(undefined),
@@ -142,6 +147,7 @@ jest.mock('../src/native/musicLibrary', () => ({
   getStoredSession: jest.fn().mockResolvedValue(null),
   getStoredAppearance: jest.fn().mockResolvedValue(null),
   storeAppearance: jest.fn().mockResolvedValue(undefined),
+  storeWidgetColors: jest.fn(),
   getMediaVolume: jest.fn().mockResolvedValue({ level: 0.2, fixed: false }),
   setMediaVolume: jest.fn().mockResolvedValue({ level: 0.9, fixed: false }),
   startVolumeUpdates: jest.fn(),
@@ -162,6 +168,14 @@ jest.mock('../src/native/musicLibrary', () => ({
   removeStoredLyrics: jest.fn().mockResolvedValue(undefined),
   importLrcFile: jest.fn().mockResolvedValue(null),
   getPixelCover: jest.fn().mockResolvedValue(null),
+  getPlaybackTuning: jest
+    .fn()
+    .mockResolvedValue({ levelVolume: true, crossfadeSeconds: 0 }),
+  setVolumeLeveling: jest.fn().mockResolvedValue(undefined),
+  setCrossfadeSeconds: jest.fn().mockResolvedValue(undefined),
+  setCrossfadeSuppressed: jest.fn(),
+  setTrackAsRingtone: jest.fn().mockResolvedValue('done'),
+  deleteTracksFromDevice: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('react-native-safe-area-context', () => {
@@ -1914,4 +1928,164 @@ test('the lyrics panel finds synced lyrics online and keeps them', async () => {
   expect(storeLyrics).toHaveBeenCalledWith('1', LRC);
   expect(screenText()).toContain('Hola mundo');
   expect(String(fetchMock.mock.calls[0][0])).toContain('lrclib.net');
+});
+
+async function longPress(label: string) {
+  const [node] = renderer.root.findAll(
+    item =>
+      item.props.accessibilityLabel === label &&
+      typeof item.props.onLongPress === 'function',
+    { deep: false },
+  );
+  if (!node) {
+    throw new Error(`No encontré: ${label}`);
+  }
+  await ReactTestRenderer.act(async () => {
+    await node.props.onLongPress();
+  });
+  await settle();
+}
+
+test('a long press picks songs and the bar acts on all of them', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2'), makeTrack('3')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(TrackPlayer.getQueue).mockResolvedValue([]);
+  await renderApp('library');
+
+  await longPress('Reproducir Tema 1 de Artista');
+  expect(hasLabel('Cancelar selección')).toBe(true);
+  await press('Seleccionar Tema 3 de Artista');
+  await press('Añadir 2 canciones al final de la cola');
+
+  expect(TrackPlayer.add).toHaveBeenCalledWith([
+    expect.objectContaining({ id: '1' }),
+    expect.objectContaining({ id: '3' }),
+  ]);
+  expect(hasLabel('Cancelar selección')).toBe(false);
+  expect(hasLabel('Reproducir Tema 1 de Artista')).toBe(true);
+});
+
+test('picked songs go to a list together and Back cancels the picking', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  const playlist: Playlist = {
+    id: 'p1',
+    name: 'Viaje',
+    createdAt: 1,
+    trackIds: ['1'],
+  };
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  jest.mocked(getPlaylists).mockResolvedValue([playlist]);
+  await renderApp('library');
+
+  await longPress('Reproducir Tema 1 de Artista');
+  await press('Seleccionar Tema 2 de Artista');
+  await press('Añadir 2 canciones a una lista');
+  await press('Añadir a Viaje');
+  expect(setPlaylistTracks).toHaveBeenCalledWith('p1', ['1', '2']);
+  expect(hasLabel('Cancelar selección')).toBe(false);
+
+  await longPress('Reproducir Tema 2 de Artista');
+  expect(hasLabel('Cancelar selección')).toBe(true);
+  await press('Cancelar selección');
+  expect(hasLabel('Cancelar selección')).toBe(false);
+  jest.mocked(getPlaylists).mockResolvedValue([]);
+});
+
+test('Ajustes turns volume leveling off and sets the crossfade', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  await renderApp();
+  await press('Ajustes');
+
+  await press('Volumen parejo, activado');
+  expect(setVolumeLeveling).toHaveBeenCalledWith(false);
+  expect(hasLabel('Volumen parejo, desactivado')).toBe(true);
+
+  await press('Fundido entre canciones, desactivado');
+  await press('Fundido de 6 segundos');
+  expect(setCrossfadeSeconds).toHaveBeenCalledWith(6);
+  expect(hasLabel('Fundido entre canciones, 6 segundos')).toBe(true);
+});
+
+test('a folder turned off in Ajustes leaves the library', async () => {
+  jest
+    .mocked(getDeviceTracks)
+    .mockResolvedValue([
+      makeTrack('1'),
+      makeTrack('2', { folder: 'WhatsApp/Audio' }),
+    ]);
+  await renderApp();
+  await press('Ajustes');
+  await press('Carpetas de la biblioteca, 0 ocultas');
+
+  const [toggle] = renderer.root.findAll(
+    node =>
+      node.props.accessibilityLabel === 'Mostrar la carpeta Audio' &&
+      typeof node.props.onValueChange === 'function',
+    { deep: false },
+  );
+  jest
+    .mocked(getStoredPreference)
+    .mockImplementation(async key =>
+      key === 'excludedFolders' ? '["WhatsApp/Audio"]' : null,
+    );
+  await ReactTestRenderer.act(async () => {
+    await toggle.props.onValueChange(false);
+  });
+  await settle();
+
+  expect(storePreference).toHaveBeenCalledWith(
+    'excludedFolders',
+    '["WhatsApp/Audio"]',
+  );
+  expect(hasLabel('Carpetas de la biblioteca, 1 ocultas')).toBe(true);
+  await press('Biblioteca');
+  expect(hasLabel('Reproducir 1 canciones')).toBe(true);
+  jest.mocked(getStoredPreference).mockResolvedValue(null);
+});
+
+test('the data of a song can be corrected from its menu', async () => {
+  jest.mocked(getDeviceTracks).mockResolvedValue([makeTrack('1')]);
+  await renderApp('library');
+  await press('Más acciones para Tema 1');
+  await press('Editar los datos de Tema 1');
+
+  const [title] = renderer.root.findAll(
+    node =>
+      node.props.accessibilityLabel === 'Título' &&
+      typeof node.props.onChangeText === 'function',
+    { deep: false },
+  );
+  await ReactTestRenderer.act(async () => {
+    title.props.onChangeText('Nombre correcto');
+  });
+  jest
+    .mocked(getStoredPreference)
+    .mockImplementation(async key =>
+      key === 'trackEdits' ? '{"1":{"title":"Nombre correcto"}}' : null,
+    );
+  await press('Guardar datos de la canción');
+
+  expect(storePreference).toHaveBeenCalledWith(
+    'trackEdits',
+    '{"1":{"title":"Nombre correcto"}}',
+  );
+  expect(hasLabel('Reproducir Nombre correcto de Artista')).toBe(true);
+  jest.mocked(getStoredPreference).mockResolvedValue(null);
+});
+
+test('a song can become the ringtone and the speed sheet jumps 10 seconds', async () => {
+  const tracks = [makeTrack('1')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  await renderApp('library');
+  await press('Más acciones para Tema 1');
+  await press('Usar Tema 1 como tono de llamada');
+  expect(setTrackAsRingtone).toHaveBeenCalledWith('1');
+
+  await press('Inicio');
+  await press('Ajustes');
+  await press('Velocidad');
+  await press('Avanzar 10 segundos');
+  await press('Retroceder 10 segundos');
+  expect(TrackPlayer.seekBy).toHaveBeenCalledWith(10);
+  expect(TrackPlayer.seekBy).toHaveBeenCalledWith(-10);
 });

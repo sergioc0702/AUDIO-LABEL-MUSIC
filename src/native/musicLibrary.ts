@@ -50,7 +50,17 @@ type MusicLibraryModule = {
   setPlaybackRate(rate: number): Promise<void>;
   getEqualizerSettings(): Promise<EqualizerSettings>;
   setEqualizerSettings(enabled: boolean, bandGainsDb: number[]): Promise<void>;
+  saveWidgetColors(colors: string[]): void;
+  getPlaybackTuning(): Promise<PlaybackTuning>;
+  setVolumeLeveling(enabled: boolean): Promise<void>;
+  setCrossfadeSeconds(seconds: number): Promise<void>;
+  setCrossfadeSuppressed(suppressed: boolean): void;
+  setAsRingtone(trackId: string): Promise<'done' | 'permission'>;
+  deleteTracks(trackIds: string[]): Promise<string[]>;
 };
+
+/** Sound options applied by the native player. */
+export type PlaybackTuning = { levelVolume: boolean; crossfadeSeconds: number };
 
 /** Media volume from 0 to 1. Fixed-volume devices cannot change it. */
 export type MediaVolume = { level: number; fixed: boolean };
@@ -351,4 +361,65 @@ export function setEqualizerSettings(
     throw new Error('El módulo nativo de música no está disponible.');
   }
   return musicLibrary.setEqualizerSettings(enabled, bandGainsDb);
+}
+
+/** Dresses the home-screen widget in the colors of the active palette. */
+export function storeWidgetColors(colors: {
+  background: string;
+  text: string;
+  secondary: string;
+  button: string;
+  onButton: string;
+}) {
+  musicLibrary?.saveWidgetColors?.([
+    colors.background,
+    colors.text,
+    colors.secondary,
+    colors.button,
+    colors.onButton,
+  ]);
+}
+
+export function getPlaybackTuning(): Promise<PlaybackTuning> {
+  return (
+    musicLibrary?.getPlaybackTuning() ??
+    Promise.resolve({ levelVolume: false, crossfadeSeconds: 0 })
+  );
+}
+
+export function setVolumeLeveling(enabled: boolean): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.setVolumeLeveling(enabled);
+}
+
+export function setCrossfadeSeconds(seconds: number): Promise<void> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.setCrossfadeSeconds(seconds);
+}
+
+/** The next song change plays without blending while this is on. */
+export function setCrossfadeSuppressed(suppressed: boolean) {
+  musicLibrary?.setCrossfadeSuppressed?.(suppressed);
+}
+
+/** Resolves "permission" when Android first needs the person to allow it. */
+export function setTrackAsRingtone(
+  trackId: string,
+): Promise<'done' | 'permission'> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.setAsRingtone(trackId);
+}
+
+/** Deletes several songs with one confirmation; resolves the deleted ids. */
+export function deleteTracksFromDevice(trackIds: string[]): Promise<string[]> {
+  if (!musicLibrary) {
+    throw new Error('El módulo nativo de música no está disponible.');
+  }
+  return musicLibrary.deleteTracks(trackIds);
 }

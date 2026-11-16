@@ -17,7 +17,6 @@ import android.provider.MediaStore
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.RatingCompat
-import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.MediaBrowserServiceCompat
 import com.doublesymmetry.trackplayer.model.Track
 import com.doublesymmetry.trackplayer.service.MusicService

@@ -6,6 +6,8 @@ import TrackPlayer, {
 import type { Track } from '../types/Track';
 
 const restartThreshold = 3;
+/** How far the jump buttons move within a song. */
+export const jumpSeconds = 10;
 
 export async function setupPlayer(): Promise<void> {
   const serviceRunning = await TrackPlayer.isServiceRunning();
@@ -35,8 +37,8 @@ export async function setupPlayer(): Promise<void> {
       Capability.SeekTo,
     ],
     progressUpdateEventInterval: 5,
-    forwardJumpInterval: 15,
-    backwardJumpInterval: 15,
+    forwardJumpInterval: jumpSeconds,
+    backwardJumpInterval: jumpSeconds,
   });
 }
 
@@ -70,6 +72,10 @@ export async function setPlayerRate(rate: number): Promise<void> {
 
 export async function seekPlayerTo(position: number): Promise<void> {
   await TrackPlayer.seekTo(position);
+}
+
+export async function jumpPlayerBy(seconds: number): Promise<void> {
+  await TrackPlayer.seekBy(seconds);
 }
 
 export async function replacePlayerQueue(

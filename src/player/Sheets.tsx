@@ -17,6 +17,7 @@ import {
   type SleepTimerState,
 } from '../services/sleepTimer';
 import { findOnlineLyrics } from '../services/lyricsSearch';
+import { jumpSeconds } from '../services/player';
 import { storeLyrics } from '../native/musicLibrary';
 import { useApp } from '../state/AppContext';
 import { playbackRates } from '../state/useMusicController';
@@ -127,10 +128,27 @@ export function SleepTimerSheet() {
 
 export function SpeedSheet() {
   const { colors } = useColors();
+  const styles = useStyles();
   const { setPlayerSheet, music } = useApp();
 
   return (
     <PlaybackPanel title="Velocidad de reproducción">
+      <View style={styles.jumps}>
+        <Button
+          accessibilityLabel={`Retroceder ${jumpSeconds} segundos`}
+          label={`− ${jumpSeconds} s`}
+          onPress={() => music.jumpBy(-jumpSeconds)}
+          style={styles.jump}
+          variant="tonal"
+        />
+        <Button
+          accessibilityLabel={`Avanzar ${jumpSeconds} segundos`}
+          label={`+ ${jumpSeconds} s`}
+          onPress={() => music.jumpBy(jumpSeconds)}
+          style={styles.jump}
+          variant="tonal"
+        />
+      </View>
       {playbackRates.map(rate => (
         <SheetAction
           key={rate}
@@ -635,6 +653,13 @@ export function QueueSheet() {
 }
 
 const useStyles = createStyles(colors => ({
+  jumps: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.xl,
+  },
+  jump: { flex: 1 },
   themeList: { flexGrow: 0 },
   palettes: {
     gap: spacing.md,

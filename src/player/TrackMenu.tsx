@@ -13,7 +13,9 @@ import {
   Heart,
   ListEnd,
   ListPlus,
+  BellRing,
   ListStart,
+  Pencil,
   Plus,
   Share2,
   Trash2,
@@ -88,7 +90,7 @@ export function TrackMenu() {
             label="Añadir a una lista"
             onPress={() => {
               close();
-              setPlaylistTarget(track);
+              setPlaylistTarget([track]);
             }}
           />
           <SheetAction
@@ -121,6 +123,21 @@ export function TrackMenu() {
             label="Compartir"
             onPress={() => music.shareTrack(track)}
           />
+          <SheetAction
+            accessibilityLabel={`Editar los datos de ${track.title}`}
+            icon={<Pencil {...iconProps} />}
+            label="Editar datos"
+            onPress={() => {
+              close();
+              music.setEditingTrack(track);
+            }}
+          />
+          <SheetAction
+            accessibilityLabel={`Usar ${track.title} como tono de llamada`}
+            icon={<BellRing {...iconProps} />}
+            label="Usar como tono de llamada"
+            onPress={() => music.setRingtone(track)}
+          />
           {queueTrackDialog?.fromLibrary ? (
             <SheetAction
               accessibilityLabel={`Eliminar ${track.title} del dispositivo`}
@@ -144,16 +161,20 @@ export function AddToPlaylistSheet() {
     playlists,
     playlistTracksById,
     addTrackToPlaylist,
+    addTracksToPlaylist,
+    clearSelection,
     setPlaylistNameDialog,
     setPlaylistDialogError,
   } = music;
   const close = () => setPlaylistTarget(null);
+  const targets = playlistTarget ?? [];
+  const single = targets.length === 1 ? targets[0] : null;
 
   return (
     <Sheet
       closeLabel="Cerrar listas"
       onClose={close}
-      subtitle={playlistTarget?.title}
+      subtitle={single ? single.title : formatTrackCount(targets.length)}
       title="Añadir a una lista"
       visible={playlistTarget !== null}
     >
@@ -169,8 +190,9 @@ export function AddToPlaylistSheet() {
             setPlaylistNameDialog({
               playlistId: null,
               name: '',
-              trackIds: playlistTarget ? [playlistTarget.id] : [],
+              trackIds: targets.map(item => item.id),
             });
+            clearSelection();
             close();
           }}
           showChevron={false}
@@ -179,17 +201,20 @@ export function AddToPlaylistSheet() {
         {playlists.map(playlist => {
           const items = playlistTracksById.get(playlist.id) ?? [];
           const included =
-            playlistTarget !== null &&
-            playlist.trackIds.includes(playlistTarget.id);
+            targets.length > 0 &&
+            targets.every(item => playlist.trackIds.includes(item.id));
           return (
             <ListRow
               key={playlist.id}
               accessibilityLabel={`Añadir a ${playlist.name}`}
               leading={<Cover size={48} uri={items[0]?.artwork} />}
               onPress={() => {
-                if (playlistTarget) {
-                  addTrackToPlaylist(playlist, playlistTarget);
+                if (single) {
+                  addTrackToPlaylist(playlist, single);
+                } else if (targets.length > 0) {
+                  addTracksToPlaylist(playlist, targets);
                 }
+                clearSelection();
                 close();
               }}
               showChevron={false}

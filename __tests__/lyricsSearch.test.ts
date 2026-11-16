@@ -1,7 +1,6 @@
 import {
   cleanTitle,
   findOnlineLyrics,
-  isSynced,
   pickBest,
 } from '../src/services/lyricsSearch';
 
@@ -69,9 +68,4 @@ test('says so when the song has no lyrics anywhere', async () => {
 test('fails loudly without a connection', async () => {
   const fetcher = jest.fn(() => Promise.reject(new Error('offline')));
   await expect(findOnlineLyrics(track, fetcher as never)).rejects.toThrow();
-});
-
-test('tells synced from plain lyrics', () => {
-  expect(isSynced('[01:02.30] Hola')).toBe(true);
-  expect(isSynced('Hola')).toBe(false);
 });

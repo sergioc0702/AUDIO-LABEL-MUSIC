@@ -1,6 +1,13 @@
 package com.doublesymmetry.kotlinaudio.audio
 
 import android.content.Context
+import android.os.Handler
+import com.google.android.exoplayer2.Renderer
+import com.google.android.exoplayer2.audio.AudioRendererEventListener
+import com.google.android.exoplayer2.audio.AudioSink
+import com.google.android.exoplayer2.audio.MediaCodecAudioRenderer
+import com.google.android.exoplayer2.mediacodec.MediaCodecAdapter
+import com.google.android.exoplayer2.mediacodec.MediaCodecSelector
 import com.google.android.exoplayer2.DefaultRenderersFactory
 import com.google.android.exoplayer2.audio.AudioProcessor
 import com.google.android.exoplayer2.audio.DefaultAudioSink
@@ -42,13 +49,16 @@ object SoftwareEqualizer {
 
 internal class SoftwareEqualizerRenderersFactory(context: Context) :
     DefaultRenderersFactory(context) {
+    private val crossfade = CrossfadeAudioProcessor()
+
     override fun buildAudioSink(
         context: Context,
         enableFloatOutput: Boolean,
         enableAudioTrackPlaybackParams: Boolean,
         enableOffload: Boolean,
     ) = DefaultAudioSink.Builder(context)
-        .setAudioProcessors(arrayOf(SoftwareEqualizerAudioProcessor()))
+        // The blend comes first so that the equalizer shapes the mixed sound.
+        .setAudioProcessors(arrayOf(crossfade, SoftwareEqualizerAudioProcessor()))
         .setEnableFloatOutput(enableFloatOutput)
         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
         .setOffloadMode(
@@ -59,6 +69,65 @@ internal class SoftwareEqualizerRenderersFactory(context: Context) :
             },
         )
         .build()
+
+    override fun buildAudioRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        audioSink: AudioSink,
+        eventHandler: Handler,
+        eventListener: AudioRendererEventListener,
+        out: ArrayList<Renderer>,
+    ) {
+        out.add(
+            SongChangeAudioRenderer(
+                context,
+                codecAdapterFactory,
+                mediaCodecSelector,
+                enableDecoderFallback,
+                eventHandler,
+                eventListener,
+                audioSink,
+                crossfade,
+            ),
+        )
+    }
+}
+
+/** Tells the crossfade when the audio it receives starts to belong to another song. */
+private class SongChangeAudioRenderer(
+    context: Context,
+    codecAdapterFactory: MediaCodecAdapter.Factory,
+    mediaCodecSelector: MediaCodecSelector,
+    enableDecoderFallback: Boolean,
+    eventHandler: Handler,
+    eventListener: AudioRendererEventListener,
+    audioSink: AudioSink,
+    private val crossfade: CrossfadeAudioProcessor,
+) : MediaCodecAudioRenderer(
+    context,
+    codecAdapterFactory,
+    mediaCodecSelector,
+    enableDecoderFallback,
+    eventHandler,
+    eventListener,
+    audioSink,
+) {
+    override fun onProcessedStreamChange() {
+        crossfade.onStreamChange()
+        super.onProcessedStreamChange()
+    }
+
+    override fun onPositionReset(positionUs: Long, joining: Boolean) {
+        crossfade.cancelBlend()
+        super.onPositionReset(positionUs, joining)
+    }
+
+    override fun onDisabled() {
+        crossfade.cancelBlend()
+        super.onDisabled()
+    }
 }
 
 internal class SoftwareEqualizerAudioProcessor : AudioProcessor {

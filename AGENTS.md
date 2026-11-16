@@ -79,9 +79,35 @@ src/
     <id>/…                   ayudantes propios (dibujos, datos, lógica pura)
   ui/                        componentes reutilizables
   services/                  servicio de reproducción, sesión, temporizador, LRCLIB
+    resumePositions.ts       posición guardada de los audios largos
+  utils/                     lógica pura con tests (folders.ts, trackEdits.ts …)
   native/                    puente con MediaStore y Room
-android/kotlin-audio/        copia propia de KotlinAudio con el ecualizador
+android/kotlin-audio/        copia propia de KotlinAudio
+  audio/SoftwareEqualizerAudioProcessor.kt   ecualizador y fábrica de renderers
+  audio/CrossfadeAudioProcessor.kt           fundido y PlaybackTuning (ajustes)
+  audio/LoudnessMeter.kt                     medidor de sonoridad (BS.1770)
+  audio/VolumeLeveler.kt                     analiza canciones y aplica el nivel
 ```
+
+### Funciones de la biblioteca y del sonido
+
+- **Selección múltiple:** `selectedIds` vive en `useMusicController`. Las filas
+  la reciben con `useTrackSelection()` y la barra es
+  `src/screens/SelectionBar.tsx`. Una pulsación larga marca la canción; el menú
+  queda en el botón ⋮. La selección se vacía al cambiar de pantalla o con Atrás.
+- **Carpetas ocultas** (`excludedFolders`) y **datos corregidos**
+  (`trackEdits`) son preferencias en JSON que se aplican en `loadLibrary`. Los
+  datos corregidos no tocan el archivo de audio.
+- **Audios largos:** `PlaybackService` guarda la posición de los audios de más
+  de 20 minutos y la recupera al empezar a sonar.
+- **Volumen parejo:** `VolumeLeveler` mide cada canción en segundo plano
+  (unas ventanas repartidas, guardadas en `loudness.db`) y aplica el nivel con
+  el volumen del reproductor, que actúa al instante. Solo atenúa.
+- **Fundido:** `CrossfadeAudioProcessor` retiene siempre los últimos segundos.
+  El renderer propio avisa del cambio de canción (`onProcessedStreamChange`) y
+  el procesador conserva esa cola durante el `configure → fin de flujo → flush`
+  que hace el sink en cada cambio. Un salto o una búsqueda la descartan
+  (`cancelBlend`). El temporizador «al terminar la canción» lo suspende.
 
 ### Los temas
 
@@ -230,6 +256,11 @@ Todos están rediseñados y probados en el teléfono.
 - Los colores de un tema no deben parecerse a los de otro.
 
 **Audio:**
+- Un `AudioProcessor` que retiene audio debe seguir entregando salida mientras
+  llena su reserva; si no, la pista se queda sin datos y hay un corte.
+- Los cambios hechos dentro de un procesador se oyen con el retraso del búfer
+  de la pista (hasta 0,75 s). Lo que deba coincidir con el cambio de canción
+  que se oye va por el volumen del reproductor.
 - `SoftwareEqualizerAudioProcessor.kt` debe copiar la entrada en su propio
   búfer cuando deja pasar el audio sin procesar. Antes, algunas canciones
   sonaban rotas hasta encender el ecualizador.

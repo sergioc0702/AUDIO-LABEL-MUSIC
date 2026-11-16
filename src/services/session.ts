@@ -2,6 +2,7 @@ import TrackPlayer, { RepeatMode } from 'react-native-track-player';
 import { getStoredSession, storeSession } from '../native/musicLibrary';
 import type { Track } from '../types/Track';
 import { toPlayerTrack } from './player';
+import { skipNextResume } from './resumePositions';
 
 export type PlaybackSession = {
   trackIds: string[];
@@ -83,6 +84,7 @@ export async function restoreSession(
   await TrackPlayer.setPlayWhenReady(false);
   await TrackPlayer.add(queue.map(toPlayerTrack));
   if (activeIndex >= 0) {
+    skipNextResume(activeId);
     await TrackPlayer.skip(activeIndex, session.position);
   }
   await TrackPlayer.setRepeatMode(session.repeatMode ?? RepeatMode.Off);

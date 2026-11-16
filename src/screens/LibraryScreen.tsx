@@ -29,6 +29,7 @@ import { Button, IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { ListRow, SquareIcon, TrackRow, trackRowHeight } from '../ui/Rows';
 import { Sheet, SheetAction } from '../ui/Sheet';
+import { useTrackSelection } from './SelectionBar';
 import { Tap } from '../ui/Tap';
 import {
   folderName,
@@ -70,6 +71,7 @@ export function LibraryScreen() {
   const { width } = useWindowDimensions();
   const [sort, setSort] = useState<TrackSort>('titleAsc');
   const [sortVisible, setSortVisible] = useState(false);
+  const selection = useTrackSelection();
 
   useEffect(() => {
     getStoredPreference(sortKey)
@@ -124,6 +126,7 @@ export function LibraryScreen() {
       onMore={() => setQueueTrackDialog({ track: item, fromLibrary: true })}
       onPress={() => playTracks(sortedTracks, item, 'Biblioteca')}
       track={item}
+      {...selection(item)}
     />
   );
 

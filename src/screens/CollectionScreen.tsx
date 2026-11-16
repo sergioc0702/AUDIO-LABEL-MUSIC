@@ -26,6 +26,7 @@ import { ReorderRow } from '../ui/ReorderRow';
 import { SectionHeader, TrackRow } from '../ui/Rows';
 import { Tap } from '../ui/Tap';
 import { Sheet, SheetAction } from '../ui/Sheet';
+import { useTrackSelection } from './SelectionBar';
 import {
   artistKey,
   groupAlbums,
@@ -45,6 +46,7 @@ export function CollectionScreen({
   const { music, nav } = useApp();
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
+  const selection = useTrackSelection();
   const {
     tracks,
     favoriteIds,
@@ -295,6 +297,7 @@ export function CollectionScreen({
               }
               onPress={() => playTracks(items, item, title)}
               track={item}
+              {...(playlist ? {} : selection(item))}
               trailing={
                 playlist ? (
                   <IconButton

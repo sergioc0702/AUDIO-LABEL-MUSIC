@@ -17,6 +17,7 @@ import {
   addPlayerTrack,
   getActivePlayerTrackIndex,
   getPlayerQueue,
+  jumpPlayerBy,
   getPlayerRepeatMode,
   movePlayerTrack,
   movePlayerTracks,
@@ -35,6 +36,7 @@ import {
   skipToPlayerTrack,
   skipToPreviousPlayerTrack,
 } from '../services/player';
+import { onResumed } from '../services/resumePositions';
 import {
   readSession,
   rememberSessionDetails,
@@ -46,12 +48,14 @@ import {
   createPlaylist,
   deletePlaylist,
   deleteTrackFromDevice,
+  deleteTracksFromDevice,
   exportBackupFile,
   getDeviceTracks,
   getEqualizerSettings,
   getFavoriteTrackIds,
   getStoredLyrics,
   getPlaybackRate,
+  getPlaybackTuning,
   getPlaylists,
   getRecentPlayback,
   getStoredPreference,
@@ -66,7 +70,10 @@ import {
   setPlaylistTracks,
   storeLyrics,
   removeStoredLyrics,
+  setCrossfadeSeconds as persistCrossfadeSeconds,
+  setTrackAsRingtone,
   setTrackFavorite,
+  setVolumeLeveling,
   shareTrackFile,
   storePreference,
   storeSession,
@@ -80,7 +87,21 @@ import type {
 } from '../types/Track';
 import { buildBackup, matchBackup, readBackup } from '../utils/backup';
 import { formatTrackCount } from '../utils/formatTrackCount';
+import {
+  listDeviceFolders,
+  readExcludedFolders,
+  withoutExcludedFolders,
+  type DeviceFolder,
+} from '../utils/folders';
+import { formatTime } from '../utils/formatTime';
 import { buildM3u, resolveM3u } from '../utils/m3u';
+import {
+  applyTrackEdits,
+  buildTrackEdit,
+  readTrackEdits,
+  type TrackEditForm,
+  type TrackEdits,
+} from '../utils/trackEdits';
 import { parseLrc } from '../utils/lyrics';
 import { exportM3uFile } from '../native/musicLibrary';
 import {
@@ -95,7 +116,11 @@ export const playbackRates = [0.75, 1, 1.25, 1.5, 2];
 const equalizerBandCount = 5;
 export const shortAudioSeconds = 30;
 
+export const crossfadeChoices = [0, 2, 4, 6, 8, 12];
+
 const hideShortAudioKey = 'hideShortAudio';
+const excludedFoldersKey = 'excludedFolders';
+const trackEditsKey = 'trackEdits';
 
 function libraryPermission() {
   return Number(Platform.Version) >= 33
@@ -138,7 +163,6 @@ export function useMusicController({
   const [playlistDialogError, setPlaylistDialogError] = useState<string | null>(
     null,
   );
-  const [loadingPlaylists, setLoadingPlaylists] = useState(true);
   const [savingPlaylist, setSavingPlaylist] = useState(false);
   const [playbackQueue, setPlaybackQueue] = useState<Track[]>([]);
   const [queueUpdating, setQueueUpdating] = useState(false);
@@ -172,6 +196,15 @@ export function useMusicController({
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [permissionBlocked, setPermissionBlocked] = useState(false);
   const [hideShortAudio, setHideShortAudio] = useState(false);
+  const [deviceFolders, setDeviceFolders] = useState<DeviceFolder[]>([]);
+  const [excludedFolders, setExcludedFolders] = useState<string[]>([]);
+  const [trackEdits, setTrackEdits] = useState<TrackEdits>({});
+  /** The songs as their files describe them, before the person's corrections. */
+  const originalTracks = useRef(new Map<string, Track>());
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [levelVolume, setLevelVolume] = useState(false);
+  const [crossfadeSeconds, setCrossfadeSeconds] = useState(0);
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [errorMessage, setErrorMessageState] = useState<string | null>(null);
@@ -347,20 +380,31 @@ export function useMusicController({
 
         // In this order: reading the tracks may update the saved favorites.
         const deviceTracks = await getDeviceTracks();
-        const [favoriteTrackIds, shortAudioHidden] = await Promise.all([
-          getFavoriteTrackIds(),
-          getStoredPreference(hideShortAudioKey),
-        ]);
+        const [favoriteTrackIds, shortAudioHidden, storedFolders, storedEdits] =
+          await Promise.all([
+            getFavoriteTrackIds(),
+            getStoredPreference(hideShortAudioKey),
+            getStoredPreference(excludedFoldersKey),
+            getStoredPreference(trackEditsKey),
+          ]);
         const hideShort = shortAudioHidden === 'true';
-        setHideShortAudio(hideShort);
-        setTracks(
-          hideShort
-            ? deviceTracks.filter(
-                track =>
-                  track.duration <= 0 || track.duration >= shortAudioSeconds,
-              )
-            : deviceTracks,
+        const hiddenFolders = readExcludedFolders(storedFolders);
+        const edits = readTrackEdits(storedEdits);
+        const shown = withoutExcludedFolders(
+          deviceTracks,
+          hiddenFolders,
+        ).filter(
+          track =>
+            !hideShort ||
+            track.duration <= 0 ||
+            track.duration >= shortAudioSeconds,
         );
+        originalTracks.current = new Map(shown.map(track => [track.id, track]));
+        setHideShortAudio(hideShort);
+        setDeviceFolders(listDeviceFolders(deviceTracks));
+        setExcludedFolders(hiddenFolders);
+        setTrackEdits(edits);
+        setTracks(applyTrackEdits(shown, edits));
         setFavoriteIds(new Set(favoriteTrackIds));
       } catch (error) {
         setRetryableError(
@@ -384,7 +428,6 @@ export function useMusicController({
   );
 
   const loadPlaylists = useCallback(async () => {
-    setLoadingPlaylists(true);
     try {
       setPlaylists(await getPlaylists());
     } catch (error) {
@@ -394,8 +437,6 @@ export function useMusicController({
           : 'No se pudieron cargar las listas de reproducción.',
         () => loadPlaylists(),
       );
-    } finally {
-      setLoadingPlaylists(false);
     }
   }, [setRetryableError]);
 
@@ -434,6 +475,11 @@ export function useMusicController({
           setEqualizerSettings(savedEqualizer);
         }
         await setupPlayer();
+        const tuning = await getPlaybackTuning().catch(() => null);
+        if (mounted && tuning) {
+          setLevelVolume(tuning.levelVolume);
+          setCrossfadeSeconds(tuning.crossfadeSeconds);
+        }
         const savedRepeatMode = await getPlayerRepeatMode();
         const savedRate = await getPlaybackRate().catch(() => 1);
         const startupRate = playbackRates.includes(savedRate) ? savedRate : 1;
@@ -591,6 +637,27 @@ export function useMusicController({
         );
       });
   }, [playerReady, setErrorMessage, tracks, tracksById]);
+
+  useEffect(
+    () =>
+      onResumed(position => {
+        showQueueNotice(`Continúa desde ${formatTime(position)}.`);
+      }),
+    // showQueueNotice only touches refs and state setters.
+
+    [],
+  );
+
+  // A song that left the library cannot stay selected.
+  useEffect(() => {
+    setSelectedIds(current => {
+      if (current.size === 0) {
+        return current;
+      }
+      const kept = new Set([...current].filter(id => tracksById.has(id)));
+      return kept.size === current.size ? current : kept;
+    });
+  }, [tracksById]);
 
   useEffect(
     () => () => {
@@ -763,6 +830,45 @@ export function useMusicController({
     }
   }
 
+  async function jumpBy(seconds: number) {
+    try {
+      await jumpPlayerBy(seconds);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo cambiar la posición: ${error.message}`
+          : 'No se pudo cambiar la posición.',
+      );
+    }
+  }
+
+  async function toggleLevelVolume() {
+    const next = !levelVolume;
+    try {
+      await setVolumeLeveling(next);
+      setLevelVolume(next);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo guardar el ajuste: ${error.message}`
+          : 'No se pudo guardar el ajuste.',
+      );
+    }
+  }
+
+  async function changeCrossfade(seconds: number) {
+    try {
+      await persistCrossfadeSeconds(seconds);
+      setCrossfadeSeconds(seconds);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo guardar el fundido: ${error.message}`
+          : 'No se pudo guardar el fundido.',
+      );
+    }
+  }
+
   async function changePlaybackRate(nextRate: number) {
     let rateWasApplied = false;
     try {
@@ -879,24 +985,6 @@ export function useMusicController({
           : 'No se pudo reproducir la canción.',
       );
     }
-  }
-
-  async function playPlaylist(playlist: Playlist, startingTrack?: Track) {
-    const playlistTracksToPlay = playlist.trackIds
-      .map(trackId => tracksById.get(trackId))
-      .filter((track): track is Track => track !== undefined);
-    if (playlistTracksToPlay.length === 0) {
-      setErrorMessage(
-        'Esta lista no tiene canciones disponibles para reproducir.',
-      );
-      return;
-    }
-
-    await playTracks(
-      playlistTracksToPlay,
-      startingTrack ?? playlistTracksToPlay[0],
-      playlist.name,
-    );
   }
 
   async function savePlaylistName() {
@@ -1475,6 +1563,278 @@ export function useMusicController({
     }
   }
 
+  /** Adds several songs after the current one, or at the end, in their order. */
+  async function addTracksToQueue(items: Track[], placement: 'next' | 'end') {
+    if (
+      !playerReady ||
+      queueOperationInProgress.current ||
+      items.length === 0
+    ) {
+      return;
+    }
+    queueOperationInProgress.current = true;
+    setQueueUpdating(true);
+    try {
+      const nativeQueue = await getPlayerQueue();
+      const queuedIds = new Set(nativeQueue.map(item => String(item.id)));
+      const fresh = items.filter(item => !queuedIds.has(item.id));
+      if (nativeQueue.length === 0) {
+        queueOperationInProgress.current = false;
+        await playTracks(items, items[0], 'Cola de reproducción');
+        showQueueNotice(`${formatTrackCount(items.length)} en la cola.`);
+        return;
+      }
+      if (fresh.length === 0) {
+        showQueueNotice('Esas canciones ya están en la cola.');
+        return;
+      }
+      const activeIndex = (await getActivePlayerTrackIndex()) ?? -1;
+      let insertIndex =
+        placement === 'next'
+          ? Math.max(0, Math.min(activeIndex + 1, nativeQueue.length))
+          : nativeQueue.length;
+      const originalIndex =
+        placement === 'end'
+          ? originalQueueOrder.current.length
+          : Math.max(
+              0,
+              originalQueueOrder.current.findIndex(
+                item => item.id === activeTrack?.id,
+              ) + 1,
+            );
+      for (const item of fresh) {
+        await addPlayerTrack(item, insertIndex);
+        insertIndex += 1;
+      }
+      originalQueueOrder.current.splice(originalIndex, 0, ...fresh);
+      await refreshPlaybackQueue();
+      showQueueNotice(
+        placement === 'next'
+          ? `${formatTrackCount(fresh.length)} a continuación.`
+          : `${formatTrackCount(fresh.length)} al final de la cola.`,
+      );
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudieron añadir las canciones: ${error.message}`
+          : 'No se pudieron añadir las canciones a la cola.',
+      );
+    } finally {
+      queueOperationInProgress.current = false;
+      setQueueUpdating(false);
+    }
+  }
+
+  function toggleSelected(track: Track) {
+    setSelectedIds(current => {
+      const updated = new Set(current);
+      if (updated.has(track.id)) {
+        updated.delete(track.id);
+      } else {
+        updated.add(track.id);
+      }
+      return updated;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(current => (current.size === 0 ? current : new Set()));
+  }
+
+  /** The selected songs in the order the library lists them. */
+  function selectedTracks() {
+    return tracks.filter(track => selectedIds.has(track.id));
+  }
+
+  async function favoriteSelection() {
+    const items = selectedTracks().filter(track => !favoriteIds.has(track.id));
+    try {
+      for (const track of items) {
+        await setTrackFavorite(track.id, true);
+      }
+      setFavoriteIds(current => new Set([...current, ...items.map(t => t.id)]));
+      showQueueNotice(
+        items.length > 0
+          ? `${formatTrackCount(items.length)} en favoritas.`
+          : 'Ya estaban en favoritas.',
+      );
+      clearSelection();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo actualizar favoritos: ${error.message}`
+          : 'No se pudo actualizar favoritos.',
+      );
+    }
+  }
+
+  async function addTracksToPlaylist(playlist: Playlist, items: Track[]) {
+    const existing = new Set(playlist.trackIds);
+    const added = items.filter(track => !existing.has(track.id));
+    if (added.length === 0) {
+      showQueueNotice(`Ya estaban en ${playlist.name}.`);
+      return;
+    }
+    const trackIds = [...playlist.trackIds, ...added.map(track => track.id)];
+    try {
+      await setPlaylistTracks(playlist.id, trackIds);
+      setPlaylists(current =>
+        current.map(item =>
+          item.id === playlist.id ? { ...item, trackIds } : item,
+        ),
+      );
+      showQueueNotice(`${formatTrackCount(added.length)} en ${playlist.name}.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo añadir a la lista: ${error.message}`
+          : 'No se pudo añadir a la lista.',
+      );
+    }
+  }
+
+  function confirmDeleteSelection() {
+    const items = selectedTracks();
+    if (items.length === 0) {
+      return;
+    }
+    Alert.alert(
+      'Eliminar del dispositivo',
+      `Se eliminarán ${formatTrackCount(
+        items.length,
+      )} del almacenamiento del dispositivo. Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            deleteSelection(items);
+          },
+        },
+      ],
+    );
+  }
+
+  async function deleteSelection(items: Track[]) {
+    if (deletingTrackId !== null || queueOperationInProgress.current) {
+      setErrorMessage(
+        'Espera a que termine la acción actual antes de eliminar.',
+      );
+      return;
+    }
+    queueOperationInProgress.current = true;
+    setQueueUpdating(true);
+    try {
+      const deleted = new Set(
+        await deleteTracksFromDevice(items.map(track => track.id)),
+      );
+      if (deleted.size === 0) {
+        return;
+      }
+      if (playerReady) {
+        const nativeQueue = await getPlayerQueue();
+        const indexes = nativeQueue
+          .map((item, index) => (deleted.has(String(item.id)) ? index : -1))
+          .filter(index => index >= 0)
+          .reverse();
+        if (activeTrack && deleted.has(String(activeTrack.id))) {
+          await pausePlayer();
+        }
+        for (const index of indexes) {
+          await removePlayerTrack(index);
+        }
+      }
+      originalQueueOrder.current = originalQueueOrder.current.filter(
+        item => !deleted.has(item.id),
+      );
+      clearSelection();
+      await Promise.all([loadLibrary(false), loadPlaylists()]);
+      loadPlaybackHistory();
+      showQueueNotice(
+        `${formatTrackCount(deleted.size)} eliminadas del dispositivo.`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo completar la eliminación: ${error.message}`
+          : 'No se pudo completar la eliminación.',
+      );
+      loadLibrary(false);
+    } finally {
+      queueOperationInProgress.current = false;
+      setQueueUpdating(false);
+    }
+  }
+
+  async function toggleFolderExcluded(path: string) {
+    const next = excludedFolders.includes(path)
+      ? excludedFolders.filter(item => item !== path)
+      : [...excludedFolders, path];
+    try {
+      await storePreference(excludedFoldersKey, JSON.stringify(next));
+      setExcludedFolders(next);
+      await loadLibrary(false);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudo guardar el ajuste: ${error.message}`
+          : 'No se pudo guardar el ajuste.',
+      );
+    }
+  }
+
+  /** Saves the person's corrections for a song; null puts back what the file says. */
+  async function saveTrackEdit(track: Track, form: TrackEditForm | null) {
+    const original = originalTracks.current.get(track.id) ?? track;
+    const edit = form ? buildTrackEdit(original, form) : null;
+    const next = { ...trackEdits };
+    if (edit) {
+      next[track.id] = edit;
+    } else {
+      delete next[track.id];
+    }
+    try {
+      await storePreference(trackEditsKey, JSON.stringify(next));
+      setTrackEdits(next);
+      setEditingTrack(null);
+      await loadLibrary(false);
+      showQueueNotice(
+        edit
+          ? 'Datos de la canción guardados.'
+          : 'Datos originales restaurados.',
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? `No se pudieron guardar los datos: ${error.message}`
+          : 'No se pudieron guardar los datos de la canción.',
+      );
+    }
+  }
+
+  async function setRingtone(track: Track) {
+    setQueueTrackDialog(null);
+    try {
+      const result = await setTrackAsRingtone(track.id);
+      if (result === 'permission') {
+        Alert.alert(
+          'Permiso necesario',
+          'Activa “Modificar ajustes del sistema” para Mi Música en la pantalla que se abrió y vuelve a elegir la canción.',
+        );
+      } else {
+        showQueueNotice(`“${track.title}” es tu tono de llamada.`);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo cambiar el tono de llamada.',
+      );
+    }
+  }
+
   async function playQueueTrack(index: number) {
     try {
       await skipToPlayerTrack(index);
@@ -1956,10 +2316,30 @@ export function useMusicController({
     requestLibraryAccess,
     hideShortAudio,
     toggleHideShortAudio,
+    deviceFolders,
+    excludedFolders,
+    toggleFolderExcluded,
+    trackEdits,
+    editingTrack,
+    setEditingTrack,
+    saveTrackEdit,
+    selectedIds,
+    toggleSelected,
+    clearSelection,
+    selectedTracks,
+    favoriteSelection,
+    confirmDeleteSelection,
+    addTracksToQueue,
+    addTracksToPlaylist,
+    levelVolume,
+    toggleLevelVolume,
+    crossfadeSeconds,
+    changeCrossfade,
+    jumpBy,
+    setRingtone,
     shareTrack,
     exportLibraryBackup,
     restoreLibraryBackup,
-    loadingPlaylists,
     savingPlaylist,
     queueUpdating,
     queueNotice,
@@ -1993,7 +2373,6 @@ export function useMusicController({
     changeEqualizerBand,
     clearRecentPlayback,
     playTracks,
-    playPlaylist,
     savePlaylistName,
     confirmDeletePlaylist,
     openPlaylistTrackPicker,

@@ -17,6 +17,12 @@ import {
 } from './src/player/TrackMenu';
 import { CollectionScreen } from './src/screens/CollectionScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { SelectionBar } from './src/screens/SelectionBar';
+import {
+  CrossfadeSheet,
+  EditTrackDialog,
+  FoldersSheet,
+} from './src/screens/SettingsSheets';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -55,6 +61,7 @@ function AppContent() {
       <StatusBar barStyle={colors.isLight ? 'dark-content' : 'light-content'} />
       <Screens />
       <View style={[styles.statusBar, { height: insets.top }]} />
+      <SelectionBar />
       <MiniPlayer />
       <TabBar />
       <Snackbar
@@ -64,6 +71,9 @@ function AppContent() {
       <PlaybackWindow />
       <ThemeSheet />
       <PaletteSheet />
+      <CrossfadeSheet />
+      <FoldersSheet />
+      <EditTrackDialog />
       <TrackMenu />
       <AddToPlaylistSheet />
       <PlaylistTrackPicker />

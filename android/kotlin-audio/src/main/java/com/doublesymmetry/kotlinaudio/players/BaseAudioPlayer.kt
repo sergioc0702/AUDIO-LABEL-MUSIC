@@ -49,6 +49,7 @@ import com.google.android.exoplayer2.DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYB
 import com.google.android.exoplayer2.DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
 import com.google.android.exoplayer2.DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
 import com.doublesymmetry.kotlinaudio.audio.SoftwareEqualizerRenderersFactory
+import com.doublesymmetry.kotlinaudio.audio.VolumeLeveler
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.ForwardingPlayer
 import com.google.android.exoplayer2.MediaItem
@@ -146,11 +147,19 @@ abstract class BaseAudioPlayer internal constructor(
             else exoPlayer.bufferedPosition
         }
 
-    var volume: Float
-        get() = exoPlayer.volume
+    /** The volume the app asked for; ducking and leveling are applied on top. */
+    var volume: Float = 1f
         set(value) {
-            exoPlayer.volume = value * volumeMultiplier
+            field = value
+            applyVolume()
         }
+
+    private var levelingGain = 1f
+    private lateinit var volumeLeveler: VolumeLeveler
+
+    private fun applyVolume() {
+        exoPlayer.volume = (volume * volumeMultiplier * levelingGain).coerceIn(0f, 1f)
+    }
 
     var playbackSpeed: Float
         get() = exoPlayer.playbackParameters.speed
@@ -163,7 +172,7 @@ abstract class BaseAudioPlayer internal constructor(
     private var volumeMultiplier = 1f
         private set(value) {
             field = value
-            volume = volume
+            applyVolume()
         }
 
     val isPlaying
@@ -255,6 +264,10 @@ abstract class BaseAudioPlayer internal constructor(
         )
 
         exoPlayer.addListener(PlayerListener())
+        volumeLeveler = VolumeLeveler(context, exoPlayer) { gain ->
+            levelingGain = gain
+            applyVolume()
+        }
 
         scope.launch {
             // Whether ExoPlayer should manage audio focus for us automatically
@@ -438,6 +451,7 @@ abstract class BaseAudioPlayer internal constructor(
         abandonAudioFocusIfHeld()
         stop()
         notificationManager.destroy()
+        volumeLeveler.release()
         exoPlayer.release()
         cache?.release()
         cache = null

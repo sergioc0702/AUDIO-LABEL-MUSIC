@@ -21,6 +21,7 @@ import { IconButton } from '../ui/Buttons';
 import { Cover } from '../ui/Cover';
 import { ListRow, SectionHeader, SquareIcon, TrackRow } from '../ui/Rows';
 import { Tap } from '../ui/Tap';
+import { useTrackSelection } from './SelectionBar';
 import {
   groupAlbums,
   groupArtists,
@@ -40,6 +41,7 @@ function indexSearchText<T>(items: T[], textFor: (item: T) => string) {
 
 export function SearchScreen() {
   const { colors, type } = useColors();
+  const selection = useTrackSelection();
   const styles = useStyles();
   const { music, nav } = useApp();
   const insets = useSafeAreaInsets();
@@ -130,6 +132,7 @@ export function SearchScreen() {
           }
           onPress={() => playTracks(matchedTracks, item.track, 'Búsqueda')}
           track={item.track}
+          {...selection(item.track)}
         />
       );
     }

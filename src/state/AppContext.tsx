@@ -9,7 +9,11 @@ import {
   type ReactNode,
 } from 'react';
 import { BackHandler } from 'react-native';
-import { getStoredAppearance, storeAppearance } from '../native/musicLibrary';
+import {
+  getStoredAppearance,
+  storeAppearance,
+  storeWidgetColors,
+} from '../native/musicLibrary';
 import { ColorsContext } from '../theme/theme';
 import {
   defaultAppearance,
@@ -32,6 +36,8 @@ export type PlayerSheet =
   | 'lyrics'
   | 'theme'
   | 'palette'
+  | 'crossfade'
+  | 'folders'
   | null;
 export type LibraryFilter =
   | 'songs'
@@ -51,8 +57,9 @@ type Navigation = {
 type AppContextValue = {
   music: MusicController;
   nav: Navigation;
-  playlistTarget: Track | null;
-  setPlaylistTarget: (track: Track | null) => void;
+  /** The songs being added to a list, while its sheet is open. */
+  playlistTarget: Track[] | null;
+  setPlaylistTarget: (tracks: Track[] | null) => void;
   libraryFilter: LibraryFilter;
   setLibraryFilter: (filter: LibraryFilter) => void;
   playerSheet: PlayerSheet;
@@ -86,7 +93,7 @@ export function AppProvider({
     search: [],
     library: [],
   });
-  const [playlistTarget, setPlaylistTarget] = useState<Track | null>(null);
+  const [playlistTarget, setPlaylistTarget] = useState<Track[] | null>(null);
   const [playerSheet, setPlayerSheet] = useState<PlayerSheet>(null);
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('songs');
   const [appearance, setAppearance] = useState<Appearance>(defaultAppearance);
@@ -158,6 +165,10 @@ export function AppProvider({
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
+        if (music.selectedIds.size > 0) {
+          music.clearSelection();
+          return true;
+        }
         if (route) {
           pop();
           return true;
@@ -170,7 +181,15 @@ export function AppProvider({
       },
     );
     return () => subscription.remove();
-  }, [pop, route, tab]);
+  }, [music, pop, route, tab]);
+
+  // Picked songs belong to the screen they were picked on.
+  const clearSelection = music.clearSelection;
+  useEffect(() => {
+    clearSelection();
+    // clearSelection only calls a state setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, tab]);
 
   const nav = useMemo(
     () => ({ tab, route, selectTab, push, pop }),
@@ -178,6 +197,18 @@ export function AppProvider({
   );
 
   const { theme, palette } = resolveAppearance(appearance);
+
+  useEffect(() => {
+    if (appearanceReady) {
+      storeWidgetColors({
+        background: palette.surface,
+        text: palette.text,
+        secondary: palette.textSecondary,
+        button: palette.control,
+        onButton: palette.onControl,
+      });
+    }
+  }, [appearanceReady, palette]);
 
   return (
     <AppContext.Provider

@@ -18,6 +18,15 @@ vuelve a abrir si cambia.
   2× y ecualizador de cinco bandas con perfiles. Se abre deslizando hacia arriba
   el mini-reproductor, se cierra deslizando hacia abajo y la carátula cambia de
   canción al deslizarla a los lados.
+- **Volumen parejo:** la app mide cada canción la primera vez que entra en la
+  cola y baja las más fuertes para que todas suenen a un nivel parecido. Solo
+  baja el volumen, nunca lo sube. Se apaga en Ajustes.
+- **Fundido entre canciones:** el final de una canción se mezcla con el inicio
+  de la siguiente, de 2 a 12 segundos. No se aplica al saltar de canción a mano.
+- **Selección múltiple:** al mantener presionada una canción se pueden marcar
+  varias y enviarlas a la cola, a una lista o a favoritas, o eliminarlas.
+- **Audios largos:** los de más de 20 minutos continúan donde se dejaron, y la
+  hoja de Velocidad tiene botones para saltar 10 segundos.
 - **Temas y paletas de colores:** en Ajustes se elige el diseño Estándar o uno de
   quince temas: Kawaii, Brutalista, Terminal, Tornamesa, Mixtape, Taquilla, Pixel,
   Vaporwave, Manga, Nave espacial, Constelación, Cyberpunk, Terror, Bloques y
@@ -34,12 +43,15 @@ vuelve a abrir si cambia.
 - **Temporizador:** 15 a 90 minutos o al terminar la canción. Funciona en segundo
   plano porque vive en el servicio de reproducción.
 - **Menú de cada canción:** reproducir a continuación, añadir a la cola o a una
-  lista, favoritas, ir al álbum o al artista, compartir y eliminar del dispositivo.
+  lista, favoritas, ir al álbum o al artista, compartir, editar los datos, usar
+  como tono de llamada y eliminar del dispositivo. Editar los datos cambia cómo
+  se ve la canción en la app; el archivo no se modifica.
 - **Copia de seguridad:** guarda favoritas y listas en un archivo y las restaura en
   este u otro teléfono, buscando las canciones por título y artista. Restaurar
   añade lo guardado, sin borrar nada.
 - **Biblioteca limpia:** solo muestra lo que Android marca como música, y en Ajustes
-  se pueden ocultar los audios de menos de 30 segundos.
+  se pueden ocultar los audios de menos de 30 segundos y las carpetas que no
+  tienen música.
 - **Listas:** crear, renombrar, eliminar, reordenar y guardar la cola como lista.
 - Reproducción en segundo plano, notificación, botones de audífonos y paso sin
   silencios entre canciones.

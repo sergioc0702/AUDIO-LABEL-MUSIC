@@ -161,8 +161,3 @@ export async function findOnlineLyrics(
   }
   return fallback;
 }
-
-/** Plain lyrics are stored without timestamps; this marks them as such. */
-export function isSynced(contents: string): boolean {
-  return /\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]/.test(contents);
-}

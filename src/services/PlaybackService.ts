@@ -1,6 +1,7 @@
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { handlePlaybackFailure, resetPlaybackFailures } from './playbackErrors';
-import { skipToPreviousPlayerTrack } from './player';
+import { jumpSeconds, skipToPreviousPlayerTrack } from './player';
+import { rememberPosition, resumeIfLong } from './resumePositions';
 import { saveSession } from './session';
 import { checkSleepTimerDeadline, handleTrackFinished } from './sleepTimer';
 
@@ -20,21 +21,38 @@ export default async function PlaybackService() {
     TrackPlayer.seekTo(event.position),
   );
   TrackPlayer.addEventListener(Event.RemoteJumpForward, () =>
-    TrackPlayer.seekBy(15),
+    TrackPlayer.seekBy(jumpSeconds),
   );
   TrackPlayer.addEventListener(Event.RemoteJumpBackward, () =>
-    TrackPlayer.seekBy(-15),
+    TrackPlayer.seekBy(-jumpSeconds),
   );
   TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, event => {
     if (event.lastTrack) {
       handleTrackFinished(event.lastPosition, event.lastTrack.duration).catch(
         ignoreFailure,
       );
+      rememberPosition(
+        String(event.lastTrack.id),
+        event.lastPosition,
+        event.lastTrack.duration,
+      ).catch(ignoreFailure);
+    }
+    if (event.track) {
+      resumeIfLong(String(event.track.id), event.track.duration).catch(
+        ignoreFailure,
+      );
     }
     saveSession().catch(ignoreFailure);
   });
-  TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, () => {
+  TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, event => {
     checkSleepTimerDeadline().catch(ignoreFailure);
+    TrackPlayer.getActiveTrack()
+      .then(track =>
+        track
+          ? rememberPosition(String(track.id), event.position, track.duration)
+          : undefined,
+      )
+      .catch(ignoreFailure);
     saveSession().catch(ignoreFailure);
   });
   TrackPlayer.addEventListener(Event.PlaybackState, event => {
