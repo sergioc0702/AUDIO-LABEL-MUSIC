@@ -185,6 +185,92 @@ Todos están rediseñados y probados en el teléfono.
   la usa el tema Terminal.
 - `src/services/lyricsSearch.ts`: LRCLIB. El User-Agent es genérico y nunca
   debe llevar correos ni datos personales.
+- `PlaybackWidgetProvider.kt`: el widget de la pantalla de inicio, con dos
+  diseños (`widget_music.xml` y `widget_music_compact.xml`).
+  - Muestra la portada y usa los colores de la paleta activa, que
+    `AppContext` le manda con `storeWidgetColors`.
+  - Un `BroadcastReceiver` no puede enlazarse a un servicio con su propio
+    contexto: usa siempre `applicationContext`.
+
+## Estado y pendientes
+
+Última versión subida: commit `5fd9190` en `main`. Pasan tsc, eslint (0
+errores), 265 tests de jest y los tests de Kotlin de `:kotlin-audio` y `:app`.
+
+### Sin probar en el teléfono
+
+Estas funciones se escribieron y pasan sus tests, pero el dueño todavía no
+confirmó que funcionen bien. Antes de darlas por buenas, pídele que las pruebe
+y corrige lo que reporte.
+
+| Función | Qué comprobar | Dónde está |
+|---|---|---|
+| Fundido | Que no haya corte ni chasquido al empezar la mezcla; que con el fundido en 0 los cambios suenen como antes | `CrossfadeAudioProcessor.kt` |
+| Volumen parejo | Que no haya saltos de volumen al empezar una canción; que dos canciones de volumen distinto queden parecidas | `VolumeLeveler.kt`, `LoudnessMeter.kt` |
+| Selección múltiple | La barra, las cinco acciones y que Atrás la cancele | `src/screens/SelectionBar.tsx` |
+| Carpetas ocultas | Que al apagar una carpeta sus canciones salgan de la biblioteca | `src/screens/SettingsSheets.tsx`, `src/utils/folders.ts` |
+| Editar datos | Que el cambio se vea en listas, álbumes y artistas | `src/utils/trackEdits.ts` |
+| Audios largos | Que un audio de más de 20 minutos continúe donde se dejó | `src/services/resumePositions.ts` |
+| Tono de llamada | El aviso de permiso y que el tono cambie | `setAsRingtone` en `MusicLibraryModule.kt` |
+| Widget | Portada, colores de la paleta y botones, en los dos tamaños | `PlaybackWidgetProvider.kt` |
+
+Tampoco se probó nunca: una biblioteca de miles de canciones, Bluetooth y
+Android Auto.
+
+### Límites conocidos de lo ya hecho
+
+Son decisiones tomadas para no arriesgar, no errores. Cámbialas solo si el
+dueño lo pide.
+
+- **Editar datos no escribe en el archivo.** Los cambios se guardan en la
+  preferencia `trackEdits` y solo se ven en la app. No se puede cambiar la
+  portada. Escribir etiquetas de verdad necesita una librería de etiquetas y
+  `MediaStore.createWriteRequest`.
+- **Los saltos de 10 s** solo están en la hoja de Velocidad (`SpeedSheet` en
+  `src/player/Sheets.tsx`). No hay botones en los reproductores ni en la
+  notificación.
+- **El volumen parejo solo baja** las canciones fuertes (`levelingGain` nunca
+  pasa de 1). Subir las bajas necesita un limitador dentro del procesador de
+  audio.
+- **Una canción sin medir** suena al 60 % (`UNKNOWN_GAIN`) hasta que termina
+  su análisis, y entonces el volumen se ajusta en 0,4 s.
+- **El fundido se aplica siempre** en los cambios automáticos, también entre
+  canciones seguidas de un mismo álbum.
+- **Eliminar varias canciones a la vez** solo existe en Android 11 o posterior.
+- **La pulsación larga** sobre una canción ahora la selecciona; el menú quedó
+  en el botón ⋮. En las listas de reproducción sigue abriendo el menú, porque
+  ahí las filas se arrastran para reordenar.
+- **La copia de seguridad** guarda favoritas y listas, pero no las letras, los
+  datos corregidos, las carpetas ocultas ni los ajustes.
+
+### Ideas ofrecidas al dueño, sin decidir
+
+No las empieces sin que las pida. Sus tres preferidas por utilidad son las
+primeras.
+
+1. Escribir las etiquetas y la portada en el archivo.
+2. Botones de ±10 s a la vista en el reproductor y en la notificación cuando
+   el audio es largo.
+3. Listas inteligentes a partir del historial (no escuchadas hace un mes,
+   añadidas esta semana).
+4. Copia de seguridad completa.
+5. Buscar dentro de la cola y de una lista.
+6. Ordenar por artista, álbum, duración y año.
+7. Número de pista para que los álbumes suenen en su orden.
+8. Aviso de canciones duplicadas e información técnica del archivo.
+9. Subir las canciones bajas con un limitador.
+10. No fundir entre canciones seguidas de un mismo álbum.
+
+### Cómo corregir algo del sonido
+
+- Reproduce primero el fallo con un test en
+  `android/kotlin-audio/src/test/`. `CrossfadeAudioProcessorTest` simula lo que
+  hace el sink en un cambio de canción: `onStreamChange`, `configure`,
+  `queueEndOfStream` y `flush`, en ese orden.
+- El código real de ExoPlayer 2.19 que hay que respetar está en
+  `DefaultAudioSink.handleBuffer` y `MediaCodecRenderer.onProcessedOutputBuffer`.
+- Ningún test puede oír el resultado: después de compilar, pide al dueño que
+  escuche y describa en qué momento falla.
 
 ## Cómo se trabaja un rediseño
 
@@ -276,6 +362,11 @@ Todos están rediseñados y probados en el teléfono.
   - el menú "Más".
 - Si un tema mueve herramientas al menú "Más", añádelo a la lista de excepción
   de `the %s theme brings its own player`.
+- Al añadir una función al puente `src/native/musicLibrary.ts`, añádela también
+  al `jest.mock` de ese módulo en `__tests__/App.test.tsx`; si falta, la app
+  de prueba falla al llamarla.
+- Un test que cambia `getStoredPreference` debe dejarlo al final como estaba
+  (`mockResolvedValue(null)`), porque los mocks se comparten entre tests.
 - El mock de Reanimated está en `jest.setup.js`; ahí se añadieron
   `Easing.steps`, `withSpring`, `useDerivedValue` y `useAnimatedReaction`.
 - Mantén estas etiquetas, porque otros tests las usan:
