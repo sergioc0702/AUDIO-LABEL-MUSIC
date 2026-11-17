@@ -767,10 +767,8 @@ abstract class BaseAudioPlayer internal constructor(
             }
             if (refreshPlaybackWidget) {
                 context.sendBroadcast(
-                    Intent("com.mymusicapp.player.WIDGET_REFRESH").setClassName(
-                        context,
-                        "${context.packageName}.PlaybackWidgetProvider"
-                    )
+                    // The app's widget listens for this; the package is enough to reach it.
+                    Intent("com.mymusicapp.player.WIDGET_REFRESH").setPackage(context.packageName)
                 )
             }
         }

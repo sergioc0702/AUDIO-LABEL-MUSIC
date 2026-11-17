@@ -1,6 +1,7 @@
 package com.mymusicapp.player
 
 import android.app.Application
+import com.mymusicapp.player.library.MusicLibraryPackage
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost

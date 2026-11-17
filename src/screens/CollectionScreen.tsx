@@ -32,9 +32,9 @@ import {
   groupAlbums,
   resolveCollection,
   type CollectionRef,
-} from '../utils/collections';
+} from '../domain/collections';
 import { formatTrackCount } from '../utils/formatTrackCount';
-import { shuffleTracks } from '../utils/shuffleQueue';
+import { shuffleTracks } from '../domain/shuffleQueue';
 
 export function CollectionScreen({
   collection,

@@ -50,7 +50,10 @@ type MusicLibraryModule = {
   setPlaybackRate(rate: number): Promise<void>;
   getEqualizerSettings(): Promise<EqualizerSettings>;
   setEqualizerSettings(enabled: boolean, bandGainsDb: number[]): Promise<void>;
-  saveWidgetColors(colors: string[]): void;
+  saveWidgetLook(look: string): void;
+  refreshWidget(): void;
+  setNotificationShuffle(enabled: boolean): void;
+  refreshNotification(): void;
   getPlaybackTuning(): Promise<PlaybackTuning>;
   setVolumeLeveling(enabled: boolean): Promise<void>;
   setCrossfadeSeconds(seconds: number): Promise<void>;
@@ -363,21 +366,33 @@ export function setEqualizerSettings(
   return musicLibrary.setEqualizerSettings(enabled, bandGainsDb);
 }
 
-/** Dresses the home-screen widget in the colors of the active palette. */
-export function storeWidgetColors(colors: {
-  background: string;
-  text: string;
-  secondary: string;
-  button: string;
-  onButton: string;
-}) {
-  musicLibrary?.saveWidgetColors?.([
-    colors.background,
-    colors.text,
-    colors.secondary,
-    colors.button,
-    colors.onButton,
-  ]);
+/** The notification shows whether shuffle is on; the app keeps it in sync. */
+export function setNotificationShuffle(enabled: boolean) {
+  musicLibrary?.setNotificationShuffle?.(enabled);
+}
+
+/** Redraws the notification buttons, e.g. after a favorite changed. */
+export function refreshNotification() {
+  musicLibrary?.refreshNotification?.();
+}
+
+/** What the home-screen widget draws: the theme, its palette and its fonts. */
+export type WidgetLook = {
+  theme: string;
+  colors: Record<string, string>;
+  skin: Record<string, string>;
+  display?: string;
+  body?: string;
+};
+
+/** Dresses the home-screen widget in the active theme and palette. */
+export function storeWidgetLook(look: WidgetLook) {
+  musicLibrary?.saveWidgetLook?.(JSON.stringify(look));
+}
+
+/** Redraws the widget, e.g. so that its progress bar moves. */
+export function refreshWidget() {
+  musicLibrary?.refreshWidget?.();
 }
 
 export function getPlaybackTuning(): Promise<PlaybackTuning> {

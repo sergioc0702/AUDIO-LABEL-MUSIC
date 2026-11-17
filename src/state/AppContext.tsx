@@ -12,7 +12,7 @@ import { BackHandler } from 'react-native';
 import {
   getStoredAppearance,
   storeAppearance,
-  storeWidgetColors,
+  storeWidgetLook,
 } from '../native/musicLibrary';
 import { ColorsContext } from '../theme/theme';
 import {
@@ -22,7 +22,7 @@ import {
 } from '../themes/catalog';
 import type { AppTheme, Palette } from '../theme/types';
 import type { Playlist, Track } from '../types/Track';
-import type { CollectionRef } from '../utils/collections';
+import type { CollectionRef } from '../domain/collections';
 import { useMusicController, type MusicController } from './useMusicController';
 
 export type Tab = 'home' | 'search' | 'library';
@@ -71,6 +71,9 @@ type AppContextValue = {
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
+
+/** Time to press back a second time to leave the app, in milliseconds. */
+const exitPressWindow = 2000;
 
 export function useApp() {
   const value = useContext(AppContext);
@@ -160,13 +163,16 @@ export function AppProvider({
   );
   const music = useMusicController({ onPlaylistCreated });
   const route = stacks[tab][stacks[tab].length - 1] ?? null;
+  const lastBackPress = useRef(0);
 
+  const hasSelection = music.selectedIds.size > 0;
+  const { clearSelection, showQueueNotice } = music;
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        if (music.selectedIds.size > 0) {
-          music.clearSelection();
+        if (hasSelection) {
+          clearSelection();
           return true;
         }
         if (route) {
@@ -177,14 +183,20 @@ export function AppProvider({
           setTab('home');
           return true;
         }
-        return false;
+        // Leaving takes a second press, so one stray tap does not close the app.
+        const now = Date.now();
+        if (now - lastBackPress.current < exitPressWindow) {
+          return false;
+        }
+        lastBackPress.current = now;
+        showQueueNotice('Pulsa atrás otra vez para salir');
+        return true;
       },
     );
     return () => subscription.remove();
-  }, [music, pop, route, tab]);
+  }, [clearSelection, hasSelection, pop, route, showQueueNotice, tab]);
 
   // Picked songs belong to the screen they were picked on.
-  const clearSelection = music.clearSelection;
   useEffect(() => {
     clearSelection();
     // clearSelection only calls a state setter.
@@ -200,12 +212,23 @@ export function AppProvider({
 
   useEffect(() => {
     if (appearanceReady) {
-      storeWidgetColors({
-        background: palette.surface,
-        text: palette.text,
-        secondary: palette.textSecondary,
-        button: palette.control,
-        onButton: palette.onControl,
+      storeWidgetLook({
+        theme: palette.design.player,
+        colors: {
+          background: palette.background,
+          surface: palette.surface,
+          surfaceHigh: palette.surfaceHigh,
+          outline: palette.outline,
+          text: palette.text,
+          textSecondary: palette.textSecondary,
+          accent: palette.accent,
+          onAccent: palette.onAccent,
+          control: palette.control,
+          onControl: palette.onControl,
+        },
+        skin: palette.skin,
+        display: palette.design.fonts.display,
+        body: palette.design.fonts.body,
       });
     }
   }, [appearanceReady, palette]);

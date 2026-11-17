@@ -12,12 +12,12 @@ import {
 } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { crossfadeChoices } from '../state/useMusicController';
+import { crossfadeChoices } from '../state/music/useSoundSettings';
 import { spacing, createStyles, useColors } from '../theme/theme';
 import { Button } from '../ui/Buttons';
 import { Sheet, SheetAction } from '../ui/Sheet';
 import { formatTrackCount } from '../utils/formatTrackCount';
-import type { TrackEditForm } from '../utils/trackEdits';
+import type { TrackEditForm } from '../domain/trackEdits';
 
 export function CrossfadeSheet() {
   const { colors } = useColors();

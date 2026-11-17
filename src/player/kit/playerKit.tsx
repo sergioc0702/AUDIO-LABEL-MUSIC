@@ -14,7 +14,7 @@ import { RepeatMode } from 'react-native-track-player';
 import { useApp } from '../../state/AppContext';
 import { formatTime } from '../../utils/formatTime';
 import { usePlaybackProgress } from '../PlaybackProgress';
-import { useSleepTimer } from '../Sheets';
+import { useSleepTimer } from '../sheets';
 
 export type SkinProps = {
   covered: boolean;

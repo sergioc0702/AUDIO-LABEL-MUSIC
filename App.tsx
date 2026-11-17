@@ -8,13 +8,13 @@ import { TabBar } from './src/navigation/TabBar';
 import { MiniPlayer } from './src/player/MiniPlayer';
 import { PlaybackProgressProvider } from './src/player/PlaybackProgress';
 import { PlaybackWindow } from './src/player/PlaybackWindow';
-import { PaletteSheet, ThemeSheet } from './src/player/Sheets';
+import { PaletteSheet, ThemeSheet } from './src/player/sheets';
 import {
   AddToPlaylistSheet,
   PlaylistDialogs,
   PlaylistTrackPicker,
-  TrackMenu,
-} from './src/player/TrackMenu';
+} from './src/player/PlaylistDialogs';
+import { TrackMenu } from './src/player/TrackMenu';
 import { CollectionScreen } from './src/screens/CollectionScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { SelectionBar } from './src/screens/SelectionBar';

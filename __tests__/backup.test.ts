@@ -1,5 +1,5 @@
 import type { Playlist, Track } from '../src/types/Track';
-import { buildBackup, matchBackup, readBackup } from '../src/utils/backup';
+import { buildBackup, matchBackup, readBackup } from '../src/domain/backup';
 
 function makeTrack(id: string, title: string, artist = 'Artista'): Track {
   return {

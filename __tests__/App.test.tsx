@@ -11,7 +11,8 @@ import TrackPlayer, {
   type Track as PlayerTrack,
 } from 'react-native-track-player';
 import App from '../App';
-import PlaybackService from '../src/services/PlaybackService';
+import PlaybackService from '../src/services/playback/PlaybackService';
+import { rememberSessionDetails } from '../src/services/playback/session';
 import {
   createPlaylist,
   deletePlaylist,
@@ -104,6 +105,8 @@ jest.mock('react-native-track-player', () => ({
     SkipToNext: 'skip-to-next',
     SkipToPrevious: 'skip-to-previous',
     SeekTo: 'seek-to',
+    JumpForward: 'jump-forward',
+    JumpBackward: 'jump-backward',
   },
   State: { Playing: 'playing', Paused: 'paused' },
   Event: {
@@ -147,7 +150,10 @@ jest.mock('../src/native/musicLibrary', () => ({
   getStoredSession: jest.fn().mockResolvedValue(null),
   getStoredAppearance: jest.fn().mockResolvedValue(null),
   storeAppearance: jest.fn().mockResolvedValue(undefined),
-  storeWidgetColors: jest.fn(),
+  storeWidgetLook: jest.fn(),
+  refreshWidget: jest.fn(),
+  setNotificationShuffle: jest.fn(),
+  refreshNotification: jest.fn(),
   getMediaVolume: jest.fn().mockResolvedValue({ level: 0.2, fixed: false }),
   setMediaVolume: jest.fn().mockResolvedValue({ level: 0.9, fixed: false }),
   startVolumeUpdates: jest.fn(),
@@ -286,6 +292,12 @@ function mockLiveQueue(tracks: Track[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // The playback session outlives the screens in the app; each test starts fresh.
+  rememberSessionDetails({
+    shuffle: false,
+    originalTrackIds: [],
+    sourceLabel: 'Tu biblioteca',
+  });
   jest.mocked(getDeviceTracks).mockReset().mockResolvedValue([]);
   jest.mocked(getPlaylists).mockReset().mockResolvedValue([]);
   jest.mocked(getRecentPlayback).mockReset().mockResolvedValue([]);
@@ -727,6 +739,16 @@ test('hardware back closes a detail, then returns to Home', async () => {
   });
   await settle();
   expect(hasLabel('Ajustes')).toBe(true);
+
+  // On Home, the first press warns and only a second one leaves.
+  await ReactTestRenderer.act(async () => {
+    expect(back()).toBe(true);
+  });
+  await settle();
+  expect(screenText()).toContain('Pulsa atrás otra vez para salir');
+  await ReactTestRenderer.act(async () => {
+    expect(back()).toBe(false);
+  });
   addListener.mockRestore();
 });
 
@@ -2088,4 +2110,84 @@ test('a song can become the ringtone and the speed sheet jumps 10 seconds', asyn
   await press('Retroceder 10 segundos');
   expect(TrackPlayer.seekBy).toHaveBeenCalledWith(10);
   expect(TrackPlayer.seekBy).toHaveBeenCalledWith(-10);
+});
+
+test('buttons in the notification reach the app', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+  expect(hasLabel('Añadir a favoritas')).toBe(true);
+
+  await ReactTestRenderer.act(async () => {
+    DeviceEventEmitter.emit('notificationAction', {
+      action: 'favorite',
+      trackId: '1',
+    });
+  });
+  await settle();
+  expect(hasLabel('Quitar de favoritas')).toBe(true);
+
+  jest.mocked(TrackPlayer.getRepeatMode).mockResolvedValueOnce(1);
+  await ReactTestRenderer.act(async () => {
+    DeviceEventEmitter.emit('notificationAction', {
+      action: 'repeat',
+      trackId: '1',
+    });
+  });
+  await settle();
+  expect(hasLabel('Activar repetir cola')).toBe(true);
+});
+
+test('a long audio shows jump buttons in the notification', async () => {
+  const podcast = makeTrack('1', { duration: 3600 });
+  jest.mocked(getDeviceTracks).mockResolvedValue([podcast]);
+  setActive(podcast);
+  await renderApp();
+
+  expect(TrackPlayer.updateOptions).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      notificationCapabilities: expect.arrayContaining([
+        'jump-backward',
+        'jump-forward',
+      ]),
+    }),
+  );
+});
+
+test('changing song while paused starts playing it', async () => {
+  const tracks = [makeTrack('1'), makeTrack('2')];
+  jest.mocked(getDeviceTracks).mockResolvedValue(tracks);
+  setActive(tracks[0]);
+  await renderApp();
+  await press('Abrir reproductor: Tema 1 de Artista');
+
+  await press('Siguiente canción');
+  expect(TrackPlayer.skipToNext).toHaveBeenCalled();
+  expect(TrackPlayer.play).toHaveBeenCalledTimes(1);
+
+  await press('Canción anterior');
+  expect(TrackPlayer.skipToPrevious).toHaveBeenCalled();
+  expect(TrackPlayer.play).toHaveBeenCalledTimes(2);
+});
+
+test('shuffle from the widget works with the screens closed', async () => {
+  const queue = toQueue([makeTrack('1'), makeTrack('2'), makeTrack('3')]);
+  jest.mocked(TrackPlayer.getQueue).mockResolvedValue(queue);
+  jest.mocked(TrackPlayer.getActiveTrackIndex).mockResolvedValue(0);
+  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  await PlaybackService();
+
+  await ReactTestRenderer.act(async () => {
+    DeviceEventEmitter.emit('notificationAction', { action: 'shuffle' });
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  });
+
+  expect(TrackPlayer.moveTracks).toHaveBeenCalledWith(
+    expect.any(Array),
+    ['1', '2', '3'],
+    '1',
+  );
+  randomSpy.mockRestore();
 });

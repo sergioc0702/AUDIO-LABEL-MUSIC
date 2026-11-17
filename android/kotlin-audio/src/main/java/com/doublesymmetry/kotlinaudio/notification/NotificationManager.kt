@@ -338,7 +338,55 @@ class NotificationManager internal constructor(
             }
         )
         mediaSessionConnector.setMetadataDeduplicationEnabled(true)
+        NotificationExtras.onChange = {
+            internalNotificationManager?.invalidate()
+            mediaSessionConnector.invalidateMediaSessionPlaybackState()
+        }
     }
+
+    private fun currentUri() = player.currentMediaItem?.localConfiguration?.uri?.toString()
+
+    /** The extra button keys to show now, one per button, matching the current state. */
+    private fun extraActionKeys(): List<String> {
+        val favorite = if (NotificationExtras.isFavorite(currentUri())) FAVORITE_ON else FAVORITE_OFF
+        val shuffle = if (NotificationExtras.shuffle) SHUFFLE_ON else SHUFFLE_OFF
+        val repeat = when (player.repeatMode) {
+            Player.REPEAT_MODE_ONE -> REPEAT_ONE
+            Player.REPEAT_MODE_ALL -> REPEAT_ALL
+            else -> REPEAT_OFF
+        }
+        return listOf(favorite, shuffle, repeat)
+    }
+
+    private fun handleExtraAction(key: String) {
+        val action = EXTRA_ACTIONS[key] ?: return
+        if (action == NotificationExtras.REPEAT) {
+            player.repeatMode = when (player.repeatMode) {
+                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+                Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+                else -> Player.REPEAT_MODE_OFF
+            }
+        }
+        if (action == NotificationExtras.SHUFFLE) {
+            // The button shows its new state at once; the app confirms it right after.
+            NotificationExtras.shuffle = !NotificationExtras.shuffle
+        }
+        NotificationExtras.onAction(action, currentUri())
+        NotificationExtras.refresh()
+    }
+
+    private fun extraMediaSessionAction(position: Int): MediaSessionConnector.CustomActionProvider =
+        object : MediaSessionConnector.CustomActionProvider {
+            override fun getCustomAction(player: Player): PlaybackStateCompat.CustomAction {
+                val key = extraActionKeys()[position]
+                return PlaybackStateCompat.CustomAction.Builder(key, EXTRA_LABELS.getValue(key), EXTRA_ICONS.getValue(key))
+                    .build()
+            }
+
+            override fun onCustomAction(player: Player, action: String, extras: Bundle?) {
+                handleExtraAction(action)
+            }
+        }
 
     /**
      * Overrides the notification metadata with the given [AudioItem].
@@ -432,8 +480,11 @@ class NotificationManager internal constructor(
             context: Context,
             instanceId: Int
         ): MutableMap<String, NotificationCompat.Action> {
-            if (!needsCustomActionsToAddMissingButtons) return mutableMapOf()
-            return mutableMapOf(
+            val extras = EXTRA_ICONS.mapValues { (key, icon) ->
+                createNotificationAction(icon, key, instanceId)
+            }
+            if (!needsCustomActionsToAddMissingButtons) return extras.toMutableMap()
+            return (extras + mapOf(
                 REWIND to createNotificationAction(
                     rewindIcon ?: DEFAULT_REWIND_ICON,
                     REWIND,
@@ -449,11 +500,11 @@ class NotificationManager internal constructor(
                     STOP,
                     instanceId
                 )
-            )
+            )).toMutableMap()
         }
 
         override fun getCustomActions(player: Player): List<String> {
-            if (!needsCustomActionsToAddMissingButtons) return emptyList()
+            if (!needsCustomActionsToAddMissingButtons) return extraActionKeys()
             return buttons.mapNotNull {
                 when (it) {
                     is NotificationButton.BACKWARD -> {
@@ -469,11 +520,11 @@ class NotificationManager internal constructor(
                         null
                     }
                 }
-            }
+            } + extraActionKeys()
         }
 
         override fun onCustomAction(player: Player, action: String, intent: Intent) {
-            handlePlayerAction(action)
+            if (action in EXTRA_ACTIONS) handleExtraAction(action) else handlePlayerAction(action)
         }
     }
 
@@ -681,7 +732,10 @@ class NotificationManager internal constructor(
                         }
                     }
                 }
-            mediaSessionConnector.setCustomActionProviders(*customActionProviders.toTypedArray())
+            val jumps = customActionProviders.dropLast(if (buttons.any { it is NotificationButton.STOP }) 1 else 0)
+            val stop = customActionProviders.drop(jumps.size)
+            val extras = List(EXTRA_SLOTS) { extraMediaSessionAction(it) }
+            mediaSessionConnector.setCustomActionProviders(*(jumps + extras + stop).toTypedArray())
         }
     }
 
@@ -785,13 +839,46 @@ class NotificationManager internal constructor(
         private const val REWIND = "rewind"
         private const val FORWARD = "forward"
         private const val STOP = "stop"
+        private const val EXTRA_SLOTS = 3
+        private const val FAVORITE_ON = "com.mymusicapp.player.FAVORITE_ON"
+        private const val FAVORITE_OFF = "com.mymusicapp.player.FAVORITE_OFF"
+        private const val SHUFFLE_ON = "com.mymusicapp.player.SHUFFLE_ON"
+        private const val SHUFFLE_OFF = "com.mymusicapp.player.SHUFFLE_OFF"
+        private const val REPEAT_OFF = "com.mymusicapp.player.REPEAT_OFF"
+        private const val REPEAT_ALL = "com.mymusicapp.player.REPEAT_ALL"
+        private const val REPEAT_ONE = "com.mymusicapp.player.REPEAT_ONE"
+        private val EXTRA_ACTIONS = mapOf(
+            FAVORITE_ON to NotificationExtras.FAVORITE,
+            FAVORITE_OFF to NotificationExtras.FAVORITE,
+            SHUFFLE_ON to NotificationExtras.SHUFFLE,
+            SHUFFLE_OFF to NotificationExtras.SHUFFLE,
+            REPEAT_OFF to NotificationExtras.REPEAT,
+            REPEAT_ALL to NotificationExtras.REPEAT,
+            REPEAT_ONE to NotificationExtras.REPEAT,
+        )
+        private val EXTRA_ICONS = mapOf(
+            FAVORITE_ON to R.drawable.ic_notification_favorite_on,
+            FAVORITE_OFF to R.drawable.ic_notification_favorite_off,
+            SHUFFLE_ON to R.drawable.ic_notification_shuffle_on,
+            SHUFFLE_OFF to R.drawable.ic_notification_shuffle_off,
+            REPEAT_OFF to R.drawable.ic_notification_repeat_off,
+            REPEAT_ALL to R.drawable.ic_notification_repeat_all,
+            REPEAT_ONE to R.drawable.ic_notification_repeat_one,
+        )
+        private val EXTRA_LABELS = mapOf(
+            FAVORITE_ON to "Quitar de favoritas",
+            FAVORITE_OFF to "Añadir a favoritas",
+            SHUFFLE_ON to "Desactivar mezcla",
+            SHUFFLE_OFF to "Mezclar",
+            REPEAT_OFF to "Repetir canción",
+            REPEAT_ALL to "Desactivar repetición",
+            REPEAT_ONE to "Repetir cola",
+        )
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_ID = "kotlin_audio_player"
         private val DEFAULT_STOP_ICON =
             com.google.android.exoplayer2.ui.R.drawable.exo_notification_stop
-        private val DEFAULT_REWIND_ICON =
-            com.google.android.exoplayer2.ui.R.drawable.exo_notification_rewind
-        private val DEFAULT_FORWARD_ICON =
-            com.google.android.exoplayer2.ui.R.drawable.exo_notification_fastforward
+        private val DEFAULT_REWIND_ICON = R.drawable.ic_notification_back10
+        private val DEFAULT_FORWARD_ICON = R.drawable.ic_notification_forward10
     }
 }

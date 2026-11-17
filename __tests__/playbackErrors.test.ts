@@ -2,7 +2,7 @@ import TrackPlayer from 'react-native-track-player';
 import {
   handlePlaybackFailure,
   resetPlaybackFailures,
-} from '../src/services/playbackErrors';
+} from '../src/services/playback/playbackErrors';
 
 jest.mock('react-native-track-player', () => ({
   __esModule: true,

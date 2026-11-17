@@ -1,4 +1,4 @@
-import { resolveActiveQueueIndex } from '../src/utils/shuffleQueue';
+import { resolveActiveQueueIndex } from '../src/domain/shuffleQueue';
 
 test('prefers the native active index when it is valid', () => {
   expect(resolveActiveQueueIndex(['a', 'b', 'c'], 2, 'a')).toBe(2);

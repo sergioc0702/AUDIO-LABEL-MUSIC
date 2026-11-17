@@ -1,9 +1,9 @@
-import { normalizeGenre, sortTracks } from '../src/utils/sortTracks';
+import { normalizeGenre, sortTracks } from '../src/domain/sortTracks';
 import {
   buildQueueMoves,
   restoreUpcomingTrackOrder,
   shuffleUpcomingTracks,
-} from '../src/utils/shuffleQueue';
+} from '../src/domain/shuffleQueue';
 import type { Track } from '../src/types/Track';
 
 const tracks: Track[] = [

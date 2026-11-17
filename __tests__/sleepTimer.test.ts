@@ -6,7 +6,7 @@ import {
   handleTrackFinished,
   startSleepTimer,
   stopAtEndOfTrack,
-} from '../src/services/sleepTimer';
+} from '../src/services/playback/sleepTimer';
 
 jest.mock('react-native-track-player', () => ({
   __esModule: true,

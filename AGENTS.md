@@ -53,17 +53,46 @@ cd android && ./gradlew :kotlin-audio:testDebugUnitTest
 
 ```
 App.tsx                      pantallas, mini-reproductor, pestañas y hojas
+index.js                     registra App y el servicio de reproducción
 src/
-  state/                     lógica sin interfaz
-    useMusicController.ts    biblioteca, cola, listas y reproducción
-    AppContext.tsx           navegación y estado compartido (useApp)
-  screens/                   Inicio, Buscar, Biblioteca, detalle y Ajustes
+  state/                     estado y acciones, sin interfaz
+    AppContext.tsx           navegación, Atrás y estado compartido (useApp)
+    useMusicController.ts    une las piezas de music/ y maneja el reproductor:
+                             cola, mezcla, repetir, sesión y eliminar canciones
+    music/                   una pieza por tema
+      useNotices.ts          errores y avisos cortos de abajo
+      useLibrary.ts          permiso, canciones, favoritas, carpetas, datos corregidos
+      usePlaybackHistory.ts  recientes y más escuchadas
+      usePlaylists.ts        listas, sus diálogos, el selector y M3U
+      useSoundSettings.ts    velocidad, ecualizador, volumen parejo y fundido
+      useTrackFiles.ts       compartir, tono, copia de seguridad y letras
+      useSelection.ts        selección múltiple
+      failure.ts             describeFailure: el texto de un error
+  domain/                    reglas de la música, puras y con tests
+                             (backup, collections, folders, lyrics, m3u,
+                             shuffleQueue, sortTracks, trackEdits)
+  services/
+    playback/                lo que corre aunque la app esté cerrada
+      PlaybackService.ts     botones de la notificación, del widget y del bloqueo
+      player.ts              envoltorio de TrackPlayer (saltos, cola, opciones)
+      session.ts             cola guardada y detalles (mezcla, origen)
+      remoteShuffle.ts       mezcla desde el widget con las pantallas cerradas
+      resumePositions.ts     posición guardada de los audios largos
+      sleepTimer.ts, playbackErrors.ts
+    lyricsSearch.ts          LRCLIB
+  native/musicLibrary.ts     puente con el módulo nativo
+  screens/                   Inicio (+ HomeShortcuts), Buscar, Biblioteca,
+                             detalle, Ajustes (+ SettingsSheets) y SelectionBar
   navigation/TabBar.tsx      barra de pestañas (un aspecto por design.tabs)
   player/                    piezas comunes del reproductor
     PlaybackWindow.tsx       ventana que se abre y se cierra deslizando
     ThemedPlayer.tsx         elige el reproductor del tema activo
     MiniPlayer.tsx           mini-reproductor (un aspecto por design.mini)
-    Sheets.tsx, TrackMenu.tsx, PlaybackQueue.tsx, controls.tsx …
+    TrackMenu.tsx            menú de una canción
+    PlaylistDialogs.tsx      añadir a lista, nombre, borrar y elegir canciones
+    sheets/                  una hoja por archivo: temporizador, velocidad,
+                             ecualizador, letras, tema y paleta, cola
+    PlaybackQueue.tsx, controls.tsx …
     kit/                     lo que comparten los reproductores con tema
       playerKit.tsx          usePlayerKit, SeekArea, DragHeader, useTrackChange
       sceneClock.ts          useSceneClock y formas SVG animadas
@@ -78,20 +107,37 @@ src/
     <id>/<Nombre>Player.tsx  su reproductor a pantalla completa
     <id>/…                   ayudantes propios (dibujos, datos, lógica pura)
   ui/                        componentes reutilizables
-  services/                  servicio de reproducción, sesión, temporizador, LRCLIB
-    resumePositions.ts       posición guardada de los audios largos
-  utils/                     lógica pura con tests (folders.ts, trackEdits.ts …)
-  native/                    puente con MediaStore y Room
+  hooks/                     volumen del teléfono y movimiento reducido
+  utils/                     formatos (tiempo, número de canciones)
+  types/Track.ts             Track, Playlist y el historial
+android/app/src/main/java/com/mymusicapp/player/
+  MainActivity.kt, MainApplication.kt
+  library/                   módulo de React: MediaStore, archivos y ajustes
+    MusicLibraryModule.kt    lo que llama src/native/musicLibrary.ts
+    PixelCover.kt            la carátula en pixel art del tema Terminal
+  data/PlaylistDatabase.kt   Room: listas, historial, letras y metadatos
+  widget/                    el widget de la pantalla de inicio
+    PlaybackWidgetProvider.kt  botones, tamaño y estado del reproductor
+    WidgetPainter.kt         dibuja el widget al estilo de cada tema
+  auto/                      Android Auto (AndroidAutoService, MediaCatalog)
 android/kotlin-audio/        copia propia de KotlinAudio
   audio/SoftwareEqualizerAudioProcessor.kt   ecualizador y fábrica de renderers
   audio/CrossfadeAudioProcessor.kt           fundido y PlaybackTuning (ajustes)
   audio/LoudnessMeter.kt                     medidor de sonoridad (BS.1770)
   audio/VolumeLeveler.kt                     analiza canciones y aplica el nivel
+  notification/NotificationManager.kt        botones de la notificación
+  notification/NotificationExtras.kt         estado de favorita, mezcla y repetir
 ```
+
+- Un archivo hace una sola cosa y se llama como lo que hace. Si un archivo
+  pasa de unas 800 líneas, sepáralo en partes (como `state/music/` o
+  `player/sheets/`).
+- La lógica pura va en `domain/` con su test; los hooks de `state/` la usan.
+- Los textos de error se arman con `describeFailure(error, prefijo, respaldo)`.
 
 ### Funciones de la biblioteca y del sonido
 
-- **Selección múltiple:** `selectedIds` vive en `useMusicController`. Las filas
+- **Selección múltiple:** `selectedIds` vive en `state/music/useSelection.ts`. Las filas
   la reciben con `useTrackSelection()` y la barra es
   `src/screens/SelectionBar.tsx`. Una pulsación larga marca la canción; el menú
   queda en el botón ⋮. La selección se vacía al cambiar de pantalla o con Atrás.
@@ -108,6 +154,11 @@ android/kotlin-audio/        copia propia de KotlinAudio
   el procesador conserva esa cola durante el `configure → fin de flujo → flush`
   que hace el sink en cada cambio. Un salto o una búsqueda la descartan
   (`cancelBlend`). El temporizador «al terminar la canción» lo suspende.
+- **Atrás:** cierra la selección, vuelve de una pantalla de detalle o a
+  Inicio. En Inicio pide un segundo toque antes de 2 s («Pulsa atrás otra vez
+  para salir»); la música sigue sonando.
+- **Cambiar de canción** desde la app, el widget, la notificación o el
+  bloqueo siempre la reproduce, aunque estuviera en pausa.
 
 ### Los temas
 
@@ -178,44 +229,43 @@ Todos están rediseñados y probados en el teléfono.
 
 ### Nativo
 
-- `src/native/musicLibrary.ts` y
-  `android/app/src/main/java/com/mymusicapp/player/MusicLibraryModule.kt`:
-  MediaStore, Room, carátulas y `getPixelCover`. Esta última convierte la
-  carátula en pixel art (recorte cuadrado, Bayer 4×4, 6 tonos, PNG en caché);
-  la usa el tema Terminal.
+- `src/native/musicLibrary.ts` y `library/MusicLibraryModule.kt`: MediaStore,
+  Room, carátulas, archivos y ajustes. `getPixelCover` (en `PixelCover.kt`)
+  convierte la carátula en pixel art (recorte cuadrado, Bayer 4×4, 6 tonos,
+  PNG en caché); la usa el tema Terminal.
 - `src/services/lyricsSearch.ts`: LRCLIB. El User-Agent es genérico y nunca
   debe llevar correos ni datos personales.
-- `PlaybackWidgetProvider.kt`: el widget de la pantalla de inicio, con dos
-  diseños (`widget_music.xml` y `widget_music_compact.xml`).
-  - Muestra la portada y usa los colores de la paleta activa, que
-    `AppContext` le manda con `storeWidgetColors`.
+- **Notificación y bloqueo:** además de reproducir y saltar, traen favorita,
+  mezcla y repetir (`NotificationExtras`). Un audio largo cambia anterior y
+  siguiente por ±10 s (`setLongAudioControls`). En Android 13 o posterior el
+  sistema solo muestra 2 botones extra.
+  - Un toque llega a JS como el evento `notificationAction`. Con las
+    pantallas abiertas lo atiende `useMusicController`; cerradas, la mezcla la
+    hace `remoteShuffle.ts` en el servicio de reproducción.
+  - El botón de mezcla cambia al instante y la app lo confirma o lo corrige
+    con `setNotificationShuffle`.
+- **Widget** (`widget/`): un solo diseño de 4 × 2 (`widget_music.xml`). Es un
+  dibujo de `WidgetPainter` con el estilo del tema y la paleta que
+  `AppContext` guarda con `storeWidgetLook`, más zonas táctiles invisibles en
+  la misma cuadrícula: el corazón arriba a la derecha y cinco botones abajo.
+  - Se redibuja con cada aviso del reproductor (`WIDGET_REFRESH`, que
+    KotlinAudio manda con `setPackage`) y cada 5 s mientras suena. La
+    carátula se lee una vez por canción.
   - Un `BroadcastReceiver` no puede enlazarse a un servicio con su propio
     contexto: usa siempre `applicationContext`.
 
 ## Estado y pendientes
 
-Última versión subida: commit `5fd9190` en `main`. Pasan tsc, eslint (0
-errores), 265 tests de jest y los tests de Kotlin de `:kotlin-audio` y `:app`.
+Todo está en `main`. Pasan tsc, eslint (0 errores), 269 tests de jest y los
+tests de Kotlin de `:kotlin-audio` y `:app`.
 
-### Sin probar en el teléfono
+El dueño probó en el teléfono y confirmó que funcionan: el fundido, el volumen
+parejo, la selección múltiple, las carpetas ocultas, editar datos, los audios
+largos, el tono de llamada, el widget con el estilo de cada tema, los botones
+de la notificación y el doble toque de Atrás.
 
-Estas funciones se escribieron y pasan sus tests, pero el dueño todavía no
-confirmó que funcionen bien. Antes de darlas por buenas, pídele que las pruebe
-y corrige lo que reporte.
-
-| Función | Qué comprobar | Dónde está |
-|---|---|---|
-| Fundido | Que no haya corte ni chasquido al empezar la mezcla; que con el fundido en 0 los cambios suenen como antes | `CrossfadeAudioProcessor.kt` |
-| Volumen parejo | Que no haya saltos de volumen al empezar una canción; que dos canciones de volumen distinto queden parecidas | `VolumeLeveler.kt`, `LoudnessMeter.kt` |
-| Selección múltiple | La barra, las cinco acciones y que Atrás la cancele | `src/screens/SelectionBar.tsx` |
-| Carpetas ocultas | Que al apagar una carpeta sus canciones salgan de la biblioteca | `src/screens/SettingsSheets.tsx`, `src/utils/folders.ts` |
-| Editar datos | Que el cambio se vea en listas, álbumes y artistas | `src/utils/trackEdits.ts` |
-| Audios largos | Que un audio de más de 20 minutos continúe donde se dejó | `src/services/resumePositions.ts` |
-| Tono de llamada | El aviso de permiso y que el tono cambie | `setAsRingtone` en `MusicLibraryModule.kt` |
-| Widget | Portada, colores de la paleta y botones, en los dos tamaños | `PlaybackWidgetProvider.kt` |
-
-Tampoco se probó nunca: una biblioteca de miles de canciones, Bluetooth y
-Android Auto.
+Nunca se probó: una biblioteca de miles de canciones, Bluetooth y Android
+Auto.
 
 ### Límites conocidos de lo ya hecho
 
@@ -226,9 +276,11 @@ dueño lo pide.
   preferencia `trackEdits` y solo se ven en la app. No se puede cambiar la
   portada. Escribir etiquetas de verdad necesita una librería de etiquetas y
   `MediaStore.createWriteRequest`.
-- **Los saltos de 10 s** solo están en la hoja de Velocidad (`SpeedSheet` en
-  `src/player/Sheets.tsx`). No hay botones en los reproductores ni en la
-  notificación.
+- **Los saltos de 10 s** están en la hoja de Velocidad (`SpeedSheet`) y, solo
+  con audios largos, en la notificación y el widget. No hay botones en los
+  reproductores.
+- **La barra de progreso del widget** avanza cada 5 s, con los avisos de
+  progreso del reproductor.
 - **El volumen parejo solo baja** las canciones fuertes (`levelingGain` nunca
   pasa de 1). Subir las bajas necesita un limitador dentro del procesador de
   audio.
@@ -249,8 +301,7 @@ No las empieces sin que las pida. Sus tres preferidas por utilidad son las
 primeras.
 
 1. Escribir las etiquetas y la portada en el archivo.
-2. Botones de ±10 s a la vista en el reproductor y en la notificación cuando
-   el audio es largo.
+2. Botones de ±10 s a la vista en los reproductores cuando el audio es largo.
 3. Listas inteligentes a partir del historial (no escuchadas hace un mes,
    añadidas esta semana).
 4. Copia de seguridad completa.

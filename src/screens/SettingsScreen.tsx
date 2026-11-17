@@ -17,7 +17,7 @@ import {
   Volume2,
 } from 'lucide-react-native';
 import { useApp } from '../state/AppContext';
-import { shortAudioSeconds } from '../state/useMusicController';
+import { shortAudioSeconds } from '../state/music/useLibrary';
 import {
   screenPadding,
   spacing,

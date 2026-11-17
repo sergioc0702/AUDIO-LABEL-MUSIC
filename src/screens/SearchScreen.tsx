@@ -28,7 +28,7 @@ import {
   groupGenres,
   normalizeText,
   type TrackGroup,
-} from '../utils/collections';
+} from '../domain/collections';
 
 type Result =
   | { type: 'track'; key: string; track: Track }

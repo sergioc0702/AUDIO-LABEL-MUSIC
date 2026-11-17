@@ -36,10 +36,10 @@ import {
   groupAlbums,
   groupArtists,
   groupFolders,
-} from '../utils/collections';
+} from '../domain/collections';
 import { formatTrackCount } from '../utils/formatTrackCount';
-import { shuffleTracks } from '../utils/shuffleQueue';
-import { sortTracks, type TrackSort } from '../utils/sortTracks';
+import { shuffleTracks } from '../domain/shuffleQueue';
+import { sortTracks, type TrackSort } from '../domain/sortTracks';
 import { getStoredPreference, storePreference } from '../native/musicLibrary';
 
 const filters: { id: LibraryFilter; label: string }[] = [

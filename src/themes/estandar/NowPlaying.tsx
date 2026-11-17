@@ -35,7 +35,7 @@ import { PlayPauseIcon } from '../../player/PlayPauseIcon';
 import { PlayerScene } from './PlayerScene';
 import { PlayerSeekBar } from '../../player/PlayerSeekBar';
 import { acceptsSwipe, clamp, playerMotion } from '../../player/playerMotion';
-import { useSleepTimer } from '../../player/Sheets';
+import { useSleepTimer } from '../../player/sheets';
 
 function Tool({
   active = false,

@@ -9,18 +9,18 @@ import {
   resumeIfLong,
   resumeTarget,
   skipNextResume,
-} from '../src/services/resumePositions';
+} from '../src/services/playback/resumePositions';
 import type { Track } from '../src/types/Track';
 import {
   listDeviceFolders,
   readExcludedFolders,
   withoutExcludedFolders,
-} from '../src/utils/folders';
+} from '../src/domain/folders';
 import {
   applyTrackEdits,
   buildTrackEdit,
   readTrackEdits,
-} from '../src/utils/trackEdits';
+} from '../src/domain/trackEdits';
 
 jest.mock('react-native-track-player', () => ({
   __esModule: true,

@@ -1,4 +1,4 @@
-import { buildM3u, parseM3u, resolveM3u } from '../src/utils/m3u';
+import { buildM3u, parseM3u, resolveM3u } from '../src/domain/m3u';
 import type { Track } from '../src/types/Track';
 
 const track = (

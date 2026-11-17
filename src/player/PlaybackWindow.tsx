@@ -34,7 +34,7 @@ import {
   QueueSheet,
   SleepTimerSheet,
   SpeedSheet,
-} from './Sheets';
+} from './sheets';
 
 const panels = {
   queue: { content: QueueSheet, close: 'Cerrar cola', tall: true },

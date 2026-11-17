@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
-  AppState,
   DeviceEventEmitter,
-  Linking,
   PermissionsAndroid,
   Platform,
 } from 'react-native';
@@ -18,9 +16,10 @@ import {
   getActivePlayerTrackIndex,
   getPlayerQueue,
   jumpPlayerBy,
+  setLongAudioControls,
   getPlayerRepeatMode,
   movePlayerTrack,
-  movePlayerTracks,
+  reorderUpcomingTracks,
   onPlayerError,
   pausePlayer,
   playPlayer,
@@ -29,104 +28,50 @@ import {
   replacePlayerQueue,
   resetPlayerQueue,
   seekPlayerTo,
-  setPlayerRate,
   setPlayerRepeatMode,
   setupPlayer,
   skipToNextPlayerTrack,
   skipToPlayerTrack,
   skipToPreviousPlayerTrack,
-} from '../services/player';
-import { onResumed } from '../services/resumePositions';
+} from '../services/playback/player';
 import {
+  longAudioSeconds,
+  onResumed,
+} from '../services/playback/resumePositions';
+import { claimRemoteShuffle } from '../services/playback/remoteShuffle';
+import {
+  getSessionDetails,
   readSession,
   rememberSessionDetails,
   restoreSession,
   saveSession,
-} from '../services/session';
+} from '../services/playback/session';
 import {
-  clearPlaybackHistory,
-  createPlaylist,
-  deletePlaylist,
   deleteTrackFromDevice,
   deleteTracksFromDevice,
-  exportBackupFile,
-  getDeviceTracks,
-  getEqualizerSettings,
-  getFavoriteTrackIds,
-  getStoredLyrics,
-  getPlaybackRate,
-  getPlaybackTuning,
-  getPlaylists,
-  getRecentPlayback,
-  getStoredPreference,
-  getTopPlayed,
-  importBackupFile,
-  importLrcFile,
-  importM3uFile,
   recordPlaybackHistory,
-  renamePlaylist,
-  setEqualizerSettings as persistEqualizerSettings,
-  setPlaybackRate as persistPlaybackRate,
-  setPlaylistTracks,
-  storeLyrics,
-  removeStoredLyrics,
-  setCrossfadeSeconds as persistCrossfadeSeconds,
-  setTrackAsRingtone,
   setTrackFavorite,
-  setVolumeLeveling,
-  shareTrackFile,
-  storePreference,
+  refreshNotification,
+  setNotificationShuffle,
   storeSession,
 } from '../native/musicLibrary';
-import type { EqualizerSettings } from '../native/musicLibrary';
-import type {
-  Playlist,
-  RecentPlayback,
-  TopPlayed,
-  Track,
-} from '../types/Track';
-import { buildBackup, matchBackup, readBackup } from '../utils/backup';
+import type { Playlist, Track } from '../types/Track';
+import { describeFailure } from './music/failure';
+import { useLibrary } from './music/useLibrary';
+import { useNotices } from './music/useNotices';
+import { usePlaybackHistory } from './music/usePlaybackHistory';
+import { usePlaylists } from './music/usePlaylists';
+import { useSelection } from './music/useSelection';
+import { useSoundSettings } from './music/useSoundSettings';
+import { useTrackFiles } from './music/useTrackFiles';
 import { formatTrackCount } from '../utils/formatTrackCount';
-import {
-  listDeviceFolders,
-  readExcludedFolders,
-  withoutExcludedFolders,
-  type DeviceFolder,
-} from '../utils/folders';
 import { formatTime } from '../utils/formatTime';
-import { buildM3u, resolveM3u } from '../utils/m3u';
 import {
-  applyTrackEdits,
-  buildTrackEdit,
-  readTrackEdits,
-  type TrackEditForm,
-  type TrackEdits,
-} from '../utils/trackEdits';
-import { parseLrc } from '../utils/lyrics';
-import { exportM3uFile } from '../native/musicLibrary';
-import {
-  buildQueueMoves,
   resolveActiveQueueIndex,
   restoreUpcomingTrackOrder,
   shuffleTracks,
   shuffleUpcomingTracks,
-} from '../utils/shuffleQueue';
-
-export const playbackRates = [0.75, 1, 1.25, 1.5, 2];
-const equalizerBandCount = 5;
-export const shortAudioSeconds = 30;
-
-export const crossfadeChoices = [0, 2, 4, 6, 8, 12];
-
-const hideShortAudioKey = 'hideShortAudio';
-const excludedFoldersKey = 'excludedFolders';
-const trackEditsKey = 'trackEdits';
-
-function libraryPermission() {
-  return Number(Platform.Version) >= 33
-    ? ('android.permission.READ_MEDIA_AUDIO' as const)
-    : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-}
+} from '../domain/shuffleQueue';
 
 type PendingQueueRemoval = {
   track: Track;
@@ -138,133 +83,86 @@ type PendingQueueRemoval = {
   nextTrackId: string | null;
 };
 
+/**
+ * Everything the screens can do with the music. The library, playlists,
+ * history, sound settings, files and selection live in ./music; this hook
+ * joins them and owns what touches the player: the queue, shuffle, repeat,
+ * the saved session and deleting songs.
+ */
 export function useMusicController({
   onPlaylistCreated,
 }: {
   onPlaylistCreated?: (playlist: Playlist) => void;
 } = {}) {
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [playlistNameDialog, setPlaylistNameDialog] = useState<{
-    playlistId: string | null;
-    name: string;
-    trackIds?: string[];
-  } | null>(null);
-  const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(
-    null,
-  );
-  const [trackPickerPlaylistId, setTrackPickerPlaylistId] = useState<
-    string | null
-  >(null);
-  const [draftPlaylistTrackIds, setDraftPlaylistTrackIds] = useState<
-    Set<string>
-  >(new Set());
-  const [playlistTrackSearch, setPlaylistTrackSearch] = useState('');
-  const [playlistDialogError, setPlaylistDialogError] = useState<string | null>(
-    null,
-  );
-  const [savingPlaylist, setSavingPlaylist] = useState(false);
+  const notices = useNotices();
+  const { setErrorMessage, setRetryableError, showQueueNotice } = notices;
+  const library = useLibrary(notices);
+  const {
+    tracks,
+    setTracks,
+    tracksById,
+    favoriteIds,
+    setFavoriteIds,
+    loadLibrary,
+  } = library;
+  const history = usePlaybackHistory({ tracksById, ...notices });
+  const { setRecentPlayback, setTopPlayed, loadPlaybackHistory } = history;
+  const playlistState = usePlaylists({
+    tracks,
+    tracksById,
+    onPlaylistCreated,
+    ...notices,
+  });
+  const {
+    playlists,
+    setPlaylists,
+    loadPlaylists,
+    setPlaylistNameDialog,
+    setPlaylistDialogError,
+  } = playlistState;
+  const sound = useSoundSettings(notices);
+  const { restoreEqualizer, restoreTuning } = sound;
+  const selection = useSelection({ tracks, tracksById });
+  const { selectedTracks, clearSelection } = selection;
   const [playbackQueue, setPlaybackQueue] = useState<Track[]>([]);
   const [queueUpdating, setQueueUpdating] = useState(false);
   const [pendingQueueRemoval, setPendingQueueRemoval] =
     useState<PendingQueueRemoval | null>(null);
   const [undoSecondsLeft, setUndoSecondsLeft] = useState(0);
-  const [playlistUndo, setPlaylistUndo] = useState<{
-    playlistId: string;
-    trackIds: string[];
-  } | null>(null);
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const [recentPlayback, setRecentPlayback] = useState<RecentPlayback[]>([]);
-  const [topPlayed, setTopPlayed] = useState<TopPlayed[]>([]);
   const [playerExpanded, setPlayerExpanded] = useState(false);
   const [queueVisible, setQueueVisible] = useState(false);
   const [queueTrackDialog, setQueueTrackDialog] = useState<{
     track: Track;
     fromLibrary: boolean;
   } | null>(null);
-  const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [playbackSourceLabel, setPlaybackSourceLabel] =
     useState('Tu biblioteca');
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [equalizerSettings, setEqualizerSettings] = useState<EqualizerSettings>(
-    {
-      enabled: false,
-      bandGainsDb: [0, 0, 0, 0, 0],
-    },
-  );
-  const [loadingLibrary, setLoadingLibrary] = useState(true);
-  const [permissionDenied, setPermissionDenied] = useState(false);
-  const [permissionBlocked, setPermissionBlocked] = useState(false);
-  const [hideShortAudio, setHideShortAudio] = useState(false);
-  const [deviceFolders, setDeviceFolders] = useState<DeviceFolder[]>([]);
-  const [excludedFolders, setExcludedFolders] = useState<string[]>([]);
-  const [trackEdits, setTrackEdits] = useState<TrackEdits>({});
-  /** The songs as their files describe them, before the person's corrections. */
-  const originalTracks = useRef(new Map<string, Track>());
-  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [levelVolume, setLevelVolume] = useState(false);
-  const [crossfadeSeconds, setCrossfadeSeconds] = useState(0);
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
-  const [errorMessage, setErrorMessageState] = useState<string | null>(null);
-  const [errorRetryAction, setErrorRetryAction] = useState<(() => void) | null>(
-    null,
-  );
   const [shuffleEnabled, setShuffleEnabled] = useState(false);
   const shuffleEnabledRef = useRef(false);
   const [repeatMode, setRepeatMode] = useState(RepeatMode.Off);
   const queueOperationInProgress = useRef(false);
-  const libraryLoadInProgress = useRef(false);
-  const libraryRefreshPending = useRef(false);
-  const hasLibraryPermission = useRef(false);
-  const libraryAccessDenied = useRef(false);
+  const trackFiles = useTrackFiles({
+    tracks,
+    favoriteIds,
+    setFavoriteIds,
+    playlists,
+    setPlaylists,
+    setQueueTrackDialog,
+    ...notices,
+  });
   const originalQueueOrder = useRef<Array<{ id: string }>>([]);
   const sessionChecked = useRef(false);
   const restoringSession = useRef(false);
   const undoTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undoInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const queueNoticeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const playlistUndoTimeout = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const equalizerWriteChain = useRef<Promise<void>>(Promise.resolve());
   const lastRecordedTrackId = useRef<string | null>(null);
   const playbackPosition = useRef(0);
   const activeTrack = useActiveTrack();
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
-  const tracksById = useMemo(
-    () => new Map(tracks.map(track => [track.id, track])),
-    [tracks],
-  );
   const currentTrack = tracksById.get(String(activeTrack?.id)) ?? null;
-  const recentTracks = useMemo(
-    () =>
-      recentPlayback
-        .map(entry => tracksById.get(entry.trackId))
-        .filter((track): track is Track => track !== undefined),
-    [recentPlayback, tracksById],
-  );
-  const topTracks = useMemo(
-    () =>
-      topPlayed
-        .map(entry => tracksById.get(entry.trackId))
-        .filter((track): track is Track => track !== undefined),
-    [topPlayed, tracksById],
-  );
-  const playlistTracksById = useMemo(
-    () =>
-      new Map(
-        playlists.map(playlist => [
-          playlist.id,
-          playlist.trackIds
-            .map(trackId => tracksById.get(trackId))
-            .filter((track): track is Track => track !== undefined),
-        ]),
-      ),
-    [playlists, tracksById],
-  );
 
   useEffect(() => {
     if (!playerReady || tracks.length === 0 || sessionChecked.current) {
@@ -273,6 +171,16 @@ export function useMusicController({
     sessionChecked.current = true;
     (async () => {
       if ((await getPlayerQueue()).length > 0) {
+        // The screens reopened while music kept playing: shuffle may have
+        // changed from the widget or the notification in the meantime.
+        const details = getSessionDetails();
+        const byId = new Map(tracks.map(track => [track.id, track]));
+        setShuffleEnabled(details.shuffle);
+        shuffleEnabledRef.current = details.shuffle;
+        originalQueueOrder.current = details.originalTrackIds
+          .map(id => byId.get(id))
+          .filter((track): track is Track => track !== undefined);
+        setPlaybackSourceLabel(details.sourceLabel);
         return;
       }
       const session = await readSession();
@@ -300,201 +208,32 @@ export function useMusicController({
     })().catch(() => undefined);
   }, [playerReady, tracks]);
 
-  const setErrorMessage = useCallback((message: string | null) => {
-    setErrorMessageState(message);
-    setErrorRetryAction(null);
-  }, []);
-  const setRetryableError = useCallback(
-    (message: string, retryAction: () => void) => {
-      setErrorMessageState(message);
-      setErrorRetryAction(() => retryAction);
-    },
-    [],
-  );
-
   const rememberPlaybackPosition = useCallback((position: number) => {
     playbackPosition.current = position;
   }, []);
-
-  const loadLibrary = useCallback(
-    async (requestPermission = true) => {
-      if (libraryLoadInProgress.current) {
-        if (!requestPermission) {
-          libraryRefreshPending.current = true;
-        }
-        return;
-      }
-      if (!requestPermission && !hasLibraryPermission.current) {
-        return;
-      }
-
-      libraryLoadInProgress.current = true;
-      if (requestPermission) {
-        setLoadingLibrary(true);
-      }
-      if (requestPermission) {
-        setErrorMessage(null);
-      }
-
-      try {
-        if (requestPermission) {
-          const granted = await PermissionsAndroid.request(
-            libraryPermission(),
-            {
-              title: 'Acceso a tu música',
-              message:
-                'Mi Música necesita permiso para encontrar canciones y leer sus metadatos en este dispositivo.',
-              buttonPositive: 'Permitir',
-              buttonNegative: 'Ahora no',
-            },
-          );
-
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            // After "don't ask again" Android no longer shows the dialog.
-            const blocked =
-              granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN;
-            hasLibraryPermission.current = false;
-            libraryAccessDenied.current = true;
-            setPermissionDenied(true);
-            setPermissionBlocked(blocked);
-            setTracks([]);
-            setRetryableError(
-              blocked
-                ? 'Activa el permiso de música en los ajustes del teléfono para ver tus canciones.'
-                : 'Sin permiso no podemos mostrar la música del dispositivo. Puedes volver a intentarlo cuando quieras.',
-              blocked ? () => Linking.openSettings() : () => loadLibrary(),
-            );
-            return;
-          }
-          hasLibraryPermission.current = true;
-          libraryAccessDenied.current = false;
-          setPermissionDenied(false);
-          setPermissionBlocked(false);
-
-          if (Number(Platform.Version) >= 33) {
-            await PermissionsAndroid.request(
-              'android.permission.POST_NOTIFICATIONS',
-            );
-          }
-        }
-
-        // In this order: reading the tracks may update the saved favorites.
-        const deviceTracks = await getDeviceTracks();
-        const [favoriteTrackIds, shortAudioHidden, storedFolders, storedEdits] =
-          await Promise.all([
-            getFavoriteTrackIds(),
-            getStoredPreference(hideShortAudioKey),
-            getStoredPreference(excludedFoldersKey),
-            getStoredPreference(trackEditsKey),
-          ]);
-        const hideShort = shortAudioHidden === 'true';
-        const hiddenFolders = readExcludedFolders(storedFolders);
-        const edits = readTrackEdits(storedEdits);
-        const shown = withoutExcludedFolders(
-          deviceTracks,
-          hiddenFolders,
-        ).filter(
-          track =>
-            !hideShort ||
-            track.duration <= 0 ||
-            track.duration >= shortAudioSeconds,
-        );
-        originalTracks.current = new Map(shown.map(track => [track.id, track]));
-        setHideShortAudio(hideShort);
-        setDeviceFolders(listDeviceFolders(deviceTracks));
-        setExcludedFolders(hiddenFolders);
-        setTrackEdits(edits);
-        setTracks(applyTrackEdits(shown, edits));
-        setFavoriteIds(new Set(favoriteTrackIds));
-      } catch (error) {
-        setRetryableError(
-          error instanceof Error
-            ? error.message
-            : 'No se pudo leer la biblioteca de música.',
-          () => loadLibrary(),
-        );
-      } finally {
-        libraryLoadInProgress.current = false;
-        if (requestPermission) {
-          setLoadingLibrary(false);
-        }
-        if (libraryRefreshPending.current && hasLibraryPermission.current) {
-          libraryRefreshPending.current = false;
-          loadLibrary(false);
-        }
-      }
-    },
-    [setErrorMessage, setRetryableError],
-  );
-
-  const loadPlaylists = useCallback(async () => {
-    try {
-      setPlaylists(await getPlaylists());
-    } catch (error) {
-      setRetryableError(
-        error instanceof Error
-          ? `No se pudieron cargar las listas: ${error.message}`
-          : 'No se pudieron cargar las listas de reproducción.',
-        () => loadPlaylists(),
-      );
-    }
-  }, [setRetryableError]);
-
-  const loadPlaybackHistory = useCallback(async () => {
-    try {
-      const [recent, top] = await Promise.all([
-        getRecentPlayback(),
-        getTopPlayed(),
-      ]);
-      setRecentPlayback(recent);
-      setTopPlayed(top);
-    } catch (error) {
-      setRetryableError(
-        error instanceof Error
-          ? `No se pudo cargar el historial: ${error.message}`
-          : 'No se pudo cargar el historial de reproducción.',
-        () => loadPlaybackHistory(),
-      );
-    }
-  }, [setRetryableError]);
 
   useEffect(() => {
     let mounted = true;
 
     async function preparePlayer() {
       try {
-        // A damaged preference must not stop playback: keep the defaults instead.
-        const savedEqualizer = await getEqualizerSettings().catch(() => null);
-        if (
-          mounted &&
-          savedEqualizer?.bandGainsDb.length === equalizerBandCount &&
-          savedEqualizer.bandGainsDb.every(
-            gain => Number.isFinite(gain) && gain >= -12 && gain <= 12,
-          )
-        ) {
-          setEqualizerSettings(savedEqualizer);
-        }
+        const isMounted = () => mounted;
+        await restoreEqualizer(isMounted);
         await setupPlayer();
-        const tuning = await getPlaybackTuning().catch(() => null);
-        if (mounted && tuning) {
-          setLevelVolume(tuning.levelVolume);
-          setCrossfadeSeconds(tuning.crossfadeSeconds);
-        }
+        await restoreTuning(isMounted);
         const savedRepeatMode = await getPlayerRepeatMode();
-        const savedRate = await getPlaybackRate().catch(() => 1);
-        const startupRate = playbackRates.includes(savedRate) ? savedRate : 1;
-        await setPlayerRate(startupRate);
         if (mounted) {
           setRepeatMode(savedRepeatMode);
-          setPlaybackRate(startupRate);
           setPlayerReady(true);
         }
       } catch (error) {
         if (mounted) {
           setErrorMessage(
-            error instanceof Error
-              ? `No se pudo iniciar el reproductor: ${error.message}`
-              : 'No se pudo iniciar el reproductor.',
+            describeFailure(
+              error,
+              'No se pudo iniciar el reproductor',
+              'No se pudo iniciar el reproductor.',
+            ),
           );
         }
       }
@@ -509,6 +248,8 @@ export function useMusicController({
       mounted = false;
     };
   }, [
+    restoreEqualizer,
+    restoreTuning,
     loadLibrary,
     loadPlaybackHistory,
     loadPlaylists,
@@ -517,36 +258,6 @@ export function useMusicController({
   ]);
 
   useEffect(() => {
-    let previousState = AppState.currentState;
-    const appStateSubscription = AppState.addEventListener(
-      'change',
-      nextState => {
-        const returnedToForeground =
-          nextState === 'active' && previousState !== 'active';
-        previousState = nextState;
-        if (returnedToForeground && hasLibraryPermission.current) {
-          loadLibrary(false);
-        } else if (returnedToForeground && libraryAccessDenied.current) {
-          // The person may be back from granting it in the phone settings.
-          PermissionsAndroid.check(libraryPermission())
-            .then(granted => {
-              if (granted) {
-                loadLibrary();
-              }
-            })
-            .catch(() => undefined);
-        }
-      },
-    );
-    const librarySubscription = DeviceEventEmitter.addListener(
-      'musicLibraryChanged',
-      () => {
-        if (hasLibraryPermission.current) {
-          loadLibrary(false);
-        }
-      },
-    );
-
     const remapSubscription = DeviceEventEmitter.addListener(
       'musicTracksRemapped',
       () => {
@@ -559,12 +270,10 @@ export function useMusicController({
     });
 
     return () => {
-      appStateSubscription.remove();
-      librarySubscription.remove();
       remapSubscription.remove();
       errorSubscription?.remove();
     };
-  }, [loadLibrary, loadPlaybackHistory, loadPlaylists, setErrorMessage]);
+  }, [loadPlaybackHistory, loadPlaylists, setErrorMessage]);
 
   useEffect(() => {
     const trackId = activeTrack?.id;
@@ -583,9 +292,11 @@ export function useMusicController({
       .then(loadPlaybackHistory)
       .catch(error => {
         setErrorMessage(
-          error instanceof Error
-            ? `No se pudo guardar el historial: ${error.message}`
-            : 'No se pudo guardar el historial de reproducción.',
+          describeFailure(
+            error,
+            'No se pudo guardar el historial',
+            'No se pudo guardar el historial de reproducción.',
+          ),
         );
       });
   }, [
@@ -631,33 +342,76 @@ export function useMusicController({
       })
       .catch(error => {
         setErrorMessage(
-          error instanceof Error
-            ? `No se pudo recuperar la cola: ${error.message}`
-            : 'No se pudo recuperar la cola de reproducción.',
+          describeFailure(
+            error,
+            'No se pudo recuperar la cola',
+            'No se pudo recuperar la cola de reproducción.',
+          ),
         );
       });
   }, [playerReady, setErrorMessage, tracks, tracksById]);
+
+  // The notification and the lock screen show the state of these buttons.
+  useEffect(() => {
+    setNotificationShuffle(shuffleEnabled);
+  }, [shuffleEnabled]);
+
+  const longAudioPlaying =
+    currentTrack !== null && currentTrack.duration >= longAudioSeconds;
+  useEffect(() => {
+    if (playerReady) {
+      setLongAudioControls(longAudioPlaying).catch(() => undefined);
+    }
+  }, [longAudioPlaying, playerReady]);
+
+  // A tap on a notification button arrives here; repeat and favorite are
+  // already saved by the native side.
+  const toggleShuffleRef = useRef<() => Promise<void>>(async () => undefined);
+  useEffect(() => {
+    const releaseShuffle = claimRemoteShuffle();
+    const subscription = DeviceEventEmitter.addListener(
+      'notificationAction',
+      (event: { action: string; trackId: string | null }) => {
+        if (event.action === 'shuffle') {
+          // The button already flipped; if the queue could not change, it
+          // must show the real state again.
+          toggleShuffleRef
+            .current()
+            .finally(() => setNotificationShuffle(shuffleEnabledRef.current));
+        } else if (event.action === 'repeat') {
+          getPlayerRepeatMode()
+            .then(mode => {
+              setRepeatMode(mode);
+              return saveSession();
+            })
+            .catch(() => undefined);
+        } else if (event.action === 'favorite' && event.trackId) {
+          const trackId = event.trackId;
+          setFavoriteIds(current => {
+            const updated = new Set(current);
+            if (updated.has(trackId)) {
+              updated.delete(trackId);
+            } else {
+              updated.add(trackId);
+            }
+            return updated;
+          });
+        }
+      },
+    );
+    return () => {
+      releaseShuffle();
+      subscription.remove();
+    };
+  }, [setFavoriteIds]);
 
   useEffect(
     () =>
       onResumed(position => {
         showQueueNotice(`Continúa desde ${formatTime(position)}.`);
       }),
-    // showQueueNotice only touches refs and state setters.
-
-    [],
+    [showQueueNotice],
   );
-
-  // A song that left the library cannot stay selected.
-  useEffect(() => {
-    setSelectedIds(current => {
-      if (current.size === 0) {
-        return current;
-      }
-      const kept = new Set([...current].filter(id => tracksById.has(id)));
-      return kept.size === current.size ? current : kept;
-    });
-  }, [tracksById]);
 
   useEffect(
     () => () => {
@@ -667,34 +421,9 @@ export function useMusicController({
       if (undoInterval.current) {
         clearInterval(undoInterval.current);
       }
-      if (queueNoticeTimeout.current) {
-        clearTimeout(queueNoticeTimeout.current);
-      }
     },
     [],
   );
-
-  async function toggleFavorite(track: Track) {
-    const isFavorite = !favoriteIds.has(track.id);
-    try {
-      await setTrackFavorite(track.id, isFavorite);
-      setFavoriteIds(current => {
-        const updated = new Set(current);
-        if (isFavorite) {
-          updated.add(track.id);
-        } else {
-          updated.delete(track.id);
-        }
-        return updated;
-      });
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo actualizar favoritos: ${error.message}`
-          : 'No se pudo actualizar favoritos.',
-      );
-    }
-  }
 
   function confirmDeleteTrack(track: Track) {
     setQueueTrackDialog(null);
@@ -782,10 +511,11 @@ export function useMusicController({
             await removePlayerTrack(index);
           }
         } catch (error) {
-          queueCleanupError =
-            error instanceof Error
-              ? `La canción se eliminó, pero no se pudo actualizar la cola: ${error.message}`
-              : 'La canción se eliminó, pero no se pudo actualizar la cola.';
+          queueCleanupError = describeFailure(
+            error,
+            'La canción se eliminó, pero no se pudo actualizar la cola',
+            'La canción se eliminó, pero no se pudo actualizar la cola.',
+          );
         }
       }
 
@@ -822,9 +552,11 @@ export function useMusicController({
       return true;
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo cambiar la posición: ${error.message}`
-          : 'No se pudo cambiar la posición.',
+        describeFailure(
+          error,
+          'No se pudo cambiar la posición',
+          'No se pudo cambiar la posición.',
+        ),
       );
       return false;
     }
@@ -835,115 +567,13 @@ export function useMusicController({
       await jumpPlayerBy(seconds);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo cambiar la posición: ${error.message}`
-          : 'No se pudo cambiar la posición.',
+        describeFailure(
+          error,
+          'No se pudo cambiar la posición',
+          'No se pudo cambiar la posición.',
+        ),
       );
     }
-  }
-
-  async function toggleLevelVolume() {
-    const next = !levelVolume;
-    try {
-      await setVolumeLeveling(next);
-      setLevelVolume(next);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo guardar el ajuste: ${error.message}`
-          : 'No se pudo guardar el ajuste.',
-      );
-    }
-  }
-
-  async function changeCrossfade(seconds: number) {
-    try {
-      await persistCrossfadeSeconds(seconds);
-      setCrossfadeSeconds(seconds);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo guardar el fundido: ${error.message}`
-          : 'No se pudo guardar el fundido.',
-      );
-    }
-  }
-
-  async function changePlaybackRate(nextRate: number) {
-    let rateWasApplied = false;
-    try {
-      await setPlayerRate(nextRate);
-      rateWasApplied = true;
-      await persistPlaybackRate(nextRate);
-      setPlaybackRate(nextRate);
-      setErrorMessage(null);
-    } catch (error) {
-      let detail =
-        error instanceof Error ? error.message : 'Error desconocido.';
-      if (rateWasApplied) {
-        try {
-          await setPlayerRate(playbackRate);
-        } catch (rollbackError) {
-          const rollbackMessage =
-            rollbackError instanceof Error
-              ? rollbackError.message
-              : 'Error desconocido.';
-          detail = `${detail} No se pudo restaurar la velocidad anterior: ${rollbackMessage}`;
-        }
-      }
-      setErrorMessage(`No se pudo cambiar la velocidad: ${detail}`);
-    }
-  }
-
-  function updateEqualizerSettings(next: EqualizerSettings) {
-    setEqualizerSettings(next);
-    equalizerWriteChain.current = equalizerWriteChain.current
-      .catch(() => undefined)
-      .then(() => persistEqualizerSettings(next.enabled, next.bandGainsDb))
-      .catch(error => {
-        setErrorMessage(
-          error instanceof Error
-            ? `No se pudo guardar el ecualizador: ${error.message}`
-            : 'No se pudo guardar la configuración del ecualizador.',
-        );
-      });
-  }
-
-  function changeEqualizerBand(index: number, gain: number) {
-    const bandGainsDb = [...equalizerSettings.bandGainsDb];
-    if (bandGainsDb[index] === gain) {
-      return;
-    }
-    bandGainsDb[index] = gain;
-    updateEqualizerSettings({ ...equalizerSettings, bandGainsDb });
-  }
-
-  async function clearRecentPlayback() {
-    Alert.alert(
-      'Borrar historial',
-      'Se eliminará el historial de reproducción reciente.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Borrar',
-          style: 'destructive',
-          onPress: () => {
-            clearPlaybackHistory()
-              .then(() => {
-                setRecentPlayback([]);
-                setTopPlayed([]);
-              })
-              .catch(error => {
-                setErrorMessage(
-                  error instanceof Error
-                    ? `No se pudo borrar el historial: ${error.message}`
-                    : 'No se pudo borrar el historial de reproducción.',
-                );
-              });
-          },
-        },
-      ],
-    );
   }
 
   async function playTracks(
@@ -980,234 +610,12 @@ export function useMusicController({
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo reproducir la canción: ${error.message}`
-          : 'No se pudo reproducir la canción.',
-      );
-    }
-  }
-
-  async function savePlaylistName() {
-    if (!playlistNameDialog) {
-      return;
-    }
-    const dialog = playlistNameDialog;
-    const normalizedName = dialog.name.trim();
-    if (!normalizedName) {
-      setPlaylistDialogError('Escribe un nombre para la lista.');
-      return;
-    }
-
-    setSavingPlaylist(true);
-    setPlaylistDialogError(null);
-    let createdPlaylist: Playlist | null = null;
-    try {
-      if (dialog.playlistId) {
-        await renamePlaylist(dialog.playlistId, normalizedName);
-      } else {
-        const playlist = await createPlaylist(normalizedName);
-        if (dialog.trackIds?.length) {
-          await setPlaylistTracks(playlist.id, dialog.trackIds);
-        }
-        createdPlaylist = playlist;
-      }
-      setPlaylists(await getPlaylists());
-      if (createdPlaylist) {
-        onPlaylistCreated?.(createdPlaylist);
-      }
-      setPlaylistNameDialog(null);
-      setPlaylistDialogError(null);
-      setErrorMessage(null);
-    } catch (error) {
-      setPlaylistDialogError(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo guardar la lista de reproducción.',
-      );
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo guardar la lista: ${error.message}`
-          : 'No se pudo guardar la lista de reproducción.',
-      );
-    } finally {
-      setSavingPlaylist(false);
-    }
-  }
-
-  async function confirmDeletePlaylist() {
-    if (!playlistToDelete) {
-      return;
-    }
-
-    setSavingPlaylist(true);
-    setPlaylistDialogError(null);
-    try {
-      await deletePlaylist(playlistToDelete.id);
-      setPlaylists(await getPlaylists());
-      setPlaylistToDelete(null);
-      setPlaylistDialogError(null);
-      setErrorMessage(null);
-    } catch (error) {
-      setPlaylistDialogError(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo eliminar la lista de reproducción.',
-      );
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo eliminar la lista: ${error.message}`
-          : 'No se pudo eliminar la lista de reproducción.',
-      );
-    } finally {
-      setSavingPlaylist(false);
-    }
-  }
-
-  function openPlaylistTrackPicker(playlist: Playlist) {
-    const availableTrackIds = new Set(tracks.map(track => track.id));
-    setDraftPlaylistTrackIds(
-      new Set(
-        playlist.trackIds.filter(trackId => availableTrackIds.has(trackId)),
-      ),
-    );
-    setPlaylistTrackSearch('');
-    setPlaylistDialogError(null);
-    setTrackPickerPlaylistId(playlist.id);
-  }
-
-  function toggleDraftPlaylistTrack(trackId: string) {
-    setDraftPlaylistTrackIds(current => {
-      const updated = new Set(current);
-      if (updated.has(trackId)) {
-        updated.delete(trackId);
-      } else {
-        updated.add(trackId);
-      }
-      return updated;
-    });
-  }
-
-  async function savePlaylistTracks() {
-    if (!trackPickerPlaylistId) {
-      return;
-    }
-    setSavingPlaylist(true);
-    setPlaylistDialogError(null);
-    try {
-      await setPlaylistTracks(
-        trackPickerPlaylistId,
-        Array.from(draftPlaylistTrackIds),
-      );
-      setPlaylists(await getPlaylists());
-      setTrackPickerPlaylistId(null);
-      setPlaylistDialogError(null);
-      setErrorMessage(null);
-    } catch (error) {
-      setPlaylistDialogError(
-        error instanceof Error
-          ? error.message
-          : 'No se pudieron guardar las canciones de la lista.',
-      );
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudieron guardar las canciones: ${error.message}`
-          : 'No se pudieron guardar las canciones de la lista.',
-      );
-    } finally {
-      setSavingPlaylist(false);
-    }
-  }
-
-  async function removeTrackFromPlaylist(playlistId: string, trackId: string) {
-    const selectedPlaylist = playlists.find(item => item.id === playlistId);
-    if (!selectedPlaylist || savingPlaylist) {
-      return;
-    }
-    setSavingPlaylist(true);
-    const updatedTrackIds = selectedPlaylist.trackIds.filter(
-      id => id !== trackId,
-    );
-    try {
-      await setPlaylistTracks(selectedPlaylist.id, updatedTrackIds);
-      setPlaylists(current =>
-        current.map(playlist =>
-          playlist.id === selectedPlaylist.id
-            ? { ...playlist, trackIds: updatedTrackIds }
-            : playlist,
+        describeFailure(
+          error,
+          'No se pudo reproducir la canción',
+          'No se pudo reproducir la canción.',
         ),
       );
-      setPlaylistUndo({
-        playlistId,
-        trackIds: selectedPlaylist.trackIds,
-      });
-      if (playlistUndoTimeout.current) {
-        clearTimeout(playlistUndoTimeout.current);
-      }
-      playlistUndoTimeout.current = setTimeout(() => {
-        setPlaylistUndo(null);
-      }, 4000);
-      setErrorMessage(null);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo quitar la canción: ${error.message}`
-          : 'No se pudo quitar la canción de la lista.',
-      );
-    } finally {
-      setSavingPlaylist(false);
-    }
-  }
-
-  async function movePlaylistTrack(
-    playlistId: string,
-    fromIndex: number,
-    toIndex: number,
-  ) {
-    const selectedPlaylist = playlists.find(item => item.id === playlistId);
-    if (!selectedPlaylist || savingPlaylist) {
-      return;
-    }
-    // The positions are those on screen, which skip songs not on this phone.
-    const visibleTrackIds = selectedPlaylist.trackIds.filter(id =>
-      tracksById.has(id),
-    );
-    if (
-      fromIndex < 0 ||
-      toIndex < 0 ||
-      fromIndex >= visibleTrackIds.length ||
-      toIndex >= visibleTrackIds.length
-    ) {
-      return;
-    }
-    const updatedTrackIds = [...selectedPlaylist.trackIds];
-    const [movedTrackId] = updatedTrackIds.splice(
-      updatedTrackIds.indexOf(visibleTrackIds[fromIndex]),
-      1,
-    );
-    updatedTrackIds.splice(
-      selectedPlaylist.trackIds.indexOf(visibleTrackIds[toIndex]),
-      0,
-      movedTrackId,
-    );
-    setSavingPlaylist(true);
-    try {
-      await setPlaylistTracks(selectedPlaylist.id, updatedTrackIds);
-      setPlaylists(current =>
-        current.map(playlist =>
-          playlist.id === selectedPlaylist.id
-            ? { ...playlist, trackIds: updatedTrackIds }
-            : playlist,
-        ),
-      );
-      setErrorMessage(null);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo cambiar el orden: ${error.message}`
-          : 'No se pudo cambiar el orden de la lista.',
-      );
-    } finally {
-      setSavingPlaylist(false);
     }
   }
 
@@ -1256,9 +664,11 @@ export function useMusicController({
                 setErrorMessage(null);
               } catch (error) {
                 setErrorMessage(
-                  error instanceof Error
-                    ? `No se pudo vaciar la cola: ${error.message}`
-                    : 'No se pudo vaciar la cola de reproducción.',
+                  describeFailure(
+                    error,
+                    'No se pudo vaciar la cola',
+                    'No se pudo vaciar la cola de reproducción.',
+                  ),
                 );
               } finally {
                 queueOperationInProgress.current = false;
@@ -1280,9 +690,11 @@ export function useMusicController({
       }
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo controlar la reproducción: ${error.message}`
-          : 'No se pudo controlar la reproducción.',
+        describeFailure(
+          error,
+          'No se pudo controlar la reproducción',
+          'No se pudo controlar la reproducción.',
+        ),
       );
     }
   }
@@ -1321,51 +733,13 @@ export function useMusicController({
       saveSession().catch(() => undefined);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo cambiar la repetición: ${error.message}`
-          : 'No se pudo cambiar la repetición.',
+        describeFailure(
+          error,
+          'No se pudo cambiar la repetición',
+          'No se pudo cambiar la repetición.',
+        ),
       );
     }
-  }
-
-  function showQueueNotice(message: string) {
-    if (queueNoticeTimeout.current) {
-      clearTimeout(queueNoticeTimeout.current);
-    }
-    setQueueNotice(message);
-    queueNoticeTimeout.current = setTimeout(() => {
-      setQueueNotice(null);
-      queueNoticeTimeout.current = null;
-    }, 2500);
-  }
-
-  async function applyUpcomingQueueOrder(
-    targetIds: string[],
-    currentIds: string[],
-    activeIndex: number,
-  ) {
-    if (activeIndex < 0 || activeIndex >= currentIds.length) {
-      throw new Error('No se pudo identificar la canción que está sonando.');
-    }
-    const activeId = currentIds[activeIndex];
-    const start = activeIndex + 1;
-    const currentUpcoming = currentIds.slice(start);
-    const currentUpcomingSet = new Set(currentUpcoming);
-    const desiredUpcoming = targetIds.filter(id => currentUpcomingSet.has(id));
-    const desiredUpcomingSet = new Set(desiredUpcoming);
-    const desiredIds = [
-      ...currentIds.slice(0, start),
-      ...desiredUpcoming,
-      ...currentUpcoming.filter(id => !desiredUpcomingSet.has(id)),
-    ];
-    const moves = buildQueueMoves(currentIds, desiredIds, start);
-    if (moves.length === 0) {
-      return;
-    }
-
-    // The native player validates this exact snapshot and applies the whole
-    // move list in one main-thread call, so playback cannot advance between moves.
-    await movePlayerTracks(moves, currentIds, activeId);
   }
 
   async function toggleShuffle() {
@@ -1411,7 +785,7 @@ export function useMusicController({
             originalQueueOrder.current,
             liveActiveId ?? '',
           );
-      await applyUpcomingQueueOrder(
+      await reorderUpcomingTracks(
         targetQueue.map(item => item.id),
         liveQueue.map(item => item.id),
         safeActiveIndex,
@@ -1428,10 +802,11 @@ export function useMusicController({
       setErrorMessage(null);
     } catch (error) {
       setShuffleEnabled(previousEnabled);
-      let message =
-        error instanceof Error
-          ? `No se pudo cambiar la mezcla: ${error.message}`
-          : 'No se pudo cambiar el orden aleatorio de la cola.';
+      let message = describeFailure(
+        error,
+        'No se pudo cambiar la mezcla',
+        'No se pudo cambiar el orden aleatorio de la cola.',
+      );
       try {
         const latestQueue = (await getPlayerQueue()).map(item => ({
           id: String(item.id),
@@ -1453,7 +828,7 @@ export function useMusicController({
           startingQueue.length > 0 ? startingQueue : latestQueue,
           latestActiveId ?? '',
         );
-        await applyUpcomingQueueOrder(
+        await reorderUpcomingTracks(
           rollbackTarget.map(item => item.id),
           latestQueue.map(item => item.id),
           latestSafeIndex,
@@ -1473,6 +848,8 @@ export function useMusicController({
       setQueueUpdating(false);
     }
   }
+
+  toggleShuffleRef.current = toggleShuffle;
 
   async function addTrackToQueue(track: Track, placement: 'next' | 'end') {
     setQueueTrackDialog(null);
@@ -1553,9 +930,11 @@ export function useMusicController({
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo añadir la canción a la cola: ${error.message}`
-          : 'No se pudo añadir la canción a la cola.',
+        describeFailure(
+          error,
+          'No se pudo añadir la canción a la cola',
+          'No se pudo añadir la canción a la cola.',
+        ),
       );
     } finally {
       queueOperationInProgress.current = false;
@@ -1616,35 +995,16 @@ export function useMusicController({
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudieron añadir las canciones: ${error.message}`
-          : 'No se pudieron añadir las canciones a la cola.',
+        describeFailure(
+          error,
+          'No se pudieron añadir las canciones',
+          'No se pudieron añadir las canciones a la cola.',
+        ),
       );
     } finally {
       queueOperationInProgress.current = false;
       setQueueUpdating(false);
     }
-  }
-
-  function toggleSelected(track: Track) {
-    setSelectedIds(current => {
-      const updated = new Set(current);
-      if (updated.has(track.id)) {
-        updated.delete(track.id);
-      } else {
-        updated.add(track.id);
-      }
-      return updated;
-    });
-  }
-
-  function clearSelection() {
-    setSelectedIds(current => (current.size === 0 ? current : new Set()));
-  }
-
-  /** The selected songs in the order the library lists them. */
-  function selectedTracks() {
-    return tracks.filter(track => selectedIds.has(track.id));
   }
 
   async function favoriteSelection() {
@@ -1654,6 +1014,7 @@ export function useMusicController({
         await setTrackFavorite(track.id, true);
       }
       setFavoriteIds(current => new Set([...current, ...items.map(t => t.id)]));
+      refreshNotification();
       showQueueNotice(
         items.length > 0
           ? `${formatTrackCount(items.length)} en favoritas.`
@@ -1662,34 +1023,11 @@ export function useMusicController({
       clearSelection();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo actualizar favoritos: ${error.message}`
-          : 'No se pudo actualizar favoritos.',
-      );
-    }
-  }
-
-  async function addTracksToPlaylist(playlist: Playlist, items: Track[]) {
-    const existing = new Set(playlist.trackIds);
-    const added = items.filter(track => !existing.has(track.id));
-    if (added.length === 0) {
-      showQueueNotice(`Ya estaban en ${playlist.name}.`);
-      return;
-    }
-    const trackIds = [...playlist.trackIds, ...added.map(track => track.id)];
-    try {
-      await setPlaylistTracks(playlist.id, trackIds);
-      setPlaylists(current =>
-        current.map(item =>
-          item.id === playlist.id ? { ...item, trackIds } : item,
+        describeFailure(
+          error,
+          'No se pudo actualizar favoritos',
+          'No se pudo actualizar favoritos.',
         ),
-      );
-      showQueueNotice(`${formatTrackCount(added.length)} en ${playlist.name}.`);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo añadir a la lista: ${error.message}`
-          : 'No se pudo añadir a la lista.',
       );
     }
   }
@@ -1757,81 +1095,16 @@ export function useMusicController({
       );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo completar la eliminación: ${error.message}`
-          : 'No se pudo completar la eliminación.',
+        describeFailure(
+          error,
+          'No se pudo completar la eliminación',
+          'No se pudo completar la eliminación.',
+        ),
       );
       loadLibrary(false);
     } finally {
       queueOperationInProgress.current = false;
       setQueueUpdating(false);
-    }
-  }
-
-  async function toggleFolderExcluded(path: string) {
-    const next = excludedFolders.includes(path)
-      ? excludedFolders.filter(item => item !== path)
-      : [...excludedFolders, path];
-    try {
-      await storePreference(excludedFoldersKey, JSON.stringify(next));
-      setExcludedFolders(next);
-      await loadLibrary(false);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo guardar el ajuste: ${error.message}`
-          : 'No se pudo guardar el ajuste.',
-      );
-    }
-  }
-
-  /** Saves the person's corrections for a song; null puts back what the file says. */
-  async function saveTrackEdit(track: Track, form: TrackEditForm | null) {
-    const original = originalTracks.current.get(track.id) ?? track;
-    const edit = form ? buildTrackEdit(original, form) : null;
-    const next = { ...trackEdits };
-    if (edit) {
-      next[track.id] = edit;
-    } else {
-      delete next[track.id];
-    }
-    try {
-      await storePreference(trackEditsKey, JSON.stringify(next));
-      setTrackEdits(next);
-      setEditingTrack(null);
-      await loadLibrary(false);
-      showQueueNotice(
-        edit
-          ? 'Datos de la canción guardados.'
-          : 'Datos originales restaurados.',
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudieron guardar los datos: ${error.message}`
-          : 'No se pudieron guardar los datos de la canción.',
-      );
-    }
-  }
-
-  async function setRingtone(track: Track) {
-    setQueueTrackDialog(null);
-    try {
-      const result = await setTrackAsRingtone(track.id);
-      if (result === 'permission') {
-        Alert.alert(
-          'Permiso necesario',
-          'Activa “Modificar ajustes del sistema” para Mi Música en la pantalla que se abrió y vuelve a elegir la canción.',
-        );
-      } else {
-        showQueueNotice(`“${track.title}” es tu tono de llamada.`);
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo cambiar el tono de llamada.',
-      );
     }
   }
 
@@ -1842,9 +1115,11 @@ export function useMusicController({
       setQueueVisible(false);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo reproducir desde la cola: ${error.message}`
-          : 'No se pudo reproducir esa canción de la cola.',
+        describeFailure(
+          error,
+          'No se pudo reproducir desde la cola',
+          'No se pudo reproducir esa canción de la cola.',
+        ),
       );
     }
   }
@@ -1919,9 +1194,11 @@ export function useMusicController({
     } catch (error) {
       setPlaybackQueue(previousQueue);
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo reordenar la cola: ${error.message}`
-          : 'No se pudo reordenar la cola.',
+        describeFailure(
+          error,
+          'No se pudo reordenar la cola',
+          'No se pudo reordenar la cola.',
+        ),
       );
     } finally {
       queueOperationInProgress.current = false;
@@ -1969,9 +1246,11 @@ export function useMusicController({
       return true;
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo quitar la canción de la cola: ${error.message}`
-          : 'No se pudo quitar la canción de la cola.',
+        describeFailure(
+          error,
+          'No se pudo quitar la canción de la cola',
+          'No se pudo quitar la canción de la cola.',
+        ),
       );
       return false;
     } finally {
@@ -2020,9 +1299,11 @@ export function useMusicController({
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? `No se pudo deshacer la eliminación: ${error.message}`
-          : 'No se pudo deshacer la eliminación.',
+        describeFailure(
+          error,
+          'No se pudo deshacer la eliminación',
+          'No se pudo deshacer la eliminación.',
+        ),
       );
     } finally {
       queueOperationInProgress.current = false;
@@ -2030,273 +1311,14 @@ export function useMusicController({
     }
   }
 
-  async function undoPlaylistRemoval() {
-    if (!playlistUndo) {
-      return;
-    }
-    const { playlistId, trackIds } = playlistUndo;
-    setPlaylistUndo(null);
-    try {
-      await setPlaylistTracks(playlistId, trackIds);
-      setPlaylists(current =>
-        current.map(item =>
-          item.id === playlistId ? { ...item, trackIds } : item,
-        ),
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo deshacer: ${error.message}`
-          : 'No se pudo deshacer.',
-      );
-    }
-  }
-
-  async function addTrackToPlaylist(playlist: Playlist, track: Track) {
-    if (playlist.trackIds.includes(track.id)) {
-      showQueueNotice(`${track.title} ya está en ${playlist.name}.`);
-      return;
-    }
-    const trackIds = [...playlist.trackIds, track.id];
-    try {
-      await setPlaylistTracks(playlist.id, trackIds);
-      setPlaylists(current =>
-        current.map(item =>
-          item.id === playlist.id ? { ...item, trackIds } : item,
-        ),
-      );
-      showQueueNotice(`Añadida a ${playlist.name}.`);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo añadir a la lista: ${error.message}`
-          : 'No se pudo añadir a la lista.',
-      );
-    }
-  }
-
-  async function importPlaylistFile(playlist: Playlist) {
-    try {
-      const contents = await importM3uFile();
-      if (contents === null) {
-        return;
-      }
-      const imported = resolveM3u(contents, tracks);
-      const existingIds = new Set(playlist.trackIds);
-      const newIds = imported.trackIds.filter(id => !existingIds.has(id));
-      const trackIds = [...playlist.trackIds, ...newIds];
-      if (
-        trackIds.length === playlist.trackIds.length &&
-        imported.missing.length === 0
-      ) {
-        Alert.alert(
-          'Lista vacía',
-          'El archivo no contiene canciones nuevas para esta lista.',
-        );
-        return;
-      }
-      await setPlaylistTracks(playlist.id, trackIds);
-      setPlaylists(current =>
-        current.map(item =>
-          item.id === playlist.id ? { ...item, trackIds } : item,
-        ),
-      );
-      const skipped =
-        imported.duplicates.length + imported.trackIds.length - newIds.length;
-      Alert.alert(
-        'Importación completada',
-        `Añadidas: ${newIds.length}. No encontradas: ${imported.missing.length}. ` +
-          `Duplicadas: ${skipped}. Entradas malformadas: ${imported.malformedLines}.`,
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo importar la lista: ${error.message}`
-          : 'No se pudo importar el archivo M3U.',
-      );
-    }
-  }
-
-  async function exportPlaylistM3u(playlist: Playlist) {
-    try {
-      const playlistTracks = playlist.trackIds
-        .map(id => tracksById.get(id))
-        .filter((track): track is Track => track !== undefined);
-      const safeName =
-        playlist.name
-          .replace(/[<>:"/\\|?*]/g, '-')
-          .split('')
-          .map(character => (character.charCodeAt(0) < 32 ? '-' : character))
-          .join('')
-          .trim() || 'lista';
-      const saved = await exportM3uFile(
-        `${safeName}.m3u8`,
-        buildM3u(playlistTracks),
-      );
-      if (saved) {
-        showQueueNotice('Lista M3U guardada.');
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo exportar la lista: ${error.message}`
-          : 'No se pudo exportar el archivo M3U.',
-      );
-    }
-  }
-
-  async function importTrackLyrics(track: Track): Promise<boolean> {
-    try {
-      const contents = await importLrcFile();
-      if (contents === null) {
-        return false;
-      }
-      if (parseLrc(contents).length === 0) {
-        Alert.alert(
-          'Archivo LRC no válido',
-          'El archivo no contiene líneas con marcas de tiempo reconocibles.',
-        );
-        return false;
-      }
-      await storeLyrics(track.id, contents);
-      showQueueNotice(`Letras guardadas para ${track.title}.`);
-      return true;
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudieron guardar las letras: ${error.message}`
-          : 'No se pudieron guardar las letras locales.',
-      );
-      return false;
-    }
-  }
-
-  const getTrackLyrics = useCallback(
-    (trackId: string): Promise<string | null> => getStoredLyrics(trackId),
-    [],
-  );
-
-  async function deleteTrackLyrics(trackId: string): Promise<boolean> {
-    try {
-      await removeStoredLyrics(trackId);
-      showQueueNotice('Letras eliminadas.');
-      return true;
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudieron eliminar las letras: ${error.message}`
-          : 'No se pudieron eliminar las letras.',
-      );
-      return false;
-    }
-  }
-
-  function requestLibraryAccess() {
-    if (permissionBlocked) {
-      Linking.openSettings().catch(() => undefined);
-    } else {
-      loadLibrary();
-    }
-  }
-
-  async function toggleHideShortAudio() {
-    try {
-      await storePreference(hideShortAudioKey, String(!hideShortAudio));
-      await loadLibrary(false);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo guardar el ajuste: ${error.message}`
-          : 'No se pudo guardar el ajuste.',
-      );
-    }
-  }
-
-  async function shareTrack(track: Track) {
-    setQueueTrackDialog(null);
-    try {
-      await shareTrackFile(track.id, track.title);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo compartir la canción: ${error.message}`
-          : 'No se pudo compartir la canción.',
-      );
-    }
-  }
-
-  async function exportLibraryBackup() {
-    try {
-      const backup = buildBackup(tracks, favoriteIds, playlists);
-      const date = new Date().toISOString().slice(0, 10);
-      const saved = await exportBackupFile(
-        `mi-musica-copia-${date}.json`,
-        JSON.stringify(backup),
-      );
-      if (saved) {
-        showQueueNotice('Copia de seguridad guardada.');
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo guardar la copia: ${error.message}`
-          : 'No se pudo guardar la copia de seguridad.',
-      );
-    }
-  }
-
-  /** Adds to what is already here: restoring never deletes favorites or lists. */
-  async function restoreLibraryBackup() {
-    try {
-      const text = await importBackupFile();
-      if (text === null) {
-        return;
-      }
-      const backup = readBackup(text);
-      if (!backup) {
-        setErrorMessage('Ese archivo no es una copia de Mi Música.');
-        return;
-      }
-      const restored = matchBackup(backup, tracks);
-      for (const trackId of restored.favoriteIds) {
-        await setTrackFavorite(trackId, true);
-      }
-      const current = await getPlaylists();
-      for (const saved of restored.playlists) {
-        const existing = current.find(
-          item => item.name.toLowerCase() === saved.name.toLowerCase(),
-        );
-        const playlist = existing ?? (await createPlaylist(saved.name));
-        await setPlaylistTracks(playlist.id, [
-          ...new Set([...playlist.trackIds, ...saved.trackIds]),
-        ]);
-      }
-      setFavoriteIds(ids => new Set([...ids, ...restored.favoriteIds]));
-      setPlaylists(await getPlaylists());
-      showQueueNotice(
-        restored.missingCount > 0
-          ? `Copia restaurada. Faltan en este teléfono: ${formatTrackCount(
-              restored.missingCount,
-            )}.`
-          : 'Copia restaurada.',
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? `No se pudo restaurar la copia: ${error.message}`
-          : 'No se pudo restaurar la copia de seguridad.',
-      );
-    }
-  }
-
   return {
-    tracks,
-    tracksById,
-    playlists,
-    playlistTracksById,
-    recentTracks,
-    topTracks,
-    favoriteIds,
+    ...notices,
+    ...library,
+    ...history,
+    ...playlistState,
+    ...sound,
+    ...selection,
+    ...trackFiles,
     currentTrack,
     isPlaying,
     playerReady,
@@ -2308,92 +1330,26 @@ export function useMusicController({
     playbackSourceLabel,
     shuffleEnabled,
     repeatMode,
-    playbackRate,
-    equalizerSettings,
-    loadingLibrary,
-    permissionDenied,
-    permissionBlocked,
-    requestLibraryAccess,
-    hideShortAudio,
-    toggleHideShortAudio,
-    deviceFolders,
-    excludedFolders,
-    toggleFolderExcluded,
-    trackEdits,
-    editingTrack,
-    setEditingTrack,
-    saveTrackEdit,
-    selectedIds,
-    toggleSelected,
-    clearSelection,
-    selectedTracks,
     favoriteSelection,
     confirmDeleteSelection,
     addTracksToQueue,
-    addTracksToPlaylist,
-    levelVolume,
-    toggleLevelVolume,
-    crossfadeSeconds,
-    changeCrossfade,
     jumpBy,
-    setRingtone,
-    shareTrack,
-    exportLibraryBackup,
-    restoreLibraryBackup,
-    savingPlaylist,
     queueUpdating,
-    queueNotice,
-    errorMessage,
-    errorRetryAction,
-    setErrorMessage,
     pendingQueueRemoval,
     undoSecondsLeft,
-    playlistUndo,
-    undoPlaylistRemoval,
     queueTrackDialog,
     setQueueTrackDialog,
-    playlistNameDialog,
-    setPlaylistNameDialog,
-    playlistToDelete,
-    setPlaylistToDelete,
-    playlistDialogError,
-    setPlaylistDialogError,
-    trackPickerPlaylistId,
-    setTrackPickerPlaylistId,
-    draftPlaylistTrackIds,
-    playlistTrackSearch,
-    setPlaylistTrackSearch,
-    loadLibrary,
     rememberPlaybackPosition,
-    toggleFavorite,
     confirmDeleteTrack,
     seekToPosition,
-    changePlaybackRate,
-    updateEqualizerSettings,
-    changeEqualizerBand,
-    clearRecentPlayback,
     playTracks,
-    savePlaylistName,
-    confirmDeletePlaylist,
-    openPlaylistTrackPicker,
-    toggleDraftPlaylistTrack,
-    savePlaylistTracks,
-    removeTrackFromPlaylist,
-    movePlaylistTrack,
     saveQueueAsPlaylist,
     confirmClearQueue,
     togglePlayback,
     skipTrack,
     cycleRepeatMode,
-    showQueueNotice,
     toggleShuffle,
     addTrackToQueue,
-    addTrackToPlaylist,
-    importPlaylistFile,
-    exportPlaylistM3u,
-    importTrackLyrics,
-    getTrackLyrics,
-    deleteTrackLyrics,
     playQueueTrack,
     moveQueueTrack,
     removeQueueTrack,

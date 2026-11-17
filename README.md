@@ -85,8 +85,7 @@ desinstalar, y eso borra listas, favoritas e historial.
 ## Organización del código
 
 - `App.tsx`: estructura general: pantallas, mini-reproductor, pestañas y hojas.
-- `src/state/useMusicController.ts`: toda la lógica de biblioteca, cola y listas,
-  sin interfaz. `src/state/AppContext.tsx`: navegación y estado compartido.
+- `src/state/AppContext.tsx`: navegación y estado compartido.
 - `src/screens/`: Inicio, Buscar, Biblioteca, detalle y Ajustes.
 - `src/navigation/TabBar.tsx`: la barra de pestañas.
 - `src/player/`: lo común a todos los reproductores: la ventana, el
@@ -99,7 +98,14 @@ desinstalar, y eso borra listas, favoritas e historial.
   seis paletas), su reproductor y sus ayudantes. `src/themes/catalog.ts` decide
   qué temas hay y en qué orden. Cómo añadir uno: ver `AGENTS.md`.
 - `src/ui/`: componentes reutilizables.
-- `src/services/`: reproductor, sesión guardada y temporizador.
-- `src/native/` y `android/app/`: acceso a MediaStore y base de datos Room.
+- `src/state/`: lo que la app sabe y hace, sin interfaz. `useMusicController`
+  une las piezas de `src/state/music/` (biblioteca, listas, historial, sonido,
+  archivos y selección) y maneja la cola y la reproducción.
+- `src/domain/`: las reglas de la música, puras y con tests (copia de
+  seguridad, carpetas, listas M3U, letras, mezcla, orden y datos corregidos).
+- `src/services/playback/`: lo que corre aunque la app esté cerrada (el
+  servicio de reproducción, la sesión guardada y el temporizador).
+- `src/native/` y `android/app/`: el módulo nativo (`library/`), la base de
+  datos Room (`data/`), el widget (`widget/`) y Android Auto (`auto/`).
 - `android/kotlin-audio/`: copia local de KotlinAudio (licencia Apache 2.0, en su
   carpeta) con el ecualizador por software y correcciones de la cola.

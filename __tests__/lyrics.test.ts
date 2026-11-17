@@ -1,4 +1,4 @@
-import { currentLyricIndex, parseLrc } from '../src/utils/lyrics';
+import { currentLyricIndex, parseLrc } from '../src/domain/lyrics';
 
 test('parses synchronized LRC lines, multiple timestamps, and positive offsets', () => {
   const lines = parseLrc(
